@@ -33,7 +33,13 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow TermBridge to take photos for attachments"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

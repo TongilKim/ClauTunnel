@@ -108,6 +108,61 @@ export function InputBar({ disabled }: InputBarProps) {
     }
   };
 
+  const takePhoto = async () => {
+    try {
+      let permission = await ImagePicker.getCameraPermissionsAsync();
+
+      if (!permission.granted) {
+        if (permission.canAskAgain) {
+          permission = await ImagePicker.requestCameraPermissionsAsync();
+        }
+        if (!permission.granted) {
+          Alert.alert(
+            'Camera Access Required',
+            'Please enable camera access in your device settings to take photos.',
+          );
+          return;
+        }
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets[0]) {
+        setSelectedImages((prev) => [...prev, result.assets[0].uri]);
+      }
+    } catch (error) {
+      console.error('[InputBar] Take photo error:', error);
+      Alert.alert('Error', `Failed to open camera: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  const chooseFromLibrary = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          'Photo Library Access Required',
+          'Please enable photo library access in your device settings.',
+        );
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsMultipleSelection: true,
+        quality: 0.8,
+      });
+      if (!result.canceled) {
+        const uris = result.assets.map(asset => asset.uri);
+        setSelectedImages((prev) => [...prev, ...uris]);
+      }
+    } catch (error) {
+      console.error('[InputBar] Choose from library error:', error);
+      Alert.alert('Error', `Failed to open photo library: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
   const handleAttachment = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
@@ -117,35 +172,11 @@ export function InputBar({ disabled }: InputBarProps) {
       [
         {
           text: 'Take Photo',
-          onPress: async () => {
-            const permission = await ImagePicker.requestCameraPermissionsAsync();
-            if (permission.granted) {
-              const result = await ImagePicker.launchCameraAsync({
-                mediaTypes: ['images'],
-                quality: 0.8,
-              });
-              if (!result.canceled && result.assets[0]) {
-                setSelectedImages([...selectedImages, result.assets[0].uri]);
-              }
-            }
-          },
+          onPress: () => { takePhoto(); },
         },
         {
           text: 'Choose from Library',
-          onPress: async () => {
-            const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            if (permission.granted) {
-              const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ['images'],
-                allowsMultipleSelection: true,
-                quality: 0.8,
-              });
-              if (!result.canceled) {
-                const uris = result.assets.map(asset => asset.uri);
-                setSelectedImages([...selectedImages, ...uris]);
-              }
-            }
-          },
+          onPress: () => { chooseFromLibrary(); },
         },
         {
           text: 'Cancel',
