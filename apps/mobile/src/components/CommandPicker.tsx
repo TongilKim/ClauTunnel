@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -29,6 +29,17 @@ export function CommandPicker({
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const [search, setSearch] = useState('');
+  const inputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    if (visible) {
+      // Delay to let the modal animation finish before focusing
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [visible]);
 
   const filteredCommands = useMemo(() => {
     if (!search.trim()) {
@@ -100,6 +111,7 @@ export function CommandPicker({
           </Text>
 
           <TextInput
+            ref={inputRef}
             style={[styles.searchInput, isDark && styles.searchInputDark]}
             placeholder="Search commands..."
             placeholderTextColor={isDark ? '#6b7280' : '#9ca3af'}
