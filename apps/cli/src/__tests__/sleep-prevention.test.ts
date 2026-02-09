@@ -15,6 +15,13 @@ vi.mock('readline', () => ({
   })),
 }));
 
+// Mock fs
+vi.mock('fs', () => ({
+  readdirSync: vi.fn(),
+}));
+
+import { readdirSync } from 'fs';
+
 import {
   enableSleepPrevention,
   disableSleepPrevention,
@@ -22,6 +29,10 @@ import {
   stopCaffeinate,
   cleanup,
   isMacOS,
+  checkFullDiskAccess,
+  getFullDiskAccessStatus,
+  getTerminalAppName,
+  openFullDiskAccessSettings,
   type SleepPreventionState,
 } from '../utils/sleep-prevention.js';
 import { execSync, spawn } from 'child_process';
@@ -165,6 +176,205 @@ describe('Sleep Prevention', () => {
       expect(isMacOS()).toBe(false);
 
       Object.defineProperty(process, 'platform', { value: originalPlatform });
+    });
+  });
+
+  describe('checkFullDiskAccess', () => {
+    let originalPlatform: string;
+
+    beforeEach(() => {
+      originalPlatform = process.platform;
+    });
+
+    afterEach(() => {
+      Object.defineProperty(process, 'platform', { value: originalPlatform });
+    });
+
+    it('should return true on non-macOS platforms', () => {
+      Object.defineProperty(process, 'platform', { value: 'linux' });
+
+      expect(checkFullDiskAccess()).toBe(true);
+      expect(readdirSync).not.toHaveBeenCalled();
+    });
+
+    it('should return true on macOS when FDA is granted', () => {
+      Object.defineProperty(process, 'platform', { value: 'darwin' });
+      vi.mocked(readdirSync).mockReturnValue([]);
+
+      expect(checkFullDiskAccess()).toBe(true);
+    });
+
+    it('should attempt to read a TCC-protected directory on macOS', () => {
+      Object.defineProperty(process, 'platform', { value: 'darwin' });
+      vi.mocked(readdirSync).mockReturnValue([]);
+
+      checkFullDiskAccess();
+
+      expect(readdirSync).toHaveBeenCalledTimes(1);
+      const calledPath = vi.mocked(readdirSync).mock.calls[0][0] as string;
+      expect(calledPath).toContain('Library/Safari');
+    });
+
+    it('should return false on macOS when FDA is not granted (access denied)', () => {
+      Object.defineProperty(process, 'platform', { value: 'darwin' });
+      vi.mocked(readdirSync).mockImplementation(() => {
+        throw new Error('EPERM: operation not permitted');
+      });
+
+      expect(checkFullDiskAccess()).toBe(false);
+    });
+
+    it('should return false on macOS for any filesystem error', () => {
+      Object.defineProperty(process, 'platform', { value: 'darwin' });
+      vi.mocked(readdirSync).mockImplementation(() => {
+        throw new Error('EACCES: permission denied');
+      });
+
+      expect(checkFullDiskAccess()).toBe(false);
+    });
+  });
+
+  describe('getFullDiskAccessStatus', () => {
+    it('should return enabled status with short message when FDA is granted', () => {
+      const status = getFullDiskAccessStatus(true);
+
+      expect(status.enabled).toBe(true);
+      expect(status.label).toBe('Enabled');
+    });
+
+    it('should return disabled status with detailed warning when FDA is not granted', () => {
+      const status = getFullDiskAccessStatus(false);
+
+      expect(status.enabled).toBe(false);
+      expect(status.label).toBe('Not enabled');
+      expect(status.warning).toBeDefined();
+      expect(status.warning).toContain('permission dialogs');
+      expect(status.warning).toContain('mobile app');
+      expect(status.warning).toContain('System Settings');
+      expect(status.warning).toContain('Privacy & Security');
+      expect(status.warning).toContain('Full Disk Access');
+    });
+
+    it('should include instructions to enable FDA in warning', () => {
+      const status = getFullDiskAccessStatus(false);
+
+      expect(status.warning).toContain('System Settings');
+      expect(status.warning).toContain('Full Disk Access');
+    });
+
+    it('should mention that operations may silently hang without FDA', () => {
+      const status = getFullDiskAccessStatus(false);
+
+      expect(status.warning).toContain('silently hang');
+    });
+
+    it('should include specific terminal app name in warning when provided', () => {
+      const status = getFullDiskAccessStatus(false, 'Visual Studio Code');
+
+      expect(status.warning).toContain('Visual Studio Code');
+    });
+
+    it('should use generic fallback in warning when no terminal app provided', () => {
+      const status = getFullDiskAccessStatus(false);
+
+      expect(status.warning).toContain('your terminal app');
+    });
+  });
+
+  describe('getTerminalAppName', () => {
+    let originalTermProgram: string | undefined;
+
+    beforeEach(() => {
+      originalTermProgram = process.env.TERM_PROGRAM;
+    });
+
+    afterEach(() => {
+      if (originalTermProgram === undefined) {
+        delete process.env.TERM_PROGRAM;
+      } else {
+        process.env.TERM_PROGRAM = originalTermProgram;
+      }
+    });
+
+    it('should return "Visual Studio Code" for vscode', () => {
+      process.env.TERM_PROGRAM = 'vscode';
+      expect(getTerminalAppName()).toBe('Visual Studio Code');
+    });
+
+    it('should return "Terminal" for Apple_Terminal', () => {
+      process.env.TERM_PROGRAM = 'Apple_Terminal';
+      expect(getTerminalAppName()).toBe('Terminal');
+    });
+
+    it('should return "iTerm2" for iTerm.app', () => {
+      process.env.TERM_PROGRAM = 'iTerm.app';
+      expect(getTerminalAppName()).toBe('iTerm2');
+    });
+
+    it('should return "Warp" for WarpTerminal', () => {
+      process.env.TERM_PROGRAM = 'WarpTerminal';
+      expect(getTerminalAppName()).toBe('Warp');
+    });
+
+    it('should return "Hyper" for Hyper', () => {
+      process.env.TERM_PROGRAM = 'Hyper';
+      expect(getTerminalAppName()).toBe('Hyper');
+    });
+
+    it('should return "your terminal app" when TERM_PROGRAM is not set', () => {
+      delete process.env.TERM_PROGRAM;
+      expect(getTerminalAppName()).toBe('your terminal app');
+    });
+
+    it('should return "your terminal app" for unknown TERM_PROGRAM values', () => {
+      process.env.TERM_PROGRAM = 'SomeUnknownTerminal';
+      expect(getTerminalAppName()).toBe('your terminal app');
+    });
+  });
+
+  describe('openFullDiskAccessSettings', () => {
+    let originalPlatform: string;
+
+    beforeEach(() => {
+      originalPlatform = process.platform;
+    });
+
+    afterEach(() => {
+      Object.defineProperty(process, 'platform', { value: originalPlatform });
+    });
+
+    it('should run open command with correct URL scheme on macOS', () => {
+      Object.defineProperty(process, 'platform', { value: 'darwin' });
+      vi.mocked(execSync).mockReturnValue(Buffer.from(''));
+
+      openFullDiskAccessSettings();
+
+      expect(execSync).toHaveBeenCalledWith(
+        'open "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"'
+      );
+    });
+
+    it('should return true on success', () => {
+      Object.defineProperty(process, 'platform', { value: 'darwin' });
+      vi.mocked(execSync).mockReturnValue(Buffer.from(''));
+
+      expect(openFullDiskAccessSettings()).toBe(true);
+    });
+
+    it('should return false when open command fails', () => {
+      Object.defineProperty(process, 'platform', { value: 'darwin' });
+      vi.mocked(execSync).mockImplementation(() => {
+        throw new Error('open failed');
+      });
+
+      expect(openFullDiskAccessSettings()).toBe(false);
+    });
+
+    it('should return false on non-macOS platforms', () => {
+      Object.defineProperty(process, 'platform', { value: 'linux' });
+
+      expect(openFullDiskAccessSettings()).toBe(false);
+      expect(execSync).not.toHaveBeenCalled();
     });
   });
 });

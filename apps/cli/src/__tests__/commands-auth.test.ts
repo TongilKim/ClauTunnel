@@ -22,6 +22,10 @@ vi.mock('../utils/sleep-prevention.js', () => ({
   startCaffeinate: vi.fn().mockReturnValue({ on: vi.fn() }),
   stopCaffeinate: vi.fn(),
   isMacOS: vi.fn().mockReturnValue(false),
+  checkFullDiskAccess: vi.fn().mockReturnValue(true),
+  getFullDiskAccessStatus: vi.fn().mockReturnValue({ enabled: true, label: 'Enabled' }),
+  getTerminalAppName: vi.fn().mockReturnValue('Terminal'),
+  openFullDiskAccessSettings: vi.fn().mockReturnValue(true),
 }));
 
 // Mock process.exit to prevent test from exiting

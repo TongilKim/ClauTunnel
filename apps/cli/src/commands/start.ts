@@ -14,7 +14,12 @@ import {
   startCaffeinate,
   stopCaffeinate,
   isMacOS,
+  checkFullDiskAccess,
+  getFullDiskAccessStatus,
+  getTerminalAppName,
+  openFullDiskAccessSettings,
   type SleepPreventionState,
+  type FullDiskAccessStatus,
 } from '../utils/sleep-prevention.js';
 import type { MachineCommand } from 'termbridge-shared';
 
@@ -93,6 +98,54 @@ export function createStartCommand(): Command {
           spinner.fail('Not authenticated');
           logger.error('Run "termbridge login" first.');
           process.exit(1);
+        }
+
+        // Check Full Disk Access (macOS only)
+        let fdaStatus: FullDiskAccessStatus | null = null;
+
+        if (isMacOS()) {
+          spinner.stop();
+
+          const terminalApp = getTerminalAppName();
+          let fdaEnabled = checkFullDiskAccess();
+          fdaStatus = getFullDiskAccessStatus(fdaEnabled, terminalApp);
+
+          if (fdaStatus.enabled) {
+            logger.info(`✓ Full Disk Access: ${fdaStatus.label}`);
+          } else {
+            logger.warn(`⚠ Full Disk Access: ${fdaStatus.label}`);
+            logger.warn('');
+            for (const line of fdaStatus.warning!.split('\n')) {
+              logger.warn(`  ${line}`);
+            }
+            logger.warn('');
+
+            const openSettings = await promptYesNo(
+              'Open Full Disk Access settings? [Y/n]: '
+            );
+
+            if (openSettings) {
+              openFullDiskAccessSettings();
+              logger.info('');
+              await promptYesNo(
+                'Press Enter after enabling Full Disk Access (or Enter to skip): '
+              );
+
+              // Recheck FDA status
+              fdaEnabled = checkFullDiskAccess();
+              fdaStatus = getFullDiskAccessStatus(fdaEnabled, terminalApp);
+
+              if (fdaStatus.enabled) {
+                logger.info('✓ Full Disk Access: Enabled');
+              } else {
+                logger.warn('Full Disk Access still not enabled. Continuing without it.');
+              }
+            }
+
+            logger.info('');
+          }
+
+          spinner.start();
         }
 
         // Handle sleep prevention (macOS only)
@@ -222,6 +275,13 @@ export function createStartCommand(): Command {
         logger.info('');
         logger.info('✓ TermBridge is ready!');
         logger.info(`  Machine: ${machine.name}`);
+        if (fdaStatus) {
+          if (fdaStatus.enabled) {
+            logger.info(`  Full Disk Access: ${fdaStatus.label}`);
+          } else {
+            logger.warn(`  Full Disk Access: ${fdaStatus.label}`);
+          }
+        }
         if (sleepState.caffeinateProcess) {
           logger.info(
             `  Sleep prevention: ${sleepState.pmsetEnabled ? 'Lid-closed mode' : 'Basic mode'}`
