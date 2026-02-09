@@ -122,6 +122,15 @@ export class Daemon extends EventEmitter {
         process.stdout.write('\n> ');
       }
 
+      // Broadcast completion to mobile so it knows Claude is done
+      if (this.realtimeClient) {
+        try {
+          await this.realtimeClient.broadcastComplete();
+        } catch {
+          // Silently handle broadcast errors
+        }
+      }
+
       // Broadcast real SDK commands (including custom skills) after first query completion
       // This updates the fallback commands with the full list from the SDK
       if (!this.sdkCommandsBroadcast && this.realtimeClient) {

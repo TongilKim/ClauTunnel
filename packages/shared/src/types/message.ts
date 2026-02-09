@@ -41,7 +41,8 @@ export type RealtimeMessageType =
   | 'user-question' // Claude is asking the user a question with options
   | 'user-answer' // User's answer to a question
   | 'permission-request' // SDK is asking for tool permission
-  | 'permission-response'; // User's response to permission request
+  | 'permission-response' // User's response to permission request
+  | 'complete'; // Claude has finished responding (query complete)
 
 export type InteractiveCommandType =
   | 'config'

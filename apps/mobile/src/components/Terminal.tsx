@@ -263,7 +263,7 @@ function TypingIndicator({ isDark }: TypingIndicatorProps) {
         <View style={[styles.typingBubble, isDark && styles.typingBubbleDark]}>
           <ActivityIndicator size="small" color={isDark ? '#9ca3af' : '#6b7280'} />
           <Text style={[styles.typingText, isDark && styles.typingTextDark]}>
-            Claude is thinking...
+            Claude is working...
           </Text>
         </View>
       </View>

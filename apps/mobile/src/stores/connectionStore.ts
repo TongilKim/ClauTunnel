@@ -235,6 +235,12 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
           return;
         }
 
+        // Handle complete - Claude has finished responding
+        if (message.type === 'complete') {
+          set({ isTyping: false });
+          return;
+        }
+
         // Handle resume-history - load messages from a previous session
         if (message.type === 'resume-history' && message.historySessionId) {
           // Fetch messages from the resumed session and prepend to current messages
@@ -268,12 +274,11 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
             (m) => m.seq === message.seq && m.type === message.type
           );
           if (isDuplicate) {
-            return { isTyping: false };
+            return {};
           }
           return {
             messages: [...state.messages, message],
             lastSeq: message.seq,
-            isTyping: false,
           };
         });
       });
