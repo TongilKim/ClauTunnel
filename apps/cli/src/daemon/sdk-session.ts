@@ -438,7 +438,6 @@ export class SdkSession extends EventEmitter {
     const coreModels: ModelInfo[] = [
       { value: 'default', displayName: 'Default (recommended)', description: 'Use the default model (currently Sonnet 4.5)' },
       { value: 'opus', displayName: 'Opus', description: 'Opus 4.6 · Most capable for complex work' },
-      { value: 'opus[1m]', displayName: 'Opus (1M context)', description: 'Opus 4.6 for long sessions' },
       { value: 'haiku', displayName: 'Haiku', description: 'Haiku 4.5 · Fastest for quick answers' },
       { value: 'sonnet', displayName: 'Sonnet', description: 'Sonnet 4.5 · Best for everyday tasks' },
     ];

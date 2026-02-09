@@ -220,9 +220,9 @@ describe('SdkSession', () => {
     it('should return fallback models when no query is active', async () => {
       const models = await sdkSession.getSupportedModels();
 
-      expect(models.length).toBe(5);
+      expect(models.length).toBe(4);
       expect(models[0].value).toBe('default');
-      expect(models.map(m => m.value)).toEqual(['default', 'opus', 'opus[1m]', 'haiku', 'sonnet']);
+      expect(models.map(m => m.value)).toEqual(['default', 'opus', 'haiku', 'sonnet']);
     });
 
     it('should cache SDK models after first fetch from SDK', async () => {
@@ -265,7 +265,7 @@ describe('SdkSession', () => {
     it('should return cached SDK models after clearHistory resets session state', async () => {
       // First: no query, no cache — should return fallback
       const fallbackModels = await sdkSession.getSupportedModels();
-      expect(fallbackModels.length).toBe(5);
+      expect(fallbackModels.length).toBe(4);
       expect(fallbackModels[0].value).toBe('default');
 
       // Now set up a query that returns SDK models
@@ -323,7 +323,7 @@ describe('SdkSession', () => {
       await sdkSession.sendPrompt('Hello');
       const models = await sdkSession.getSupportedModels();
 
-      expect(models.length).toBe(5);
+      expect(models.length).toBe(4);
       expect(models[0].value).toBe('default');
     });
 
