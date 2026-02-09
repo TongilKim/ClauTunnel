@@ -220,51 +220,385 @@ describe('SdkSession', () => {
     it('should return fallback models when no query is active', async () => {
       const models = await sdkSession.getSupportedModels();
 
-      expect(models.length).toBe(3);
+      expect(models.length).toBe(5);
+      expect(models[0].value).toBe('default');
+      expect(models.map(m => m.value)).toEqual(['default', 'opus', 'opus[1m]', 'haiku', 'sonnet']);
+    });
+
+    it('should cache SDK models after first fetch from SDK', async () => {
+      const sdkModels: ModelInfo[] = [
+        { value: 'default', displayName: 'Default (recommended)', description: 'Use the default model' },
+        { value: 'opus', displayName: 'Opus', description: 'Opus 4.6' },
+        { value: 'sonnet', displayName: 'Sonnet', description: 'Sonnet 4.5' },
+      ];
+
+      const mockSupportedModels = vi.fn().mockResolvedValue(sdkModels);
+      mockedQuery.mockImplementation(() => {
+        const queryObj = (async function* () {
+          yield {
+            type: 'system',
+            subtype: 'init',
+            session_id: 'test-session-123',
+          };
+          yield { type: 'result', result: 'done' };
+        })();
+        (queryObj as any).setMaxThinkingTokens = vi.fn();
+        (queryObj as any).supportedModels = mockSupportedModels;
+        (queryObj as any).supportedCommands = vi.fn().mockResolvedValue([]);
+        return queryObj as any;
+      });
+
+      // Create a query so currentQuery is set
+      await sdkSession.sendPrompt('Hello');
+
+      // First call — fetches from SDK and caches
+      const models = await sdkSession.getSupportedModels();
+      expect(models).toEqual(sdkModels);
+      expect(mockSupportedModels).toHaveBeenCalledTimes(1);
+
+      // Second call — should use cache, not call SDK again
+      const models2 = await sdkSession.getSupportedModels();
+      expect(models2).toEqual(sdkModels);
+      expect(mockSupportedModels).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return cached SDK models after clearHistory resets session state', async () => {
+      // First: no query, no cache — should return fallback
+      const fallbackModels = await sdkSession.getSupportedModels();
+      expect(fallbackModels.length).toBe(5);
+      expect(fallbackModels[0].value).toBe('default');
+
+      // Now set up a query that returns SDK models
+      const sdkModels: ModelInfo[] = [
+        { value: 'default', displayName: 'Default', description: 'Default model' },
+        { value: 'opus', displayName: 'Opus', description: 'Opus 4.6' },
+      ];
+
+      mockedQuery.mockImplementation(() => {
+        const queryObj = (async function* () {
+          yield {
+            type: 'system',
+            subtype: 'init',
+            session_id: 'test-session-123',
+          };
+          yield { type: 'result', result: 'done' };
+        })();
+        (queryObj as any).setMaxThinkingTokens = vi.fn();
+        (queryObj as any).supportedModels = vi.fn().mockResolvedValue(sdkModels);
+        (queryObj as any).supportedCommands = vi.fn().mockResolvedValue([]);
+        return queryObj as any;
+      });
+
+      await sdkSession.sendPrompt('Hello');
+
+      // Fetch and cache SDK models
+      const cachedModels = await sdkSession.getSupportedModels();
+      expect(cachedModels).toEqual(sdkModels);
+
+      // clearHistory resets sessionId and history, but cache persists
+      sdkSession.clearHistory();
+
+      // Should still return cached SDK models, not fallback
+      const modelsAfterClear = await sdkSession.getSupportedModels();
+      expect(modelsAfterClear).toEqual(sdkModels);
+    });
+
+    it('should return fallback models when SDK supportedModels() fails', async () => {
+      const mockSupportedModels = vi.fn().mockRejectedValue(new Error('SDK error'));
+      mockedQuery.mockImplementation(() => {
+        const queryObj = (async function* () {
+          yield {
+            type: 'system',
+            subtype: 'init',
+            session_id: 'test-session-123',
+          };
+          yield { type: 'result', result: 'done' };
+        })();
+        (queryObj as any).setMaxThinkingTokens = vi.fn();
+        (queryObj as any).supportedModels = mockSupportedModels;
+        (queryObj as any).supportedCommands = vi.fn().mockResolvedValue([]);
+        return queryObj as any;
+      });
+
+      await sdkSession.sendPrompt('Hello');
+      const models = await sdkSession.getSupportedModels();
+
+      expect(models.length).toBe(5);
       expect(models[0].value).toBe('default');
     });
 
-    it('should clear sessionId when model changes to force new session', async () => {
-      // Establish a session first
-      mockedQuery.mockImplementation(async function* () {
-        yield {
-          type: 'system',
-          subtype: 'init',
-          session_id: 'test-session-123',
-        };
-        yield { type: 'result', result: 'done' };
-      } as any);
+    it('should not emit model event when setting same model', async () => {
+      const modelHandler = vi.fn();
+      sdkSession.on('model', modelHandler);
 
-      await sdkSession.sendPrompt('First message');
+      await sdkSession.setModel('default');
+
+      expect(modelHandler).not.toHaveBeenCalled();
+    });
+
+    it('should call SDK query.setModel() when query is active', async () => {
+      const mockSetModel = vi.fn().mockResolvedValue(undefined);
+      mockedQuery.mockImplementation(() => {
+        const queryObj = (async function* () {
+          yield {
+            type: 'system',
+            subtype: 'init',
+            session_id: 'test-session-123',
+          };
+          yield { type: 'result', result: 'done' };
+        })();
+        (queryObj as any).setModel = mockSetModel;
+        (queryObj as any).setMaxThinkingTokens = vi.fn();
+        (queryObj as any).supportedModels = vi.fn().mockResolvedValue([]);
+        (queryObj as any).supportedCommands = vi.fn().mockResolvedValue([]);
+        return queryObj as any;
+      });
+
+      // Create an active query
+      await sdkSession.sendPrompt('Hello');
+
+      // Now change model — should use SDK's setModel
+      await sdkSession.setModel('opus');
+
+      expect(mockSetModel).toHaveBeenCalledWith('opus');
+      // Session should NOT be nulled since SDK handled it
+      expect(sdkSession.getSessionId()).toBe('test-session-123');
+    });
+
+    it('should fall back to session-null when SDK query.setModel() fails', async () => {
+      const mockSetModel = vi.fn().mockRejectedValue(new Error('not supported'));
+      mockedQuery.mockImplementation(() => {
+        const queryObj = (async function* () {
+          yield {
+            type: 'system',
+            subtype: 'init',
+            session_id: 'test-session-123',
+          };
+          yield { type: 'result', result: 'done' };
+        })();
+        (queryObj as any).setModel = mockSetModel;
+        (queryObj as any).setMaxThinkingTokens = vi.fn();
+        (queryObj as any).supportedModels = vi.fn().mockResolvedValue([]);
+        (queryObj as any).supportedCommands = vi.fn().mockResolvedValue([]);
+        return queryObj as any;
+      });
+
+      await sdkSession.sendPrompt('Hello');
       expect(sdkSession.getSessionId()).toBe('test-session-123');
 
-      // Change model - should clear session
+      // SDK setModel fails — should fall back to clearing session
+      await sdkSession.setModel('opus');
+
+      expect(mockSetModel).toHaveBeenCalledWith('opus');
+      expect(sdkSession.getSessionId()).toBeNull();
+    });
+
+    it('should clear sessionId when model changes with no active query', async () => {
+      // setModel before any sendPrompt — no currentQuery exists
+      // Manually set a sessionId to simulate a previous session
+      sdkSession.resumeSession('test-session-123');
+      expect(sdkSession.getSessionId()).toBe('test-session-123');
+
+      // Change model — no currentQuery, should clear session
       await sdkSession.setModel('opus');
       expect(sdkSession.getSessionId()).toBeNull();
     });
 
-    it('should not resume session after model change', async () => {
-      // Establish a session first
-      mockedQuery.mockImplementation(async function* () {
-        yield {
-          type: 'system',
-          subtype: 'init',
-          session_id: 'test-session-123',
-        };
-        yield { type: 'result', result: 'done' };
-      } as any);
+    it('should preserve session and resume after successful SDK setModel', async () => {
+      const mockSetModel = vi.fn().mockResolvedValue(undefined);
+      mockedQuery.mockImplementation(() => {
+        const queryObj = (async function* () {
+          yield {
+            type: 'system',
+            subtype: 'init',
+            session_id: 'test-session-123',
+          };
+          yield { type: 'result', result: 'done' };
+        })();
+        (queryObj as any).setModel = mockSetModel;
+        (queryObj as any).setMaxThinkingTokens = vi.fn();
+        (queryObj as any).supportedModels = vi.fn().mockResolvedValue([]);
+        (queryObj as any).supportedCommands = vi.fn().mockResolvedValue([]);
+        return queryObj as any;
+      });
 
       await sdkSession.sendPrompt('First message');
 
-      // Change model
+      // Change model — SDK setModel succeeds, session preserved
+      await sdkSession.setModel('opus');
+      expect(mockSetModel).toHaveBeenCalledWith('opus');
+      expect(sdkSession.getSessionId()).toBe('test-session-123');
+
+      // Send another message — should resume the same session
+      await sdkSession.sendPrompt('Second message');
+
+      const secondCall = mockedQuery.mock.calls[1][0];
+      expect(secondCall.options.resume).toBe('test-session-123');
+      expect(secondCall.options.model).toBe('opus');
+    });
+
+    it('should not resume session after model change when SDK setModel fails', async () => {
+      const mockSetModel = vi.fn().mockRejectedValue(new Error('not supported'));
+      mockedQuery.mockImplementation(() => {
+        const queryObj = (async function* () {
+          yield {
+            type: 'system',
+            subtype: 'init',
+            session_id: 'test-session-123',
+          };
+          yield { type: 'result', result: 'done' };
+        })();
+        (queryObj as any).setModel = mockSetModel;
+        (queryObj as any).setMaxThinkingTokens = vi.fn();
+        (queryObj as any).supportedModels = vi.fn().mockResolvedValue([]);
+        (queryObj as any).supportedCommands = vi.fn().mockResolvedValue([]);
+        return queryObj as any;
+      });
+
+      await sdkSession.sendPrompt('First message');
+
+      // Change model — SDK setModel fails, falls back to clearing session
       await sdkSession.setModel('opus');
 
-      // Send another message - should NOT have resume option
+      // Send another message — should NOT resume
       await sdkSession.sendPrompt('Second message');
 
       const secondCall = mockedQuery.mock.calls[1][0];
       expect(secondCall.options.resume).toBeUndefined();
       expect(secondCall.options.model).toBe('opus');
+    });
+
+    it('should prepend conversation context to next prompt after model change clears session', async () => {
+      // First: establish a conversation with history
+      mockedQuery.mockImplementation(() => {
+        const queryObj = (async function* () {
+          yield {
+            type: 'system',
+            subtype: 'init',
+            session_id: 'test-session-123',
+          };
+          yield {
+            type: 'assistant',
+            message: {
+              content: [{ type: 'text', text: 'I can help with that.' }],
+            },
+          };
+          yield { type: 'result', result: 'done' };
+        })();
+        (queryObj as any).setMaxThinkingTokens = vi.fn();
+        (queryObj as any).supportedModels = vi.fn().mockResolvedValue([]);
+        (queryObj as any).supportedCommands = vi.fn().mockResolvedValue([]);
+        return queryObj as any;
+      });
+
+      await sdkSession.sendPrompt('Help me with code');
+
+      // Change model with no active SDK setModel — falls back to clearing session
+      // (mock query has no setModel method, so it will throw and clear session)
+      await sdkSession.setModel('opus');
+      expect(sdkSession.getSessionId()).toBeNull();
+
+      // Capture the prompt sent to the next query call
+      let capturedPrompt: any;
+      mockedQuery.mockImplementation((args: any) => {
+        capturedPrompt = args;
+        const queryObj = (async function* () {
+          yield {
+            type: 'system',
+            subtype: 'init',
+            session_id: 'new-session-456',
+          };
+          yield { type: 'result', result: 'done' };
+        })();
+        (queryObj as any).setMaxThinkingTokens = vi.fn();
+        (queryObj as any).supportedModels = vi.fn().mockResolvedValue([]);
+        (queryObj as any).supportedCommands = vi.fn().mockResolvedValue([]);
+        return queryObj as any;
+      });
+
+      await sdkSession.sendPrompt('Continue helping');
+
+      // The prompt should NOT have a resume option (session was cleared)
+      expect(capturedPrompt.options.resume).toBeUndefined();
+      expect(capturedPrompt.options.model).toBe('opus');
+
+      // Consume the async iterable to get the user message
+      const promptIterable = capturedPrompt.prompt;
+      const messages: any[] = [];
+      for await (const msg of promptIterable) {
+        messages.push(msg);
+      }
+
+      // The user message content should include conversation context prefix
+      const textBlock = messages[0].message.content.find((b: any) => b.type === 'text');
+      expect(textBlock.text).toContain('[Previous conversation context');
+      expect(textBlock.text).toContain('User: Help me with code');
+      expect(textBlock.text).toContain('Assistant: I can help with that.');
+      expect(textBlock.text).toContain('Continue helping');
+    });
+
+    it('should NOT prepend context when SDK setModel succeeds (session preserved)', async () => {
+      const mockSetModel = vi.fn().mockResolvedValue(undefined);
+      mockedQuery.mockImplementation(() => {
+        const queryObj = (async function* () {
+          yield {
+            type: 'system',
+            subtype: 'init',
+            session_id: 'test-session-123',
+          };
+          yield {
+            type: 'assistant',
+            message: {
+              content: [{ type: 'text', text: 'Sure thing.' }],
+            },
+          };
+          yield { type: 'result', result: 'done' };
+        })();
+        (queryObj as any).setModel = mockSetModel;
+        (queryObj as any).setMaxThinkingTokens = vi.fn();
+        (queryObj as any).supportedModels = vi.fn().mockResolvedValue([]);
+        (queryObj as any).supportedCommands = vi.fn().mockResolvedValue([]);
+        return queryObj as any;
+      });
+
+      await sdkSession.sendPrompt('Hello');
+
+      // SDK setModel succeeds — session preserved, no context transfer needed
+      await sdkSession.setModel('opus');
+      expect(sdkSession.getSessionId()).toBe('test-session-123');
+
+      // Capture next prompt
+      let capturedPrompt: any;
+      mockedQuery.mockImplementation((args: any) => {
+        capturedPrompt = args;
+        const queryObj = (async function* () {
+          yield {
+            type: 'system',
+            subtype: 'init',
+            session_id: 'test-session-123',
+          };
+          yield { type: 'result', result: 'done' };
+        })();
+        (queryObj as any).setMaxThinkingTokens = vi.fn();
+        (queryObj as any).supportedModels = vi.fn().mockResolvedValue([]);
+        (queryObj as any).supportedCommands = vi.fn().mockResolvedValue([]);
+        return queryObj as any;
+      });
+
+      await sdkSession.sendPrompt('Next question');
+
+      // Should resume and NOT have context prefix
+      expect(capturedPrompt.options.resume).toBe('test-session-123');
+
+      const promptIterable = capturedPrompt.prompt;
+      const messages: any[] = [];
+      for await (const msg of promptIterable) {
+        messages.push(msg);
+      }
+
+      const textBlock = messages[0].message.content.find((b: any) => b.type === 'text');
+      expect(textBlock.text).not.toContain('[Previous conversation context');
+      expect(textBlock.text).toBe('Next question');
     });
 
     it('should track conversation history', async () => {

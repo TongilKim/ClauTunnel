@@ -34,6 +34,7 @@ export class SdkSession extends EventEmitter {
   private currentPermissionMode: PermissionMode;
   private currentQuery: Query | null = null;
   private cachedCommands: SlashCommand[] | null = null;
+  private cachedModels: ModelInfo[] | null = null;
   private currentModel: string = 'default';
   private conversationHistory: ConversationMessage[] = [];
   private pendingContextTransfer: boolean = false;
@@ -396,13 +397,25 @@ export class SdkSession extends EventEmitter {
   }
 
   async setModel(model: string): Promise<void> {
-    // If model actually changed and we have an active session, prepare for context transfer
-    if (model !== this.currentModel && this.sessionId) {
+    if (model === this.currentModel) return;
+
+    this.currentModel = model;
+
+    // If there's an active query, use SDK's runtime setModel() to switch mid-session
+    if (this.currentQuery) {
+      try {
+        await this.currentQuery.setModel(model);
+      } catch {
+        // If runtime setModel fails, fall back to creating a new session on next prompt
+        this.sessionId = null;
+        this.pendingContextTransfer = true;
+      }
+    } else if (this.sessionId) {
+      // No active query - will take effect on next sendPrompt() via Options.model
       this.sessionId = null;
       this.pendingContextTransfer = true;
     }
 
-    this.currentModel = model;
     this.emit('model', model);
   }
 
@@ -421,12 +434,19 @@ export class SdkSession extends EventEmitter {
   }
 
   async getSupportedModels(): Promise<ModelInfo[]> {
-    // Core models that should always be available
+    // Fallback models matching SDK response format
     const coreModels: ModelInfo[] = [
-      { value: 'default', displayName: 'Default (recommended)', description: 'Balanced performance (default)' },
-      { value: 'opus', displayName: 'Opus 4', description: 'Most capable, highest quality' },
-      { value: 'haiku', displayName: 'Haiku', description: 'Fast and efficient' },
+      { value: 'default', displayName: 'Default (recommended)', description: 'Use the default model (currently Sonnet 4.5)' },
+      { value: 'opus', displayName: 'Opus', description: 'Opus 4.6 · Most capable for complex work' },
+      { value: 'opus[1m]', displayName: 'Opus (1M context)', description: 'Opus 4.6 for long sessions' },
+      { value: 'haiku', displayName: 'Haiku', description: 'Haiku 4.5 · Fastest for quick answers' },
+      { value: 'sonnet', displayName: 'Sonnet', description: 'Sonnet 4.5 · Best for everyday tasks' },
     ];
+
+    // Return cached SDK models if available
+    if (this.cachedModels) {
+      return this.cachedModels;
+    }
 
     if (!this.currentQuery) {
       return coreModels;
@@ -435,29 +455,14 @@ export class SdkSession extends EventEmitter {
     try {
       const sdkModels = await this.currentQuery.supportedModels();
       if (sdkModels && sdkModels.length > 0) {
-        // Map SDK models - SDK returns objects with value, displayName, description
         const mappedModels = sdkModels.map((m: { value?: string; displayName?: string; description?: string }) => ({
           value: m.value || '',
           displayName: m.displayName || m.value || '',
           description: m.description || '',
         }));
 
-        // Ensure core models are included (they might be missing from SDK response)
-        const existingValues = new Set(mappedModels.map(m => m.value));
-        for (const coreModel of coreModels) {
-          // Skip 'default' if SDK provides it or a sonnet variant
-          if (coreModel.value === 'default') {
-            const hasDefault = existingValues.has('default') ||
-              mappedModels.some(m => m.value.includes('sonnet'));
-            if (hasDefault) continue;
-          }
-          // Add core model if not present
-          if (!existingValues.has(coreModel.value) &&
-              !mappedModels.some(m => m.value.includes(coreModel.value))) {
-            mappedModels.push(coreModel);
-          }
-        }
-
+        // Cache for future calls (including new sessions before a query is active)
+        this.cachedModels = mappedModels;
         return mappedModels;
       }
     } catch {
