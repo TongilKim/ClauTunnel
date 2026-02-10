@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { supabase } from '../services/supabase';
-import type { Session, Machine, PresencePayload, MachineCommand } from 'termbridge-shared';
+import type { Session, Machine, MachineCommand } from 'termbridge-shared';
 import { REALTIME_CHANNELS } from 'termbridge-shared';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import { setupPresenceHandlers } from '../utils/presenceUtils';
 
 interface SessionStoreState {
   sessions: Session[];
@@ -284,47 +285,19 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
       const channelName = REALTIME_CHANNELS.sessionPresence(session.id);
       const channel = supabase.channel(channelName);
 
-      channel
-        .on('presence', { event: 'sync' }, () => {
-          const state = channel.presenceState();
-          const entries = Object.values(state);
-          const isCliOnline = entries.some((presences) =>
-            (presences as PresencePayload[]).some((p) => p.type === 'cli')
-          );
-          set((s) => {
-            // Preserve optimistic true on empty initial sync
-            // (CLI presence may not have propagated yet)
-            if (!isCliOnline && entries.length === 0 && s.sessionOnlineStatus[session.id] === true) {
-              return s;
-            }
-            return {
-              sessionOnlineStatus: { ...s.sessionOnlineStatus, [session.id]: isCliOnline },
-            };
-          });
-        })
-        .on('presence', { event: 'join' }, ({ newPresences }) => {
-          const cliJoined = (newPresences as PresencePayload[]).some((p) => p.type === 'cli');
-          if (cliJoined) {
-            set((s) => ({
-              sessionOnlineStatus: { ...s.sessionOnlineStatus, [session.id]: true },
-            }));
+      setupPresenceHandlers(channel, session.id, (entityId, isOnline, entries) => {
+        set((s) => {
+          // Preserve optimistic true on empty initial sync
+          // (CLI presence may not have propagated yet)
+          if (!isOnline && entries.length === 0 && s.sessionOnlineStatus[entityId] === true) {
+            return s;
           }
-        })
-        .on('presence', { event: 'leave' }, ({ leftPresences }) => {
-          const cliLeft = (leftPresences as PresencePayload[]).some((p) => p.type === 'cli');
-          if (cliLeft) {
-            // Re-check if any CLI is still present
-            const state = channel.presenceState();
-            const isCliOnline = Object.values(state).some((presences) =>
-              (presences as PresencePayload[]).some((p) => p.type === 'cli')
-            );
-            set((s) => ({
-              sessionOnlineStatus: { ...s.sessionOnlineStatus, [session.id]: isCliOnline },
-            }));
-          }
+          return {
+            sessionOnlineStatus: { ...s.sessionOnlineStatus, [entityId]: isOnline },
+          };
         });
+      });
 
-      // Subscribe to presence channel - event handlers above update state
       channel.subscribe();
 
       presenceChannels.set(session.id, channel);
@@ -369,36 +342,11 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
       const channelName = REALTIME_CHANNELS.machinePresence(machineId);
       const channel = supabase.channel(channelName);
 
-      channel
-        .on('presence', { event: 'sync' }, () => {
-          const state = channel.presenceState();
-          const isListenerOnline = Object.values(state).some((presences) =>
-            (presences as PresencePayload[]).some((p) => p.type === 'cli')
-          );
-          set((s) => ({
-            machineOnlineStatus: { ...s.machineOnlineStatus, [machineId]: isListenerOnline },
-          }));
-        })
-        .on('presence', { event: 'join' }, ({ newPresences }) => {
-          const cliJoined = (newPresences as PresencePayload[]).some((p) => p.type === 'cli');
-          if (cliJoined) {
-            set((s) => ({
-              machineOnlineStatus: { ...s.machineOnlineStatus, [machineId]: true },
-            }));
-          }
-        })
-        .on('presence', { event: 'leave' }, ({ leftPresences }) => {
-          const cliLeft = (leftPresences as PresencePayload[]).some((p) => p.type === 'cli');
-          if (cliLeft) {
-            const state = channel.presenceState();
-            const isListenerOnline = Object.values(state).some((presences) =>
-              (presences as PresencePayload[]).some((p) => p.type === 'cli')
-            );
-            set((s) => ({
-              machineOnlineStatus: { ...s.machineOnlineStatus, [machineId]: isListenerOnline },
-            }));
-          }
-        });
+      setupPresenceHandlers(channel, machineId, (entityId, isOnline) => {
+        set((s) => ({
+          machineOnlineStatus: { ...s.machineOnlineStatus, [entityId]: isOnline },
+        }));
+      });
 
       channel.subscribe();
       machinePresenceChannels.set(machineId, channel);

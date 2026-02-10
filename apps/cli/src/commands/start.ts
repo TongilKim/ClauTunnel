@@ -1,5 +1,4 @@
 import { Command } from 'commander';
-import { createClient } from '@supabase/supabase-js';
 import WebSocket from 'ws';
 import { Daemon } from '../daemon/daemon.js';
 import { MachineManager } from '../daemon/machine.js';
@@ -7,12 +6,12 @@ import { MachineRealtimeClient } from '../realtime/machine-client.js';
 import { Config, ConfigurationError } from '../utils/config.js';
 import { Logger } from '../utils/logger.js';
 import { Spinner } from '../utils/spinner.js';
+import { createSupabaseClient, restoreSession } from '../utils/supabase.js';
 import {
   promptYesNo,
   enableSleepPrevention,
-  disableSleepPrevention,
   startCaffeinate,
-  stopCaffeinate,
+  cleanup as cleanupSleep,
   isMacOS,
   checkFullDiskAccess,
   getFullDiskAccessStatus,
@@ -54,51 +53,23 @@ export function createStartCommand(): Command {
 
         spinner.start();
 
-        const supabaseUrl = config.getSupabaseUrl();
-        const supabaseKey = config.getSupabaseAnonKey();
-
-        const supabase = createClient(supabaseUrl, supabaseKey, {
-          realtime: {
-            params: {
-              eventsPerSecond: 10,
-            },
-            timeout: 30000,
-          },
-        });
+        const supabase = createSupabaseClient(
+          config.getSupabaseUrl(),
+          config.getSupabaseAnonKey(),
+          { realtime: true }
+        );
 
         // Restore session from stored tokens
-        const sessionTokens = config.getSessionTokens();
-        if (!sessionTokens) {
-          spinner.fail('Not authenticated');
-          logger.error('Run "termbridge login" first.');
-          process.exit(1);
-        }
-
         spinner.update('Authenticating...');
 
-        const { error: sessionError } = await supabase.auth.setSession({
-          access_token: sessionTokens.accessToken,
-          refresh_token: sessionTokens.refreshToken,
-        });
-
-        if (sessionError) {
-          spinner.fail('Session expired');
-          logger.error('Run "termbridge login" again.');
-          config.clearSessionTokens();
-          process.exit(1);
-        }
-
-        // Get current user
-        const {
-          data: { user },
-          error: authError,
-        } = await supabase.auth.getUser();
-
-        if (authError || !user) {
+        const session = await restoreSession(supabase, config);
+        if (!session) {
           spinner.fail('Not authenticated');
           logger.error('Run "termbridge login" first.');
           process.exit(1);
         }
+
+        const { user } = session;
 
         // Check Full Disk Access (macOS only)
         let fdaStatus: FullDiskAccessStatus | null = null;
@@ -193,12 +164,11 @@ export function createStartCommand(): Command {
         }
 
         // Cleanup helper
-        const cleanup = async () => {
-          stopCaffeinate(sleepState.caffeinateProcess);
+        const cleanup = () => {
           if (sleepState.pmsetEnabled) {
             console.log('Restoring sleep settings...');
-            disableSleepPrevention();
           }
+          cleanupSleep(sleepState);
         };
 
         // Handle process signals

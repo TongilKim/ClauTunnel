@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import type { SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
 import type { MachineCommand, PresencePayload } from 'termbridge-shared';
 import { REALTIME_CHANNELS } from 'termbridge-shared';
+import { subscribeWithTimeout } from './utils.js';
 
 export interface MachineRealtimeClientOptions {
   supabase: SupabaseClient;
@@ -22,42 +23,6 @@ export class MachineRealtimeClient extends EventEmitter {
   }
 
   async connect(): Promise<boolean> {
-    const SUBSCRIPTION_TIMEOUT = 10000;
-
-    const subscribeWithTimeout = (
-      channel: RealtimeChannel,
-      channelName: string
-    ): Promise<boolean> => {
-      return new Promise<boolean>((resolve) => {
-        const timeout = setTimeout(() => {
-          console.warn(
-            `[WARN] Realtime subscription timeout for ${channelName}.`
-          );
-          resolve(false);
-        }, SUBSCRIPTION_TIMEOUT);
-
-        channel.subscribe((status, err) => {
-          if (status === 'SUBSCRIBED') {
-            clearTimeout(timeout);
-            resolve(true);
-          } else if (
-            status === 'CHANNEL_ERROR' ||
-            status === 'CLOSED' ||
-            status === 'TIMED_OUT'
-          ) {
-            clearTimeout(timeout);
-            console.warn(
-              `[WARN] Channel ${channelName} ${status.toLowerCase()}.`
-            );
-            if (err) {
-              console.warn(`[WARN] Error details: ${err.message || err}`);
-            }
-            resolve(false);
-          }
-        });
-      });
-    };
-
     // Subscribe to input channel (receives commands from mobile)
     const inputChannelName = REALTIME_CHANNELS.machineInput(this.machineId);
     this.inputChannel = this.supabase.channel(inputChannelName);

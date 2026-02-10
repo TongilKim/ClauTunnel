@@ -1,66 +1,8 @@
 import { Command } from 'commander';
-import { createClient } from '@supabase/supabase-js';
-import * as readline from 'readline';
 import { Config, ConfigurationError } from '../utils/config.js';
 import { Logger } from '../utils/logger.js';
-
-function prompt(question: string): Promise<string> {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  return new Promise((resolve) => {
-    rl.question(question, (answer) => {
-      rl.close();
-      resolve(answer);
-    });
-  });
-}
-
-function promptHidden(question: string): Promise<string> {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  return new Promise((resolve) => {
-    process.stdout.write(question);
-
-    if (process.stdin.isTTY) {
-      process.stdin.setRawMode(true);
-    }
-
-    let password = '';
-
-    const onData = (char: Buffer) => {
-      const c = char.toString();
-
-      if (c === '\n' || c === '\r') {
-        process.stdin.removeListener('data', onData);
-        if (process.stdin.isTTY) {
-          process.stdin.setRawMode(false);
-        }
-        process.stdout.write('\n');
-        rl.close();
-        resolve(password);
-      } else if (c === '\u0003') {
-        // Ctrl+C
-        process.exit(0);
-      } else if (c === '\u007F' || c === '\b') {
-        // Backspace
-        if (password.length > 0) {
-          password = password.slice(0, -1);
-        }
-      } else {
-        password += c;
-      }
-    };
-
-    process.stdin.on('data', onData);
-    process.stdin.resume();
-  });
-}
+import { prompt, promptHidden } from '../utils/prompt.js';
+import { createSupabaseClient } from '../utils/supabase.js';
 
 export function createLoginCommand(): Command {
   const command = new Command('login');
@@ -72,10 +14,10 @@ export function createLoginCommand(): Command {
     try {
       config.requireConfiguration();
 
-      const supabaseUrl = config.getSupabaseUrl();
-      const supabaseKey = config.getSupabaseAnonKey();
-
-      const supabase = createClient(supabaseUrl, supabaseKey);
+      const supabase = createSupabaseClient(
+        config.getSupabaseUrl(),
+        config.getSupabaseAnonKey()
+      );
 
       const email = await prompt('Email: ');
       const password = await promptHidden('Password: ');

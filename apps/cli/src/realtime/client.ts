@@ -13,6 +13,7 @@ import type {
   PermissionRequestData,
 } from 'termbridge-shared';
 import { REALTIME_CHANNELS } from 'termbridge-shared';
+import { subscribeWithTimeout } from './utils.js';
 
 export interface RealtimeClientOptions {
   supabase: SupabaseClient;
@@ -46,52 +47,6 @@ export class RealtimeClient extends EventEmitter {
     this.inputChannel.on('broadcast', { event: 'input' }, (payload) => {
       this.emit('input', payload.payload as RealtimeMessage);
     });
-
-    const SUBSCRIPTION_TIMEOUT = 10000; // 10 second timeout
-
-    const subscribeWithTimeout = (
-      channel: RealtimeChannel,
-      channelName: string
-    ): Promise<boolean> => {
-      return new Promise<boolean>((resolve) => {
-        const timeout = setTimeout(() => {
-          // Resolve with warning instead of rejecting - allows CLI to work without realtime
-          console.warn(
-            `[WARN] Realtime subscription timeout for ${channelName}. Mobile sync disabled.`
-          );
-          resolve(false);
-        }, SUBSCRIPTION_TIMEOUT);
-
-        channel.subscribe((status, err) => {
-          if (status === 'SUBSCRIBED') {
-            clearTimeout(timeout);
-            resolve(true);
-          } else if (status === 'CHANNEL_ERROR') {
-            clearTimeout(timeout);
-            // Resolve with warning instead of rejecting
-            console.warn(
-              `[WARN] Failed to subscribe to ${channelName}. Mobile sync disabled.`
-            );
-            if (err) {
-              console.warn(`[WARN] Error details: ${err.message || err}`);
-            }
-            resolve(false);
-          } else if (status === 'CLOSED') {
-            clearTimeout(timeout);
-            console.warn(
-              `[WARN] Channel ${channelName} closed. Mobile sync disabled.`
-            );
-            resolve(false);
-          } else if (status === 'TIMED_OUT') {
-            clearTimeout(timeout);
-            console.warn(
-              `[WARN] Channel ${channelName} timed out. Check your network connection.`
-            );
-            resolve(false);
-          }
-        });
-      });
-    };
 
     const results = await Promise.all([
       subscribeWithTimeout(this.outputChannel, 'output'),

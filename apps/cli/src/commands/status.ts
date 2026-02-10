@@ -1,8 +1,8 @@
 import { Command } from 'commander';
-import { createClient } from '@supabase/supabase-js';
 import { Config } from '../utils/config.js';
 import { Logger } from '../utils/logger.js';
 import { MachineManager } from '../daemon/machine.js';
+import { createSupabaseClient, restoreSession } from '../utils/supabase.js';
 
 export function createStatusCommand(): Command {
   const command = new Command('status');
@@ -14,42 +14,20 @@ export function createStatusCommand(): Command {
       const logger = new Logger();
 
       try {
-        const supabaseUrl = config.getSupabaseUrl();
-        const supabaseKey = config.getSupabaseAnonKey();
-
-        const supabase = createClient(supabaseUrl, supabaseKey);
+        const supabase = createSupabaseClient(
+          config.getSupabaseUrl(),
+          config.getSupabaseAnonKey()
+        );
 
         // Restore session from stored tokens
-        const sessionTokens = config.getSessionTokens();
-        if (!sessionTokens) {
+        const session = await restoreSession(supabase, config);
+        if (!session) {
           logger.info('Status: Not authenticated');
           logger.info('Run "termbridge login" to authenticate');
           return;
         }
 
-        const { error: sessionError } = await supabase.auth.setSession({
-          access_token: sessionTokens.accessToken,
-          refresh_token: sessionTokens.refreshToken,
-        });
-
-        if (sessionError) {
-          logger.info('Status: Session expired');
-          logger.info('Run "termbridge login" to authenticate');
-          config.clearSessionTokens();
-          return;
-        }
-
-        // Get current user
-        const {
-          data: { user },
-          error: authError,
-        } = await supabase.auth.getUser();
-
-        if (authError || !user) {
-          logger.info('Status: Not authenticated');
-          logger.info('Run "termbridge login" to authenticate');
-          return;
-        }
+        const { user } = session;
 
         logger.info(`User: ${user.email}`);
 

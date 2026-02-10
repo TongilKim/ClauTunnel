@@ -62,30 +62,12 @@ describe('Message Types', () => {
       expect(message.seq).toBe(0);
     });
 
-    it('should include ping and pong message types', () => {
-      const pingMessage: RealtimeMessage = {
-        type: 'ping',
-        timestamp: Date.now(),
-        seq: 1,
-      };
-
-      const pongMessage: RealtimeMessage = {
-        type: 'pong',
-        timestamp: Date.now(),
-        seq: 2,
-      };
-
-      expect(pingMessage.type).toBe('ping');
-      expect(pongMessage.type).toBe('pong');
-
-      // Verify all valid types compile
+    it('should include all core message types', () => {
       const validTypes: RealtimeMessageType[] = [
         'output',
         'input',
         'error',
         'system',
-        'ping',
-        'pong',
       ];
       validTypes.forEach((type) => {
         const msg: RealtimeMessage = { type, timestamp: 0, seq: 0 };
@@ -108,8 +90,6 @@ describe('Message Types', () => {
         'input',
         'error',
         'system',
-        'ping',
-        'pong',
         'mode',
       ];
       expect(validTypes).toContain('mode');
