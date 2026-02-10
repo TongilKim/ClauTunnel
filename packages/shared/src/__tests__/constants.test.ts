@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { REALTIME_CHANNELS, NOTIFICATION_TYPES } from '../index';
+import { REALTIME_CHANNELS } from '../index';
 
 describe('Constants', () => {
   describe('REALTIME_CHANNELS', () => {
@@ -22,12 +22,4 @@ describe('Constants', () => {
     });
   });
 
-  describe('NOTIFICATION_TYPES', () => {
-    it('contains TASK_COMPLETE, ERROR, INPUT_REQUIRED, CONNECTION_LOST', () => {
-      expect(NOTIFICATION_TYPES.TASK_COMPLETE).toBe('task_complete');
-      expect(NOTIFICATION_TYPES.ERROR).toBe('error');
-      expect(NOTIFICATION_TYPES.INPUT_REQUIRED).toBe('input_required');
-      expect(NOTIFICATION_TYPES.CONNECTION_LOST).toBe('connection_lost');
-    });
-  });
 });

@@ -22,7 +22,6 @@ const version = packageJson.version || '0.0.0';
 export { Config, getConfig } from './utils/config.js';
 export { Logger, getLogger } from './utils/logger.js';
 export { RealtimeClient } from './realtime/client.js';
-export { MessageHandler } from './realtime/handlers.js';
 export { SessionManager } from './daemon/session.js';
 export { MachineManager } from './daemon/machine.js';
 export { Daemon } from './daemon/daemon.js';
