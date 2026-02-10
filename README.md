@@ -4,20 +4,25 @@ Remote control for Claude Code CLI from your mobile device.
 
 ## Overview
 
-TermBridge allows you to monitor and control Claude Code CLI sessions running on your computer from your iOS or Android device. See terminal output in real-time, send inputs, and receive push notifications when tasks complete or require attention.
+TermBridge allows you to monitor and control Claude Code CLI sessions running on your computer from your iOS or Android device. See terminal output in real-time and send inputs remotely.
+
+<p align="center">
+  <img src="docs/screenshots/sessions.png" width="250" alt="Session list" />
+  <img src="docs/screenshots/commands.png" width="250" alt="Slash commands" />
+  <img src="docs/screenshots/chat.png" width="250" alt="Live chat" />
+</p>
 
 ## Tech Stack
 
 - **CLI Wrapper**: Node.js + TypeScript + node-pty
 - **Mobile App**: React Native + Expo (iOS & Android)
-- **Backend**: Supabase (Realtime, Auth, Database, Edge Functions)
+- **Backend**: Supabase (Realtime, Auth, Database)
 - **Monorepo**: pnpm workspaces
 
 ## Features
 
 - 📱 Real-time terminal output streaming to mobile
 - ⌨️ Send input from mobile to CLI
-- 🔔 Push notifications for task completion, errors, and input prompts
 - 🔄 Automatic reconnection with exponential backoff
 - 🌙 Dark mode support
 - 🔐 Secure authentication with Supabase
@@ -27,15 +32,22 @@ TermBridge allows you to monitor and control Claude Code CLI sessions running on
 ```
 TermBridge/
 ├── apps/
-│   ├── cli/              # CLI wrapper package
-│   └── mobile/           # Expo mobile app
+│   ├── cli/                  # CLI wrapper package
+│   │   └── src/
+│   │       ├── commands/     # CLI commands (start, stop, status, login, setup)
+│   │       ├── daemon/       # Background daemon logic
+│   │       ├── realtime/     # Supabase realtime connection
+│   │       └── utils/        # Config, logger, prompt, supabase utilities
+│   └── mobile/               # Expo mobile app
+│       └── src/
+│           ├── components/   # React Native components
+│           ├── screens/      # App screens
+│           ├── stores/       # Zustand state management
+│           └── utils/        # Presence and shared utilities
 ├── packages/
-│   └── shared/           # Shared types and constants
+│   └── shared/               # Shared types and constants
 ├── supabase/
-│   ├── migrations/       # Database schema
-│   └── functions/        # Edge functions
-├── tests/
-│   └── integration/      # Integration tests
+│   └── migrations/           # Database schema
 └── package.json
 ```
 
@@ -46,7 +58,6 @@ TermBridge/
 - Node.js 18+
 - pnpm 8+
 - Supabase account
-- Expo account (for push notifications)
 
 ### Installation
 
@@ -89,7 +100,7 @@ This will prompt you for:
 - **Supabase Project URL**: Found in Supabase Dashboard → Settings → API (e.g., `https://xxxx.supabase.co`)
 - **Supabase Anon Key**: Found in Supabase Dashboard → Settings → API → `anon` `public` key
 
-Alternatively, you can set environment variables:
+Alternatively, set these in your shell profile (e.g., `~/.zshrc` or `~/.bashrc`):
 
 ```bash
 export SUPABASE_URL=https://your-project.supabase.co
@@ -113,10 +124,6 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
    ```bash
    supabase db push
    ```
-3. Deploy the edge function:
-   ```bash
-   supabase functions deploy send-notification
-   ```
 
 ### CLI Usage
 
@@ -127,16 +134,19 @@ termbridge setup
 # Authenticate
 termbridge login
 
-# Start a session (hybrid mode - local + remote)
+# Start listening for session requests from mobile
 termbridge start
 
-# Start in daemon mode (background only)
-termbridge start --daemon
+# Start with a custom machine name
+termbridge start --name "Work Laptop"
 
-# Check status
+# Start with automatic sleep prevention
+termbridge start --prevent-sleep
+
+# Check connection status
 termbridge status
 
-# Stop the daemon
+# Stop the running daemon
 termbridge stop
 ```
 
@@ -184,6 +194,12 @@ pnpm test
 
 # Run CLI tests
 pnpm --filter @tongil_kim/termbridge test
+
+# Run mobile tests
+pnpm --filter termbridge-mobile test
+
+# Run shared package tests
+pnpm --filter termbridge-shared test
 ```
 
 ## Architecture
@@ -197,13 +213,6 @@ pnpm --filter @tongil_kim/termbridge test
 5. Mobile app connects to the same channel to receive output
 6. Input from mobile is sent via Realtime to CLI
 7. CLI writes input to PTY
-
-### Push Notifications
-
-1. CLI detects trigger patterns in output (errors, completion, input required)
-2. CLI calls Supabase Edge Function
-3. Edge Function fetches user's push tokens
-4. Notifications sent via Expo Push API
 
 ## License
 
