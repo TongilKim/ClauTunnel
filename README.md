@@ -19,10 +19,30 @@ Running Claude Code on your workstation but need to step away? TermBridge lets y
 
 TermBridge allows you to monitor and control Claude Code CLI sessions running on your computer from your iOS or Android device. See terminal output in real-time and send inputs remotely.
 
+## Screenshots
+
+### 📱 Session List
+
+View and manage all your Claude Code sessions at a glance — see which are active, online, or offline.
+
 <p align="center">
-    <img src="docs/screenshots/sessions.png" width="250" alt="Session list" />
-    <img src="docs/screenshots/commands.png" width="250" alt="Slash commands" />
-    <img src="docs/screenshots/chat.png" width="250" alt="Live chat" />
+    <img src="docs/screenshots/sessions.png" width="300" alt="Session list" />
+</p>
+
+### ⚡ Slash Commands
+
+Quickly access powerful commands like /clear, /compact, /resume, /rewind, and /config right from your phone.
+
+<p align="center">
+    <img src="docs/screenshots/commands.png" width="300" alt="Slash commands" />
+</p>
+
+### 💬 Live Chat
+
+Chat with Claude Code in real-time from your mobile device, just like you would from the terminal.
+
+<p align="center">
+    <img src="docs/screenshots/chat.png" width="300" alt="Live chat" />
 </p>
 
 ## Quick Start
