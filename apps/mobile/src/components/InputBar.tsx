@@ -11,11 +11,13 @@ import {
   Image,
   ScrollView,
   Text,
+  ActivityIndicator,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useConnectionStore } from '../stores/connectionStore';
 import { convertImageToBase64 } from '../utils/imageUtils';
+import { getModelBadgeState } from '../utils/modelBadgeState';
 import { CommandPicker } from './CommandPicker';
 import { ModelPicker } from './ModelPicker';
 import { InteractivePicker } from './InteractivePicker';
@@ -62,6 +64,7 @@ export function InputBar({ disabled }: InputBarProps) {
     isTyping,
     model,
     availableModels,
+    isModelChanging,
     interactiveData,
     isInteractiveLoading,
     interactiveError,
@@ -72,6 +75,13 @@ export function InputBar({ disabled }: InputBarProps) {
     sessionId,
   } = useConnectionStore();
   const isDisabled = disabled || state !== 'connected' || isSending || isTyping;
+
+  // Compute model badge state
+  const modelBadge = getModelBadgeState({
+    model,
+    availableModels,
+    isModelChanging,
+  });
 
   // Placeholder text based on connection state (not typing/sending state)
   const placeholderText =
@@ -340,6 +350,17 @@ export function InputBar({ disabled }: InputBarProps) {
             >
               <Text style={[styles.commandsButtonText, isDark && styles.commandsButtonTextDark]}>/</Text>
             </TouchableOpacity>
+            {modelBadge.visible && (
+              <View style={[styles.modelBadge, isDark && styles.modelBadgeDark]}>
+                {modelBadge.showSpinner ? (
+                  <ActivityIndicator size="small" color={isDark ? '#9ca3af' : '#6b7280'} />
+                ) : (
+                  <Text style={[styles.modelBadgeText, isDark && styles.modelBadgeTextDark]}>
+                    {modelBadge.displayText}
+                  </Text>
+                )}
+              </View>
+            )}
           </View>
           <TouchableOpacity
             style={[
@@ -547,6 +568,27 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   commandsButtonTextDark: {
+    color: '#9ca3af',
+  },
+  // Model badge
+  modelBadge: {
+    backgroundColor: '#f3f4f6',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginLeft: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modelBadgeDark: {
+    backgroundColor: '#374151',
+  },
+  modelBadgeText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  modelBadgeTextDark: {
     color: '#9ca3af',
   },
   imageIcon: {
