@@ -7,6 +7,12 @@ import type { Options, Query, SlashCommand as SDKSlashCommand, CanUseTool, Permi
 import type { ImageAttachment, ModelInfo, PermissionMode, SlashCommand, UserQuestionData, UserQuestion, PermissionRequestData, PermissionResponseData, PermissionUpdate } from 'termbridge-shared';
 import { v4 as uuidv4 } from 'uuid';
 
+/** Commands unsupported in remote/mobile context */
+const UNSUPPORTED_COMMANDS = new Set([
+  'keybindings-help', 'help', 'context', 'cost', 'release-notes',
+  'vim', 'mcp', 'agents', 'hooks', 'status',
+]);
+
 export interface SdkSessionOptions {
   cwd: string;
   allowedTools?: string[];
@@ -342,6 +348,12 @@ export class SdkSession extends EventEmitter {
             }
           }
         } else if (message.type === 'result') {
+          // Emit result text if no assistant output was captured (e.g. slash commands like /context)
+          if (!assistantResponse.trim() && 'result' in message && message.result) {
+            const resultText = String(message.result);
+            this.emit('output', resultText);
+            assistantResponse = resultText;
+          }
           // Final result - track assistant response in history
           if (assistantResponse.trim()) {
             this.conversationHistory.push({ role: 'assistant', content: assistantResponse.trim() });
@@ -600,7 +612,6 @@ export class SdkSession extends EventEmitter {
       { name: 'bug', description: 'Report a bug to Anthropic', argumentHint: '' },
       { name: 'cost', description: 'Show token usage and cost', argumentHint: '' },
       { name: 'status', description: 'Show current session status', argumentHint: '' },
-      { name: 'keybindings-help', description: 'Show keyboard shortcuts', argumentHint: '' },
     ];
 
     // Get custom commands from file system (includes gsd:* etc.)
@@ -638,6 +649,8 @@ export class SdkSession extends EventEmitter {
     const existingNames = new Set(allCommands.map(c => c.name));
     const uniqueFallbacks = fallbackCommands.filter(c => !existingNames.has(c.name));
     allCommands = [...allCommands, ...uniqueFallbacks];
+
+    allCommands = allCommands.filter(c => !UNSUPPORTED_COMMANDS.has(c.name));
 
     return allCommands;
   }

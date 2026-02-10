@@ -147,6 +147,9 @@ export function ResumeSessionPicker({
                 <Text style={[styles.emptyText, isDark && styles.emptyTextDark]}>
                   No previous sessions found
                 </Text>
+                <Text style={[styles.emptyHint, isDark && styles.emptyHintDark]}>
+                  Only ended sessions can be resumed. End a session first, then come back here.
+                </Text>
               </View>
             ) : (
               sessions.map((session) => (
@@ -295,6 +298,16 @@ const styles = StyleSheet.create({
   },
   emptyTextDark: {
     color: '#9ca3af',
+  },
+  emptyHint: {
+    fontSize: 12,
+    color: '#9ca3af',
+    textAlign: 'center',
+    marginTop: 8,
+    paddingHorizontal: 16,
+  },
+  emptyHintDark: {
+    color: '#6b7280',
   },
   sessionItem: {
     backgroundColor: '#f9fafb',

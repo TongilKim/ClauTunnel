@@ -146,24 +146,6 @@ export class ConfigManager {
         value: settings.preferences?.autoCompact ?? true,
         selected: settings.preferences?.autoCompact ?? true,
       },
-      {
-        id: 'theme',
-        label: 'Theme',
-        description: 'Color theme for the interface',
-        value: settings.preferences?.theme || 'system',
-        children: [
-          { id: 'light', label: 'Light', value: 'light' },
-          { id: 'dark', label: 'Dark', value: 'dark' },
-          { id: 'system', label: 'System', value: 'system' },
-        ],
-      },
-      {
-        id: 'verbose',
-        label: 'Verbose Mode',
-        description: 'Show detailed output during operations',
-        value: settings.preferences?.verboseMode || false,
-        selected: settings.preferences?.verboseMode || false,
-      },
     ];
 
     return {
