@@ -1,23 +1,47 @@
 # TermBridge
 
-Remote control for Claude Code CLI from your mobile device.
+[![npm version](https://img.shields.io/npm/v/@tongil_kim/termbridge.svg)](https://www.npmjs.com/package/@tongil_kim/termbridge)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![TypeScript](https://img.shields.io/badge/TypeScript-98.4%25-blue.svg)](https://www.typescriptlang.org/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/TongilKim/TermBridge/pulls)
+
+📱 **Remote control for Claude Code CLI from your mobile device.**
+
+Monitor and send inputs to Claude Code terminal sessions in real-time from your iOS or Android device.
+
+---
+
+## Why TermBridge?
+
+Running Claude Code on your workstation but need to step away? TermBridge lets you keep the conversation going from your phone. Whether you're reviewing a long-running code generation, approving permission prompts, or sending follow-up instructions — you stay in control without being tied to your desk.
 
 ## Overview
 
 TermBridge allows you to monitor and control Claude Code CLI sessions running on your computer from your iOS or Android device. See terminal output in real-time and send inputs remotely.
 
 <p align="center">
-  <img src="docs/screenshots/sessions.png" width="250" alt="Session list" />
-  <img src="docs/screenshots/commands.png" width="250" alt="Slash commands" />
-  <img src="docs/screenshots/chat.png" width="250" alt="Live chat" />
+    <img src="docs/screenshots/sessions.png" width="250" alt="Session list" />
+    <img src="docs/screenshots/commands.png" width="250" alt="Slash commands" />
+    <img src="docs/screenshots/chat.png" width="250" alt="Live chat" />
 </p>
 
-## Tech Stack
+## Quick Start
 
-- **CLI Wrapper**: Node.js + TypeScript + node-pty
-- **Mobile App**: React Native + Expo (iOS & Android)
-- **Backend**: Supabase (Realtime, Auth, Database)
-- **Monorepo**: pnpm workspaces
+```bash
+# Install
+npm install -g @tongil_kim/termbridge
+
+# Configure Supabase credentials
+termbridge setup
+
+# Authenticate
+termbridge login
+
+# Start listening for mobile connections
+termbridge start
+```
+
+Then open the TermBridge mobile app, and you're connected!
 
 ## Features
 
@@ -27,29 +51,39 @@ TermBridge allows you to monitor and control Claude Code CLI sessions running on
 - 🌙 Dark mode support
 - 🔐 Secure authentication with Supabase
 
-## Project Structure
+## Tech Stack
+
+- **CLI Wrapper**: Node.js + TypeScript + node-pty
+- **Mobile App**: React Native + Expo (iOS & Android)
+- **Backend**: Supabase (Realtime, Auth, Database)
+- **Monorepo**: pnpm workspaces
+
+<details>
+<summary><strong>📁 Project Structure</strong></summary>
 
 ```
 TermBridge/
 ├── apps/
-│   ├── cli/                  # CLI wrapper package
+│   ├── cli/                    # CLI wrapper package
 │   │   └── src/
-│   │       ├── commands/     # CLI commands (start, stop, status, login, setup)
-│   │       ├── daemon/       # Background daemon logic
-│   │       ├── realtime/     # Supabase realtime connection
-│   │       └── utils/        # Config, logger, prompt, supabase utilities
-│   └── mobile/               # Expo mobile app
+│   │       ├── commands/       # CLI commands (start, stop, status, login, setup)
+│   │       ├── daemon/         # Background daemon logic
+│   │       ├── realtime/       # Supabase realtime connection
+│   │       └── utils/          # Config, logger, prompt, supabase utilities
+│   └── mobile/                 # Expo mobile app
 │       └── src/
-│           ├── components/   # React Native components
-│           ├── screens/      # App screens
-│           ├── stores/       # Zustand state management
-│           └── utils/        # Presence and shared utilities
+│           ├── components/     # React Native components
+│           ├── screens/        # App screens
+│           ├── stores/         # Zustand state management
+│           └── utils/          # Presence and shared utilities
 ├── packages/
-│   └── shared/               # Shared types and constants
+│   └── shared/                 # Shared types and constants
 ├── supabase/
-│   └── migrations/           # Database schema
+│   └── migrations/             # Database schema
 └── package.json
 ```
+
+</details>
 
 ## Getting Started
 
@@ -97,6 +131,7 @@ termbridge setup
 ```
 
 This will prompt you for:
+
 - **Supabase Project URL**: Found in Supabase Dashboard → Settings → API (e.g., `https://xxxx.supabase.co`)
 - **Supabase Anon Key**: Found in Supabase Dashboard → Settings → API → `anon` `public` key
 
@@ -121,9 +156,10 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 
 1. Create a new Supabase project
 2. Run the database migration:
-   ```bash
-   supabase db push
-   ```
+
+```bash
+supabase db push
+```
 
 ### CLI Usage
 
@@ -172,12 +208,14 @@ eas build --platform android
 Run CLI and mobile app in separate terminals:
 
 **Terminal 1 (CLI):**
+
 ```bash
 cd apps/cli
 pnpm start
 ```
 
 **Terminal 2 (Mobile):**
+
 ```bash
 cd apps/mobile
 pnpm start
@@ -214,6 +252,10 @@ pnpm --filter termbridge-shared test
 6. Input from mobile is sent via Realtime to CLI
 7. CLI writes input to PTY
 
+## Contributing
+
+Contributions are welcome! Please see the [Contributing Guide](CONTRIBUTING.md) for details.
+
 ## License
 
-MIT
+[MIT](LICENSE)
