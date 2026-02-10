@@ -300,8 +300,8 @@ export function InputBar({ disabled }: InputBarProps) {
           editable={!isDisabled}
           onSubmitEditing={handleSend}
           returnKeyType="send"
-          autoCapitalize="none"
-          autoCorrect={false}
+          autoCapitalize="sentences"
+          autoCorrect={true}
           multiline={true}
           textAlignVertical="top"
           onContentSizeChange={handleContentSizeChange}
