@@ -177,6 +177,15 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
       outputChannel.on('broadcast', { event: 'output' }, (payload) => {
         const message = payload.payload as RealtimeMessage;
 
+        // Handle error messages - reset isTyping and show error
+        if (message.type === 'error') {
+          set({
+            isTyping: false,
+            error: message.content || 'An error occurred'
+          });
+          return;
+        }
+
         // Handle mode messages separately
         if (message.type === 'mode' && message.permissionMode) {
           set({ permissionMode: message.permissionMode });

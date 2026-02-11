@@ -190,6 +190,7 @@ export class SdkSession extends EventEmitter {
   async sendPrompt(prompt: string, attachments?: ImageAttachment[]): Promise<void> {
     if (this.isProcessing) {
       this.emit('output', '\n[TermBridge] Previous request still processing...\n');
+      this.emit('request-rejected', 'Your message was not processed because Claude is still working on the previous request. Please wait.');
       return;
     }
 

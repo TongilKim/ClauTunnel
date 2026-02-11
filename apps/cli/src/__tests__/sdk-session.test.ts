@@ -755,4 +755,57 @@ describe('SdkSession', () => {
       expect(mockSetMaxThinkingTokens).not.toHaveBeenCalled();
     });
   });
+
+  describe('request rejection', () => {
+    it('should emit request-rejected event when sendPrompt is called while already processing', async () => {
+      // Mock query to simulate a long-running request
+      mockedQuery.mockImplementation(async function* () {
+        yield { type: 'system', subtype: 'init', session_id: 'test-session' };
+        // Simulate long-running task
+        await new Promise(resolve => setTimeout(resolve, 100));
+        yield { type: 'result', result: 'done' };
+      } as any);
+
+      const requestRejectedHandler = vi.fn();
+      const outputHandler = vi.fn();
+      sdkSession.on('request-rejected', requestRejectedHandler);
+      sdkSession.on('output', outputHandler);
+
+      // Start first request (doesn't await, so it's still processing)
+      const firstPromise = sdkSession.sendPrompt('First message');
+
+      // Wait a bit to ensure first request is processing
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      // Try to send second request while first is processing
+      await sdkSession.sendPrompt('Second message');
+
+      // Verify request-rejected event was emitted
+      expect(requestRejectedHandler).toHaveBeenCalledWith(
+        'Your message was not processed because Claude is still working on the previous request. Please wait.'
+      );
+
+      // Verify output event was also emitted (for terminal)
+      expect(outputHandler).toHaveBeenCalledWith(
+        '\n[TermBridge] Previous request still processing...\n'
+      );
+
+      // Clean up - wait for first request to complete
+      await firstPromise;
+    });
+
+    it('should not emit request-rejected when sendPrompt is called after previous request completes', async () => {
+      const requestRejectedHandler = vi.fn();
+      sdkSession.on('request-rejected', requestRejectedHandler);
+
+      // Send first request and wait for completion
+      await sdkSession.sendPrompt('First message');
+
+      // Send second request after first completes
+      await sdkSession.sendPrompt('Second message');
+
+      // Verify request-rejected was never emitted
+      expect(requestRejectedHandler).not.toHaveBeenCalled();
+    });
+  });
 });
