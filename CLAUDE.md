@@ -77,3 +77,28 @@ curl -s https://raw.githubusercontent.com/TongilKim/homebrew-termbridge/main/For
 
 - `NPM_TOKEN`: npm access token for publishing
 - `HOMEBREW_TAP_TOKEN`: GitHub PAT with repo scope for homebrew-termbridge
+
+## SDK Architecture (Claude Agent SDK)
+
+TermBridge uses the V2 Session API (`unstable_v2_createSession`) to communicate with the Claude Code subprocess.
+
+### Key Concepts
+
+- **AskUserQuestion goes through the `canUseTool` callback**, NOT through the stream as a special message type.
+  - The subprocess sends a `control_request` with `subtype: "can_use_tool"` and blocks waiting for a `control_response`.
+  - The SDK calls the `canUseTool(toolName, input, options)` callback provided at session creation.
+  - For AskUserQuestion: the callback must return `{ behavior: 'allow', updatedInput: { questions, answers } }`.
+  - `session.send()` writes a NEW user message to stdin — it does NOT unblock pending control_requests.
+- **V2 `stream()` returns after each `result` message** — `startStreamLoop()` must loop to handle multi-turn conversations.
+- **`processControlRequest`** in the SDK only handles three subtypes: `can_use_tool`, `hook_callback`, `mcp_message`.
+
+### Key Files
+
+- `apps/cli/src/daemon/sdk-session.ts` — V2 Session wrapper, handles AskUserQuestion via `canUseTool`, permission requests, model switching, conversation history
+- `apps/cli/src/daemon/daemon.ts` — Wires SDK session events to Supabase realtime broadcasts
+- `apps/cli/src/realtime/client.ts` — Supabase realtime client for mobile communication
+
+### Testing Notes
+
+- Mock `createMockSession` must block on subsequent `stream()` calls (use `await new Promise(() => {})`) to prevent infinite loop in `startStreamLoop()`.
+- AskUserQuestion tests capture the `canUseTool` callback from `mockedCreateSession.mockImplementation((opts) => ...)` and call it manually to simulate the SDK's internal control_request flow.

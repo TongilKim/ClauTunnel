@@ -87,6 +87,9 @@ export class Daemon extends EventEmitter {
         process.stdout.write(data);
       }
 
+      // Emit for external listeners (e.g., start command logging)
+      this.emit('mobile-output', data);
+
       // Broadcast to mobile
       if (this.realtimeClient) {
         try {
@@ -340,9 +343,12 @@ export class Daemon extends EventEmitter {
       }
 
       // Handle user answer (response to AskUserQuestion)
+      // Use provideAnswer() to stream into the existing query instead of
+      // sendPrompt() which would be rejected since isProcessing is true
       if (message.type === 'user-answer' && message.userAnswer) {
         const answerText = Object.values(message.userAnswer.answers).join('\n');
-        await this.sdkSession.sendPrompt(answerText);
+        this.emit('mobile-input', `(answer) ${answerText}`);
+        await this.sdkSession.provideAnswer(answerText, message.userAnswer.answers);
         return;
       }
 
@@ -394,6 +400,9 @@ export class Daemon extends EventEmitter {
       // Send if there's text or attachments
       if (prompt.trim() || (attachments && attachments.length > 0)) {
         const trimmedPrompt = prompt.trim();
+
+        // Emit mobile input event for logging
+        this.emit('mobile-input', trimmedPrompt, attachments);
 
         // Handle /clear typed in chat (legacy support)
         if (trimmedPrompt === '/clear') {
