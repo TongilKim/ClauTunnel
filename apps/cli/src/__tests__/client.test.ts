@@ -760,4 +760,86 @@ describe('RealtimeClient', () => {
     // But NOT sent via realtime channel
     expect(errorOutputChannel.send).not.toHaveBeenCalled();
   });
+
+  describe('broadcastError', () => {
+    it('should broadcast error message with correct structure', async () => {
+      const client = new RealtimeClient({
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      await client.connect();
+
+      const errorMessage = 'Test error message';
+      const errorCode = 'request_rejected';
+      await client.broadcastError(errorMessage, errorCode);
+
+      expect(mockOutputChannel.send).toHaveBeenCalledWith({
+        type: 'broadcast',
+        event: 'output',
+        payload: expect.objectContaining({
+          type: 'error',
+          content: errorMessage,
+          errorCode: errorCode,
+          timestamp: expect.any(Number),
+          seq: expect.any(Number),
+        }),
+      });
+    });
+
+    it('should use default errorCode if not provided', async () => {
+      const client = new RealtimeClient({
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      await client.connect();
+
+      const errorMessage = 'Test error message';
+      await client.broadcastError(errorMessage);
+
+      expect(mockOutputChannel.send).toHaveBeenCalledWith({
+        type: 'broadcast',
+        event: 'output',
+        payload: expect.objectContaining({
+          type: 'error',
+          content: errorMessage,
+          errorCode: 'request_rejected',
+        }),
+      });
+    });
+
+    it('should emit broadcast event after sending error', async () => {
+      const client = new RealtimeClient({
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      await client.connect();
+
+      const broadcastHandler = vi.fn();
+      client.on('broadcast', broadcastHandler);
+
+      await client.broadcastError('Test error');
+
+      expect(broadcastHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'error',
+          content: 'Test error',
+          errorCode: 'request_rejected',
+        })
+      );
+    });
+
+    it('should throw error if not connected', async () => {
+      const client = new RealtimeClient({
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      // Don't connect
+
+      await expect(client.broadcastError('Test error')).rejects.toThrow('Not connected');
+    });
+  });
 });

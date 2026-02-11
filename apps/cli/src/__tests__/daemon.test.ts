@@ -915,4 +915,59 @@ describe('Daemon', () => {
       );
     });
   });
+
+  describe('request rejection handling', () => {
+    it('should broadcast error when sdkSession emits request-rejected event', async () => {
+      daemon = new Daemon({
+        cwd: '/test',
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'session-789',
+      });
+
+      await daemon.start();
+
+      // Get the sdkSession from daemon
+      const sdkSession = (daemon as any).sdkSession;
+
+      // Emit request-rejected event
+      sdkSession.emit('request-rejected', 'Your message was not processed because Claude is still working on the previous request. Please wait.');
+
+      // Wait for async operations
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      // Verify broadcastError was called via the output channel
+      expect(mockOutputChannel.send).toHaveBeenCalledWith({
+        type: 'broadcast',
+        event: 'output',
+        payload: expect.objectContaining({
+          type: 'error',
+          content: 'Your message was not processed because Claude is still working on the previous request. Please wait.',
+          errorCode: 'request_rejected',
+        }),
+      });
+    });
+
+    it('should handle broadcast errors silently when rejecting requests', async () => {
+      // Mock output channel to throw error
+      mockOutputChannel.send = vi.fn().mockRejectedValue(new Error('Broadcast failed'));
+
+      daemon = new Daemon({
+        cwd: '/test',
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'session-789',
+      });
+
+      await daemon.start();
+
+      const sdkSession = (daemon as any).sdkSession;
+
+      // Should not throw even if broadcast fails
+      expect(() => {
+        sdkSession.emit('request-rejected', 'Test error message');
+      }).not.toThrow();
+
+      // Wait for async operations
+      await new Promise(resolve => setTimeout(resolve, 10));
+    });
+  });
 });
