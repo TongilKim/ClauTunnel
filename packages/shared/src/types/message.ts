@@ -107,6 +107,7 @@ export interface RealtimeMessage {
   userAnswer?: UserAnswerData; // For user-answer type
   permissionRequest?: PermissionRequestData; // For permission-request type
   permissionResponse?: PermissionResponseData; // For permission-response type
+  errorCode?: string; // For error type messages (e.g., 'request_rejected', 'timeout')
   timestamp: number;
   seq: number;
 }

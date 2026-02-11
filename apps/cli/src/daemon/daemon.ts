@@ -161,6 +161,17 @@ export class Daemon extends EventEmitter {
       }
     });
 
+    // Wire up request rejection errors to broadcast to mobile
+    this.sdkSession.on('request-rejected', async (errorMessage: string) => {
+      if (this.realtimeClient) {
+        try {
+          await this.realtimeClient.broadcastError(errorMessage, 'request_rejected');
+        } catch {
+          // Silently handle broadcast errors
+        }
+      }
+    });
+
     // Wire up permission requests to broadcast to mobile
     this.sdkSession.on('permission-request', async (requestData: PermissionRequestData) => {
       if (this.realtimeClient) {
