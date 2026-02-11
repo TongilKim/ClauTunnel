@@ -1,45 +1,90 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ImageAttachment, ModelInfo, SlashCommand } from 'termbridge-shared';
 
-// Mock Claude Agent SDK
+// Helper to let the background stream loop process messages
+const tick = () => new Promise(resolve => setTimeout(resolve, 10));
+
+// Helper to create a mock V2 session
+function createMockSession(messages: any[]) {
+  const sendMock = vi.fn().mockResolvedValue(undefined);
+  const closeMock = vi.fn();
+  let streamConsumed = false;
+
+  const session = {
+    closed: false,
+    get sessionId() {
+      const init = messages.find((m: any) => m.type === 'system' && m.subtype === 'init');
+      return init?.session_id || '';
+    },
+    send: sendMock,
+    stream: async function* () {
+      if (streamConsumed) {
+        // On subsequent calls, block forever (simulates waiting for next user input)
+        await new Promise(() => {});
+        return;
+      }
+      streamConsumed = true;
+      for (const msg of messages) {
+        yield msg;
+      }
+    },
+    close: () => {
+      session.closed = true;
+      closeMock();
+    },
+    [Symbol.asyncDispose]: async () => {},
+    _sendMock: sendMock,
+    _closeMock: closeMock,
+  };
+
+  return session;
+}
+
+// Mock Claude Agent SDK V2
 vi.mock('@anthropic-ai/claude-agent-sdk', () => ({
-  query: vi.fn(),
+  unstable_v2_createSession: vi.fn(),
+  unstable_v2_resumeSession: vi.fn(),
 }));
 
 import { SdkSession } from '../daemon/sdk-session.js';
-import { query } from '@anthropic-ai/claude-agent-sdk';
+import { unstable_v2_createSession, unstable_v2_resumeSession } from '@anthropic-ai/claude-agent-sdk';
 
 describe('SdkSession', () => {
   let sdkSession: SdkSession;
-  const mockedQuery = vi.mocked(query);
+  const mockedCreateSession = vi.mocked(unstable_v2_createSession);
+  const mockedResumeSession = vi.mocked(unstable_v2_resumeSession);
 
   beforeEach(() => {
     vi.clearAllMocks();
     sdkSession = new SdkSession({ cwd: '/test' });
 
-    // Default mock to return empty async iterable
-    mockedQuery.mockImplementation(async function* () {
-      yield { type: 'result', result: 'done' };
-    } as any);
+    // Default mock - creates a session that yields init + result
+    const defaultSession = createMockSession([
+      { type: 'system', subtype: 'init', session_id: 'test-session-id' },
+      { type: 'result', subtype: 'success', result: 'done' },
+    ]);
+    mockedCreateSession.mockReturnValue(defaultSession as any);
+    mockedResumeSession.mockReturnValue(defaultSession as any);
   });
 
   describe('permission mode events', () => {
     it('should emit permission-mode event on init message', async () => {
-      // Mock query to return a system init message with permissionMode
-      mockedQuery.mockImplementation(async function* () {
-        yield {
+      const session = createMockSession([
+        {
           type: 'system',
           subtype: 'init',
           session_id: 'test-session-id',
           permissionMode: 'bypassPermissions',
-        };
-        yield { type: 'result', result: 'done' };
-      } as any);
+        },
+        { type: 'result', subtype: 'success', result: 'done' },
+      ]);
+      mockedCreateSession.mockReturnValue(session as any);
 
       const permissionModeHandler = vi.fn();
       sdkSession.on('permission-mode', permissionModeHandler);
 
       await sdkSession.sendPrompt('Hello');
+      await tick();
 
       expect(permissionModeHandler).toHaveBeenCalledWith('bypassPermissions');
     });
@@ -69,71 +114,116 @@ describe('SdkSession', () => {
         { type: 'image', mediaType: 'image/jpeg', data: 'base64data' },
       ];
 
-      // Should not throw when called with attachments
       await sdkSession.sendPrompt('Describe this image', attachments);
 
-      expect(mockedQuery).toHaveBeenCalled();
+      expect(mockedCreateSession).toHaveBeenCalled();
     });
 
-    it('should build content blocks with image type', async () => {
+    it('should send message with image content blocks', async () => {
+      const session = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'test-session-id' },
+        { type: 'result', subtype: 'success', result: 'done' },
+      ]);
+      mockedCreateSession.mockReturnValue(session as any);
+
       const attachments: ImageAttachment[] = [
         { type: 'image', mediaType: 'image/jpeg', data: 'base64data' },
       ];
 
       await sdkSession.sendPrompt('Describe this image', attachments);
 
-      // Verify query was called with the right structure
-      const callArgs = mockedQuery.mock.calls[0][0];
-      expect(callArgs).toBeDefined();
-
-      // When attachments are provided, prompt should be an array or content blocks
-      // The exact format depends on SDK implementation
-      expect(mockedQuery).toHaveBeenCalledWith(
+      // Verify send was called with content blocks including image
+      expect(session._sendMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          options: expect.any(Object),
+          type: 'user',
+          message: expect.objectContaining({
+            role: 'user',
+            content: expect.arrayContaining([
+              expect.objectContaining({
+                type: 'image',
+                source: expect.objectContaining({
+                  type: 'base64',
+                  media_type: 'image/jpeg',
+                  data: 'base64data',
+                }),
+              }),
+            ]),
+          }),
         })
       );
     });
 
     it('should include base64 source in image content block', async () => {
+      const session = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'test-session-id' },
+        { type: 'result', subtype: 'success', result: 'done' },
+      ]);
+      mockedCreateSession.mockReturnValue(session as any);
+
       const attachments: ImageAttachment[] = [
         { type: 'image', mediaType: 'image/png', data: 'iVBORw0KGgoAAAANS' },
       ];
 
       await sdkSession.sendPrompt('What is this?', attachments);
 
-      // The implementation should pass data to the query
-      expect(mockedQuery).toHaveBeenCalled();
+      expect(session._sendMock).toHaveBeenCalled();
+      const sentMessage = session._sendMock.mock.calls[0][0];
+      const imageBlock = sentMessage.message.content.find((b: any) => b.type === 'image');
+      expect(imageBlock.source.data).toBe('iVBORw0KGgoAAAANS');
+      expect(imageBlock.source.media_type).toBe('image/png');
     });
 
     it('should add text block after images when text provided', async () => {
+      const session = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'test-session-id' },
+        { type: 'result', subtype: 'success', result: 'done' },
+      ]);
+      mockedCreateSession.mockReturnValue(session as any);
+
       const attachments: ImageAttachment[] = [
         { type: 'image', mediaType: 'image/jpeg', data: 'base64data' },
       ];
 
       await sdkSession.sendPrompt('Describe this image', attachments);
 
-      expect(mockedQuery).toHaveBeenCalled();
+      const sentMessage = session._sendMock.mock.calls[0][0];
+      const textBlock = sentMessage.message.content.find((b: any) => b.type === 'text');
+      expect(textBlock.text).toBe('Describe this image');
     });
 
     it('should work with images only (no text)', async () => {
+      const session = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'test-session-id' },
+        { type: 'result', subtype: 'success', result: 'done' },
+      ]);
+      mockedCreateSession.mockReturnValue(session as any);
+
       const attachments: ImageAttachment[] = [
         { type: 'image', mediaType: 'image/jpeg', data: 'base64data' },
       ];
 
-      // Empty prompt with attachments should work
       await sdkSession.sendPrompt('', attachments);
 
-      expect(mockedQuery).toHaveBeenCalled();
+      expect(session._sendMock).toHaveBeenCalled();
     });
 
     it('should work with text only (no attachments)', async () => {
+      const session = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'test-session-id' },
+        { type: 'result', subtype: 'success', result: 'done' },
+      ]);
+      mockedCreateSession.mockReturnValue(session as any);
+
       await sdkSession.sendPrompt('Hello, how are you?');
 
-      // Now always uses streaming input mode (AsyncIterable) for setModel() support
-      expect(mockedQuery).toHaveBeenCalledWith(
+      expect(session._sendMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          options: expect.any(Object),
+          type: 'user',
+          message: expect.objectContaining({
+            content: expect.arrayContaining([
+              expect.objectContaining({ type: 'text', text: 'Hello, how are you?' }),
+            ]),
+          }),
         })
       );
     });
@@ -161,49 +251,83 @@ describe('SdkSession', () => {
   describe('session resumption', () => {
     it('should resume session when sending subsequent messages', async () => {
       // First query to establish session
-      mockedQuery.mockImplementation(async function* () {
-        yield {
-          type: 'system',
-          subtype: 'init',
-          session_id: 'test-session-123',
-        };
-        yield { type: 'result', result: 'done' };
-      } as any);
+      const session1 = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'test-session-123' },
+        { type: 'result', subtype: 'success', result: 'done' },
+      ]);
+      mockedCreateSession.mockReturnValue(session1 as any);
 
       await sdkSession.sendPrompt('First message');
+      await tick();
+
       expect(sdkSession.getSessionId()).toBe('test-session-123');
 
-      // Send second message - should resume
+      // For second message, the same session is reused (V2 sessions are persistent)
+      // send() is called on the same session object
       await sdkSession.sendPrompt('Second message');
 
-      // Second call should have resume option
-      const secondCall = mockedQuery.mock.calls[1][0];
-      expect(secondCall.options.resume).toBe('test-session-123');
+      // With V2, the session is reused, so send should have been called twice
+      expect(session1._sendMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('should use unstable_v2_resumeSession when resuming a different session', async () => {
+      const resumeSession = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'resumed-session-456' },
+        { type: 'result', subtype: 'success', result: 'done' },
+      ]);
+      mockedResumeSession.mockReturnValue(resumeSession as any);
+
+      sdkSession.resumeSession('resumed-session-456');
+      await sdkSession.sendPrompt('Continue');
+
+      expect(mockedResumeSession).toHaveBeenCalledWith(
+        'resumed-session-456',
+        expect.any(Object)
+      );
     });
   });
 
   describe('model switching', () => {
-    it('should pass model option when creating query', async () => {
+    it('should pass model option when creating session', async () => {
       await sdkSession.sendPrompt('Hello');
 
-      expect(mockedQuery).toHaveBeenCalledWith(
+      expect(mockedCreateSession).toHaveBeenCalledWith(
         expect.objectContaining({
-          options: expect.objectContaining({
-            model: 'default',
-          }),
+          model: expect.any(String),
         })
       );
     });
 
-    it('should pass updated model option after setModel', async () => {
-      await sdkSession.setModel('opus');
-      await sdkSession.sendPrompt('Hello');
+    it('should create new session with updated model after setModel', async () => {
+      const session1 = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'session-1' },
+        { type: 'result', subtype: 'success', result: 'done' },
+      ]);
+      mockedCreateSession.mockReturnValue(session1 as any);
 
-      expect(mockedQuery).toHaveBeenCalledWith(
+      await sdkSession.sendPrompt('Hello');
+      await tick();
+
+      // Change model - this closes the session
+      await sdkSession.setModel('opus');
+
+      // Session should be closed
+      expect(session1._closeMock).toHaveBeenCalled();
+      expect(sdkSession.getSessionId()).toBeNull();
+
+      // Create new session for next prompt
+      const session2 = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'session-2' },
+        { type: 'result', subtype: 'success', result: 'done' },
+      ]);
+      mockedCreateSession.mockReturnValue(session2 as any);
+
+      await sdkSession.sendPrompt('Hello again');
+
+      // New session created with opus model
+      expect(mockedCreateSession).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          options: expect.objectContaining({
-            model: 'opus',
-          }),
+          model: 'opus',
         })
       );
     });
@@ -225,108 +349,6 @@ describe('SdkSession', () => {
       expect(models.map(m => m.value)).toEqual(['default', 'opus', 'haiku', 'sonnet']);
     });
 
-    it('should cache SDK models after first fetch from SDK', async () => {
-      const sdkModels: ModelInfo[] = [
-        { value: 'default', displayName: 'Default (recommended)', description: 'Use the default model' },
-        { value: 'opus', displayName: 'Opus', description: 'Opus 4.6' },
-        { value: 'sonnet', displayName: 'Sonnet', description: 'Sonnet 4.5' },
-      ];
-
-      const mockSupportedModels = vi.fn().mockResolvedValue(sdkModels);
-      mockedQuery.mockImplementation(() => {
-        const queryObj = (async function* () {
-          yield {
-            type: 'system',
-            subtype: 'init',
-            session_id: 'test-session-123',
-          };
-          yield { type: 'result', result: 'done' };
-        })();
-        (queryObj as any).setMaxThinkingTokens = vi.fn();
-        (queryObj as any).supportedModels = mockSupportedModels;
-        (queryObj as any).supportedCommands = vi.fn().mockResolvedValue([]);
-        return queryObj as any;
-      });
-
-      // Create a query so currentQuery is set
-      await sdkSession.sendPrompt('Hello');
-
-      // First call — fetches from SDK and caches
-      const models = await sdkSession.getSupportedModels();
-      expect(models).toEqual(sdkModels);
-      expect(mockSupportedModels).toHaveBeenCalledTimes(1);
-
-      // Second call — should use cache, not call SDK again
-      const models2 = await sdkSession.getSupportedModels();
-      expect(models2).toEqual(sdkModels);
-      expect(mockSupportedModels).toHaveBeenCalledTimes(1);
-    });
-
-    it('should return cached SDK models after clearHistory resets session state', async () => {
-      // First: no query, no cache — should return fallback
-      const fallbackModels = await sdkSession.getSupportedModels();
-      expect(fallbackModels.length).toBe(4);
-      expect(fallbackModels[0].value).toBe('default');
-
-      // Now set up a query that returns SDK models
-      const sdkModels: ModelInfo[] = [
-        { value: 'default', displayName: 'Default', description: 'Default model' },
-        { value: 'opus', displayName: 'Opus', description: 'Opus 4.6' },
-      ];
-
-      mockedQuery.mockImplementation(() => {
-        const queryObj = (async function* () {
-          yield {
-            type: 'system',
-            subtype: 'init',
-            session_id: 'test-session-123',
-          };
-          yield { type: 'result', result: 'done' };
-        })();
-        (queryObj as any).setMaxThinkingTokens = vi.fn();
-        (queryObj as any).supportedModels = vi.fn().mockResolvedValue(sdkModels);
-        (queryObj as any).supportedCommands = vi.fn().mockResolvedValue([]);
-        return queryObj as any;
-      });
-
-      await sdkSession.sendPrompt('Hello');
-
-      // Fetch and cache SDK models
-      const cachedModels = await sdkSession.getSupportedModels();
-      expect(cachedModels).toEqual(sdkModels);
-
-      // clearHistory resets sessionId and history, but cache persists
-      sdkSession.clearHistory();
-
-      // Should still return cached SDK models, not fallback
-      const modelsAfterClear = await sdkSession.getSupportedModels();
-      expect(modelsAfterClear).toEqual(sdkModels);
-    });
-
-    it('should return fallback models when SDK supportedModels() fails', async () => {
-      const mockSupportedModels = vi.fn().mockRejectedValue(new Error('SDK error'));
-      mockedQuery.mockImplementation(() => {
-        const queryObj = (async function* () {
-          yield {
-            type: 'system',
-            subtype: 'init',
-            session_id: 'test-session-123',
-          };
-          yield { type: 'result', result: 'done' };
-        })();
-        (queryObj as any).setMaxThinkingTokens = vi.fn();
-        (queryObj as any).supportedModels = mockSupportedModels;
-        (queryObj as any).supportedCommands = vi.fn().mockResolvedValue([]);
-        return queryObj as any;
-      });
-
-      await sdkSession.sendPrompt('Hello');
-      const models = await sdkSession.getSupportedModels();
-
-      expect(models.length).toBe(4);
-      expect(models[0].value).toBe('default');
-    });
-
     it('should not emit model event when setting same model', async () => {
       const modelHandler = vi.fn();
       sdkSession.on('model', modelHandler);
@@ -336,288 +358,68 @@ describe('SdkSession', () => {
       expect(modelHandler).not.toHaveBeenCalled();
     });
 
-    it('should call SDK query.setModel() when query is active', async () => {
-      const mockSetModel = vi.fn().mockResolvedValue(undefined);
-      mockedQuery.mockImplementation(() => {
-        const queryObj = (async function* () {
-          yield {
-            type: 'system',
-            subtype: 'init',
-            session_id: 'test-session-123',
-          };
-          yield { type: 'result', result: 'done' };
-        })();
-        (queryObj as any).setModel = mockSetModel;
-        (queryObj as any).setMaxThinkingTokens = vi.fn();
-        (queryObj as any).supportedModels = vi.fn().mockResolvedValue([]);
-        (queryObj as any).supportedCommands = vi.fn().mockResolvedValue([]);
-        return queryObj as any;
-      });
-
-      // Create an active query
-      await sdkSession.sendPrompt('Hello');
-
-      // Now change model — should use SDK's setModel
-      await sdkSession.setModel('opus');
-
-      expect(mockSetModel).toHaveBeenCalledWith('opus');
-      // Session should NOT be nulled since SDK handled it
-      expect(sdkSession.getSessionId()).toBe('test-session-123');
-    });
-
-    it('should fall back to session-null when SDK query.setModel() fails', async () => {
-      const mockSetModel = vi.fn().mockRejectedValue(new Error('not supported'));
-      mockedQuery.mockImplementation(() => {
-        const queryObj = (async function* () {
-          yield {
-            type: 'system',
-            subtype: 'init',
-            session_id: 'test-session-123',
-          };
-          yield { type: 'result', result: 'done' };
-        })();
-        (queryObj as any).setModel = mockSetModel;
-        (queryObj as any).setMaxThinkingTokens = vi.fn();
-        (queryObj as any).supportedModels = vi.fn().mockResolvedValue([]);
-        (queryObj as any).supportedCommands = vi.fn().mockResolvedValue([]);
-        return queryObj as any;
-      });
-
-      await sdkSession.sendPrompt('Hello');
-      expect(sdkSession.getSessionId()).toBe('test-session-123');
-
-      // SDK setModel fails — should fall back to clearing session
-      await sdkSession.setModel('opus');
-
-      expect(mockSetModel).toHaveBeenCalledWith('opus');
-      expect(sdkSession.getSessionId()).toBeNull();
-    });
-
-    it('should clear sessionId when model changes with no active query', async () => {
-      // setModel before any sendPrompt — no currentQuery exists
-      // Manually set a sessionId to simulate a previous session
+    it('should clear sessionId when model changes with no active session', async () => {
       sdkSession.resumeSession('test-session-123');
       expect(sdkSession.getSessionId()).toBe('test-session-123');
 
-      // Change model — no currentQuery, should clear session
       await sdkSession.setModel('opus');
       expect(sdkSession.getSessionId()).toBeNull();
-    });
-
-    it('should preserve session and resume after successful SDK setModel', async () => {
-      const mockSetModel = vi.fn().mockResolvedValue(undefined);
-      mockedQuery.mockImplementation(() => {
-        const queryObj = (async function* () {
-          yield {
-            type: 'system',
-            subtype: 'init',
-            session_id: 'test-session-123',
-          };
-          yield { type: 'result', result: 'done' };
-        })();
-        (queryObj as any).setModel = mockSetModel;
-        (queryObj as any).setMaxThinkingTokens = vi.fn();
-        (queryObj as any).supportedModels = vi.fn().mockResolvedValue([]);
-        (queryObj as any).supportedCommands = vi.fn().mockResolvedValue([]);
-        return queryObj as any;
-      });
-
-      await sdkSession.sendPrompt('First message');
-
-      // Change model — SDK setModel succeeds, session preserved
-      await sdkSession.setModel('opus');
-      expect(mockSetModel).toHaveBeenCalledWith('opus');
-      expect(sdkSession.getSessionId()).toBe('test-session-123');
-
-      // Send another message — should resume the same session
-      await sdkSession.sendPrompt('Second message');
-
-      const secondCall = mockedQuery.mock.calls[1][0];
-      expect(secondCall.options.resume).toBe('test-session-123');
-      expect(secondCall.options.model).toBe('opus');
-    });
-
-    it('should not resume session after model change when SDK setModel fails', async () => {
-      const mockSetModel = vi.fn().mockRejectedValue(new Error('not supported'));
-      mockedQuery.mockImplementation(() => {
-        const queryObj = (async function* () {
-          yield {
-            type: 'system',
-            subtype: 'init',
-            session_id: 'test-session-123',
-          };
-          yield { type: 'result', result: 'done' };
-        })();
-        (queryObj as any).setModel = mockSetModel;
-        (queryObj as any).setMaxThinkingTokens = vi.fn();
-        (queryObj as any).supportedModels = vi.fn().mockResolvedValue([]);
-        (queryObj as any).supportedCommands = vi.fn().mockResolvedValue([]);
-        return queryObj as any;
-      });
-
-      await sdkSession.sendPrompt('First message');
-
-      // Change model — SDK setModel fails, falls back to clearing session
-      await sdkSession.setModel('opus');
-
-      // Send another message — should NOT resume
-      await sdkSession.sendPrompt('Second message');
-
-      const secondCall = mockedQuery.mock.calls[1][0];
-      expect(secondCall.options.resume).toBeUndefined();
-      expect(secondCall.options.model).toBe('opus');
     });
 
     it('should prepend conversation context to next prompt after model change clears session', async () => {
       // First: establish a conversation with history
-      mockedQuery.mockImplementation(() => {
-        const queryObj = (async function* () {
-          yield {
-            type: 'system',
-            subtype: 'init',
-            session_id: 'test-session-123',
-          };
-          yield {
-            type: 'assistant',
-            message: {
-              content: [{ type: 'text', text: 'I can help with that.' }],
-            },
-          };
-          yield { type: 'result', result: 'done' };
-        })();
-        (queryObj as any).setMaxThinkingTokens = vi.fn();
-        (queryObj as any).supportedModels = vi.fn().mockResolvedValue([]);
-        (queryObj as any).supportedCommands = vi.fn().mockResolvedValue([]);
-        return queryObj as any;
-      });
+      const session1 = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'test-session-123' },
+        {
+          type: 'assistant',
+          message: {
+            content: [{ type: 'text', text: 'I can help with that.' }],
+          },
+        },
+        { type: 'result', subtype: 'success', result: 'done' },
+      ]);
+      mockedCreateSession.mockReturnValue(session1 as any);
 
       await sdkSession.sendPrompt('Help me with code');
+      await tick();
 
-      // Change model with no active SDK setModel — falls back to clearing session
-      // (mock query has no setModel method, so it will throw and clear session)
+      // Change model - closes session
       await sdkSession.setModel('opus');
       expect(sdkSession.getSessionId()).toBeNull();
 
-      // Capture the prompt sent to the next query call
-      let capturedPrompt: any;
-      mockedQuery.mockImplementation((args: any) => {
-        capturedPrompt = args;
-        const queryObj = (async function* () {
-          yield {
-            type: 'system',
-            subtype: 'init',
-            session_id: 'new-session-456',
-          };
-          yield { type: 'result', result: 'done' };
-        })();
-        (queryObj as any).setMaxThinkingTokens = vi.fn();
-        (queryObj as any).supportedModels = vi.fn().mockResolvedValue([]);
-        (queryObj as any).supportedCommands = vi.fn().mockResolvedValue([]);
-        return queryObj as any;
-      });
+      // Setup new session for next prompt
+      const session2 = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'new-session-456' },
+        { type: 'result', subtype: 'success', result: 'done' },
+      ]);
+      mockedCreateSession.mockReturnValue(session2 as any);
 
       await sdkSession.sendPrompt('Continue helping');
 
-      // The prompt should NOT have a resume option (session was cleared)
-      expect(capturedPrompt.options.resume).toBeUndefined();
-      expect(capturedPrompt.options.model).toBe('opus');
-
-      // Consume the async iterable to get the user message
-      const promptIterable = capturedPrompt.prompt;
-      const messages: any[] = [];
-      for await (const msg of promptIterable) {
-        messages.push(msg);
-      }
-
-      // The user message content should include conversation context prefix
-      const textBlock = messages[0].message.content.find((b: any) => b.type === 'text');
+      // Check that send was called with context prefix
+      const sentMessage = session2._sendMock.mock.calls[0][0];
+      const textBlock = sentMessage.message.content.find((b: any) => b.type === 'text');
       expect(textBlock.text).toContain('[Previous conversation context');
       expect(textBlock.text).toContain('User: Help me with code');
       expect(textBlock.text).toContain('Assistant: I can help with that.');
       expect(textBlock.text).toContain('Continue helping');
     });
 
-    it('should NOT prepend context when SDK setModel succeeds (session preserved)', async () => {
-      const mockSetModel = vi.fn().mockResolvedValue(undefined);
-      mockedQuery.mockImplementation(() => {
-        const queryObj = (async function* () {
-          yield {
-            type: 'system',
-            subtype: 'init',
-            session_id: 'test-session-123',
-          };
-          yield {
-            type: 'assistant',
-            message: {
-              content: [{ type: 'text', text: 'Sure thing.' }],
-            },
-          };
-          yield { type: 'result', result: 'done' };
-        })();
-        (queryObj as any).setModel = mockSetModel;
-        (queryObj as any).setMaxThinkingTokens = vi.fn();
-        (queryObj as any).supportedModels = vi.fn().mockResolvedValue([]);
-        (queryObj as any).supportedCommands = vi.fn().mockResolvedValue([]);
-        return queryObj as any;
-      });
-
-      await sdkSession.sendPrompt('Hello');
-
-      // SDK setModel succeeds — session preserved, no context transfer needed
-      await sdkSession.setModel('opus');
-      expect(sdkSession.getSessionId()).toBe('test-session-123');
-
-      // Capture next prompt
-      let capturedPrompt: any;
-      mockedQuery.mockImplementation((args: any) => {
-        capturedPrompt = args;
-        const queryObj = (async function* () {
-          yield {
-            type: 'system',
-            subtype: 'init',
-            session_id: 'test-session-123',
-          };
-          yield { type: 'result', result: 'done' };
-        })();
-        (queryObj as any).setMaxThinkingTokens = vi.fn();
-        (queryObj as any).supportedModels = vi.fn().mockResolvedValue([]);
-        (queryObj as any).supportedCommands = vi.fn().mockResolvedValue([]);
-        return queryObj as any;
-      });
-
-      await sdkSession.sendPrompt('Next question');
-
-      // Should resume and NOT have context prefix
-      expect(capturedPrompt.options.resume).toBe('test-session-123');
-
-      const promptIterable = capturedPrompt.prompt;
-      const messages: any[] = [];
-      for await (const msg of promptIterable) {
-        messages.push(msg);
-      }
-
-      const textBlock = messages[0].message.content.find((b: any) => b.type === 'text');
-      expect(textBlock.text).not.toContain('[Previous conversation context');
-      expect(textBlock.text).toBe('Next question');
-    });
-
     it('should track conversation history', async () => {
-      mockedQuery.mockImplementation(async function* () {
-        yield {
-          type: 'system',
-          subtype: 'init',
-          session_id: 'test-session-123',
-        };
-        yield {
+      const session = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'test-session-123' },
+        {
           type: 'assistant',
           message: {
             content: [{ type: 'text', text: 'Hello! How can I help?' }],
           },
-        };
-        yield { type: 'result', result: 'done' };
-      } as any);
+        },
+        { type: 'result', subtype: 'success', result: 'done' },
+      ]);
+      mockedCreateSession.mockReturnValue(session as any);
 
       await sdkSession.sendPrompt('Hello');
+      await tick();
 
       const history = sdkSession.getConversationHistory();
       expect(history.length).toBe(2);
@@ -625,54 +427,22 @@ describe('SdkSession', () => {
       expect(history[1]).toEqual({ role: 'assistant', content: 'Hello! How can I help?' });
     });
 
-    it('should include conversation context in prompt after model change', async () => {
-      // First establish session and conversation
-      mockedQuery.mockImplementation(async function* () {
-        yield {
-          type: 'system',
-          subtype: 'init',
-          session_id: 'test-session-123',
-        };
-        yield {
-          type: 'assistant',
-          message: {
-            content: [{ type: 'text', text: 'I am Claude Sonnet.' }],
-          },
-        };
-        yield { type: 'result', result: 'done' };
-      } as any);
-
-      await sdkSession.sendPrompt('Who are you?');
-
-      // Change model
-      await sdkSession.setModel('opus');
-
-      // Send new message - should include context
-      await sdkSession.sendPrompt('Continue helping me');
-
-      const secondCall = mockedQuery.mock.calls[1][0];
-      // The prompt should be an async iterable that yields a user message with context
-      expect(secondCall.options.model).toBe('opus');
-      // Context should be included (we'll verify the structure in implementation)
-    });
-
     it('should clear conversation history and session ID when clearHistory is called', async () => {
-      mockedQuery.mockImplementation(async function* () {
-        yield {
-          type: 'system',
-          subtype: 'init',
-          session_id: 'test-session-123',
-        };
-        yield {
+      const session = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'test-session-123' },
+        {
           type: 'assistant',
           message: {
             content: [{ type: 'text', text: 'Response' }],
           },
-        };
-        yield { type: 'result', result: 'done' };
-      } as any);
+        },
+        { type: 'result', subtype: 'success', result: 'done' },
+      ]);
+      mockedCreateSession.mockReturnValue(session as any);
 
       await sdkSession.sendPrompt('Hello');
+      await tick();
+
       expect(sdkSession.getConversationHistory().length).toBe(2);
       expect(sdkSession.getSessionId()).toBe('test-session-123');
 
@@ -682,25 +452,31 @@ describe('SdkSession', () => {
     });
 
     it('should not resume session after clearHistory', async () => {
-      mockedQuery.mockImplementation(async function* () {
-        yield {
-          type: 'system',
-          subtype: 'init',
-          session_id: 'test-session-123',
-        };
-        yield { type: 'result', result: 'done' };
-      } as any);
+      const session1 = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'test-session-123' },
+        { type: 'result', subtype: 'success', result: 'done' },
+      ]);
+      mockedCreateSession.mockReturnValue(session1 as any);
 
       await sdkSession.sendPrompt('First message');
+      await tick();
+
       expect(sdkSession.getSessionId()).toBe('test-session-123');
 
       sdkSession.clearHistory();
 
-      // Send another message - should NOT have resume option
+      // New session should be created (not resumed)
+      const session2 = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'new-session-456' },
+        { type: 'result', subtype: 'success', result: 'done' },
+      ]);
+      mockedCreateSession.mockReturnValue(session2 as any);
+
       await sdkSession.sendPrompt('Second message');
 
-      const secondCall = mockedQuery.mock.calls[1][0];
-      expect(secondCall.options.resume).toBeUndefined();
+      // Should call createSession, not resumeSession
+      expect(mockedCreateSession).toHaveBeenCalledTimes(2);
+      expect(mockedResumeSession).not.toHaveBeenCalled();
     });
   });
 
@@ -722,60 +498,36 @@ describe('SdkSession', () => {
 
       expect(thinkingModeHandler).toHaveBeenCalledWith(true);
     });
-
-    it('should call setMaxThinkingTokens on query when thinking is enabled', async () => {
-      const mockSetMaxThinkingTokens = vi.fn().mockResolvedValue(undefined);
-      mockedQuery.mockImplementation(() => {
-        const queryObj = (async function* () {
-          yield { type: 'result', result: 'done' };
-        })();
-        (queryObj as any).setMaxThinkingTokens = mockSetMaxThinkingTokens;
-        return queryObj as any;
-      });
-
-      await sdkSession.setThinkingMode(true);
-      await sdkSession.sendPrompt('Hello');
-
-      expect(mockSetMaxThinkingTokens).toHaveBeenCalledWith(null);
-    });
-
-    it('should not call setMaxThinkingTokens when thinking is disabled', async () => {
-      const mockSetMaxThinkingTokens = vi.fn().mockResolvedValue(undefined);
-      mockedQuery.mockImplementation(() => {
-        const queryObj = (async function* () {
-          yield { type: 'result', result: 'done' };
-        })();
-        (queryObj as any).setMaxThinkingTokens = mockSetMaxThinkingTokens;
-        return queryObj as any;
-      });
-
-      await sdkSession.setThinkingMode(false);
-      await sdkSession.sendPrompt('Hello');
-
-      expect(mockSetMaxThinkingTokens).not.toHaveBeenCalled();
-    });
   });
 
   describe('request rejection', () => {
     it('should emit request-rejected event when sendPrompt is called while already processing', async () => {
-      // Mock query to simulate a long-running request
-      mockedQuery.mockImplementation(async function* () {
-        yield { type: 'system', subtype: 'init', session_id: 'test-session' };
-        // Simulate long-running task
-        await new Promise(resolve => setTimeout(resolve, 100));
-        yield { type: 'result', result: 'done' };
-      } as any);
+      // Create a session that takes time to finish
+      let resolveStream: (() => void) | null = null;
+      const slowSession = {
+        get sessionId() { return 'slow-session'; },
+        send: vi.fn().mockResolvedValue(undefined),
+        stream: async function* () {
+          yield { type: 'system', subtype: 'init', session_id: 'slow-session' };
+          // Wait before yielding result
+          await new Promise<void>(r => { resolveStream = r; });
+          yield { type: 'result', subtype: 'success', result: 'done' };
+        },
+        close: vi.fn(),
+        [Symbol.asyncDispose]: async () => {},
+      };
+      mockedCreateSession.mockReturnValue(slowSession as any);
 
       const requestRejectedHandler = vi.fn();
       const outputHandler = vi.fn();
       sdkSession.on('request-rejected', requestRejectedHandler);
       sdkSession.on('output', outputHandler);
 
-      // Start first request (doesn't await, so it's still processing)
+      // Start first request (doesn't complete yet)
       const firstPromise = sdkSession.sendPrompt('First message');
 
-      // Wait a bit to ensure first request is processing
-      await new Promise(resolve => setTimeout(resolve, 10));
+      // Wait for first request to start processing
+      await tick();
 
       // Try to send second request while first is processing
       await sdkSession.sendPrompt('Second message');
@@ -790,8 +542,10 @@ describe('SdkSession', () => {
         '\n[TermBridge] Previous request still processing...\n'
       );
 
-      // Clean up - wait for first request to complete
+      // Clean up - resolve the slow stream
+      if (resolveStream) resolveStream();
       await firstPromise;
+      await tick();
     });
 
     it('should not emit request-rejected when sendPrompt is called after previous request completes', async () => {
@@ -800,12 +554,130 @@ describe('SdkSession', () => {
 
       // Send first request and wait for completion
       await sdkSession.sendPrompt('First message');
+      await tick();
 
       // Send second request after first completes
       await sdkSession.sendPrompt('Second message');
 
       // Verify request-rejected was never emitted
       expect(requestRejectedHandler).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('AskUserQuestion and provideAnswer', () => {
+    it('should emit user-question event when canUseTool is called for AskUserQuestion', async () => {
+      let capturedCanUseTool: any = null;
+
+      // Capture the canUseTool callback from session creation
+      mockedCreateSession.mockImplementation((opts: any) => {
+        capturedCanUseTool = opts.canUseTool;
+        return createMockSession([
+          { type: 'system', subtype: 'init', session_id: 'test-session-id' },
+        ]) as any;
+      });
+
+      const questionHandler = vi.fn();
+      sdkSession.on('user-question', questionHandler);
+
+      // Start a prompt to create the session
+      sdkSession.sendPrompt('Help me choose');
+      await tick();
+
+      expect(capturedCanUseTool).not.toBeNull();
+
+      // Simulate SDK calling canUseTool for AskUserQuestion
+      const canUseToolPromise = capturedCanUseTool('AskUserQuestion', {
+        questions: [{
+          question: 'Which option?',
+          header: 'Choice',
+          options: [
+            { label: 'Option A', description: 'First option' },
+            { label: 'Option B', description: 'Second option' },
+          ],
+        }],
+      }, {
+        signal: new AbortController().signal,
+        toolUseID: 'toolu_123',
+      });
+
+      await tick();
+
+      // user-question event should have been emitted
+      expect(questionHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toolUseId: 'toolu_123',
+          questions: expect.arrayContaining([
+            expect.objectContaining({
+              question: 'Which option?',
+              header: 'Choice',
+            }),
+          ]),
+        })
+      );
+
+      // Resolve the question to avoid hanging
+      await sdkSession.provideAnswer('Option A', { '0': 'Option A' });
+      await canUseToolPromise;
+    });
+
+    it('should resolve canUseTool with updatedInput when provideAnswer is called', async () => {
+      let capturedCanUseTool: any = null;
+
+      mockedCreateSession.mockImplementation((opts: any) => {
+        capturedCanUseTool = opts.canUseTool;
+        return createMockSession([
+          { type: 'system', subtype: 'init', session_id: 'test-session-id' },
+        ]) as any;
+      });
+
+      sdkSession.sendPrompt('Start');
+      await tick();
+
+      // Simulate canUseTool being called (this blocks until provideAnswer resolves it)
+      const canUseToolPromise = capturedCanUseTool('AskUserQuestion', {
+        questions: [{
+          question: 'Pick one',
+          header: 'Test',
+          options: [{ label: 'A', description: 'Option A' }],
+        }],
+      }, {
+        signal: new AbortController().signal,
+        toolUseID: 'toolu_456',
+      });
+
+      await tick();
+
+      // Provide answer - should resolve the canUseTool promise
+      await sdkSession.provideAnswer('Option A', { '0': 'Option A' });
+
+      const result = await canUseToolPromise;
+      expect(result.behavior).toBe('allow');
+      expect(result.updatedInput).toEqual({
+        questions: [{
+          question: 'Pick one',
+          header: 'Test',
+          options: [{ label: 'A', description: 'Option A' }],
+        }],
+        answers: { '0': 'Option A' },
+      });
+    });
+
+    it('should fall back to sendPrompt when no pending question exists', async () => {
+      const session = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'test-session-id' },
+        { type: 'result', subtype: 'success', result: 'done' },
+      ]);
+      mockedCreateSession.mockReturnValue(session as any);
+
+      // First complete a normal prompt so isProcessing is false
+      await sdkSession.sendPrompt('Hello');
+      await tick();
+
+      // Call provideAnswer without a pending question - should fall back
+      await sdkSession.provideAnswer('An answer', { result: 'An answer' });
+
+      // send() should have been called twice (initial prompt + fallback)
+      expect(session._sendMock).toHaveBeenCalledTimes(2);
     });
   });
 });

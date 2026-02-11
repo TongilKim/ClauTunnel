@@ -2,8 +2,8 @@ import { EventEmitter } from 'events';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { query } from '@anthropic-ai/claude-agent-sdk';
-import type { Options, Query, SlashCommand as SDKSlashCommand, CanUseTool, PermissionResult, PermissionUpdate as SDKPermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
+import { unstable_v2_createSession, unstable_v2_resumeSession } from '@anthropic-ai/claude-agent-sdk';
+import type { SDKSession as V2Session, SDKSessionOptions, SDKMessage, SlashCommand as SDKSlashCommand, CanUseTool, PermissionResult, PermissionUpdate as SDKPermissionUpdate, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import type { ImageAttachment, ModelInfo, PermissionMode, SlashCommand, UserQuestionData, UserQuestion, PermissionRequestData, PermissionResponseData, PermissionUpdate } from 'termbridge-shared';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -35,10 +35,10 @@ interface PendingPermissionRequest {
 export class SdkSession extends EventEmitter {
   private options: SdkSessionOptions;
   private sessionId: string | null = null;
-  private abortController: AbortController | null = null;
   private isProcessing: boolean = false;
   private currentPermissionMode: PermissionMode;
-  private currentQuery: Query | null = null;
+  private v2Session: V2Session | null = null;
+  private streamLoopRunning: boolean = false;
   private cachedCommands: SlashCommand[] | null = null;
   private cachedModels: ModelInfo[] | null = null;
   private currentModel: string = 'default';
@@ -46,6 +46,10 @@ export class SdkSession extends EventEmitter {
   private pendingContextTransfer: boolean = false;
   private thinkingEnabled: boolean = false;
   private pendingPermissionRequests: Map<string, PendingPermissionRequest> = new Map();
+  // Pending AskUserQuestion answer resolver - resolved by provideAnswer()
+  private pendingAnswerResolve: ((answers: Record<string, string>) => void) | null = null;
+  // Track current assistant response text for conversation history
+  private currentAssistantResponse: string = '';
 
   constructor(options: SdkSessionOptions) {
     super();
@@ -84,6 +88,13 @@ export class SdkSession extends EventEmitter {
 
   /**
    * Create canUseTool callback for SDK
+   *
+   * AskUserQuestion goes through this path: the subprocess sends a
+   * control_request with subtype "can_use_tool" and blocks until a
+   * control_response is returned.  For AskUserQuestion we emit a
+   * user-question event, wait for provideAnswer() to resolve the pending
+   * promise, and return {behavior:'allow', updatedInput:{questions, answers}}
+   * so the subprocess can produce the tool_result and continue.
    */
   private createCanUseTool(): CanUseTool {
     return async (
@@ -98,6 +109,64 @@ export class SdkSession extends EventEmitter {
         agentID?: string;
       }
     ): Promise<PermissionResult> => {
+
+      // --- AskUserQuestion: route through user-question event -----------
+      if (toolName === 'AskUserQuestion') {
+        const questionInput = input as {
+          questions?: Array<{
+            question: string;
+            header: string;
+            options: Array<{ label: string; description: string }>;
+            multiSelect?: boolean;
+          }>;
+        };
+
+        if (questionInput.questions && Array.isArray(questionInput.questions)) {
+          const questions: UserQuestion[] = questionInput.questions.map(q => ({
+            question: q.question,
+            header: q.header,
+            options: (q.options || []).map(o => ({
+              label: o.label,
+              description: o.description,
+            })),
+            multiSelect: q.multiSelect,
+          }));
+
+          const questionData: UserQuestionData = {
+            toolUseId: options.toolUseID,
+            questions,
+          };
+
+          // Broadcast to mobile
+          this.emit('user-question', questionData);
+
+          // Wait for provideAnswer() to supply the answers
+          const answers = await new Promise<Record<string, string>>(
+            (resolve, reject) => {
+              this.pendingAnswerResolve = resolve;
+
+              // Clean up if the request is aborted (e.g. session cancelled)
+              options.signal.addEventListener('abort', () => {
+                this.pendingAnswerResolve = null;
+                reject(new Error('Question aborted'));
+              });
+            }
+          );
+
+          this.pendingAnswerResolve = null;
+
+          // Return updatedInput so the subprocess can build the tool_result
+          return {
+            behavior: 'allow' as const,
+            updatedInput: {
+              questions: questionInput.questions,
+              answers,
+            },
+          };
+        }
+      }
+
+      // --- Regular permission request: broadcast to mobile and wait -----
       const requestId = uuidv4();
 
       // Convert SDK permission updates to our type
@@ -169,22 +238,144 @@ export class SdkSession extends EventEmitter {
 
   async setThinkingMode(enabled: boolean): Promise<void> {
     this.thinkingEnabled = enabled;
-
-    // If there's an active query, update it at runtime
-    if (this.currentQuery) {
-      try {
-        // Use null to enable with SDK default, 0 to disable
-        await this.currentQuery.setMaxThinkingTokens(enabled ? null : 0);
-      } catch {
-        // Silently ignore if the query doesn't support this
-      }
-    }
-
     this.emit('thinking-mode', enabled);
   }
 
   getThinkingMode(): boolean {
     return this.thinkingEnabled;
+  }
+
+  /**
+   * Build V2 session options from current state
+   */
+  private buildSessionOptions(): SDKSessionOptions {
+    const opts: SDKSessionOptions = {
+      model: this.currentModel === 'default' ? 'claude-sonnet-4-5-20250929' : this.currentModel,
+      allowedTools: this.options.allowedTools || ['Read', 'Edit', 'Write', 'Bash', 'Glob', 'Grep'],
+      canUseTool: this.createCanUseTool(),
+      permissionMode: this.currentPermissionMode,
+    };
+    return opts;
+  }
+
+  /**
+   * Ensure a V2 session exists, creating one if needed
+   */
+  private ensureSession(): V2Session {
+    if (!this.v2Session) {
+      const opts = this.buildSessionOptions();
+
+      if (this.sessionId) {
+        // Resume existing session
+        this.v2Session = unstable_v2_resumeSession(this.sessionId, opts);
+      } else {
+        // Create new session
+        this.v2Session = unstable_v2_createSession(opts);
+      }
+
+      // Start the background message processing loop
+      this.startStreamLoop();
+    }
+    return this.v2Session;
+  }
+
+  /**
+   * Background loop that processes messages from the V2 session stream.
+   * Runs continuously for the lifetime of the session.
+   */
+  private async startStreamLoop(): Promise<void> {
+    if (this.streamLoopRunning || !this.v2Session) return;
+    this.streamLoopRunning = true;
+
+    try {
+      // The V2 stream() returns after each 'result' message.
+      // For multi-turn sessions, we need to call stream() again after each result.
+      while (this.v2Session && !this.v2Session['closed']) {
+        for await (const message of this.v2Session.stream()) {
+          this.processMessage(message);
+        }
+      }
+    } catch (error) {
+      if ((error as Error).name !== 'AbortError') {
+        this.emit('error', error);
+      }
+    } finally {
+      this.streamLoopRunning = false;
+    }
+  }
+
+  /**
+   * Process a single SDK message from the stream
+   */
+  private processMessage(message: SDKMessage): void {
+    // Handle different message types
+    if (message.type === 'system' && 'subtype' in message && message.subtype === 'init') {
+      // Capture session ID for resuming
+      this.sessionId = message.session_id;
+      this.emit('session-started', this.sessionId);
+
+      // Emit permission mode if present
+      if ('permissionMode' in message) {
+        this.emit('permission-mode', message.permissionMode);
+      }
+
+      // Capture slash commands from init message (includes plugins/skills)
+      if ('slash_commands' in message && Array.isArray(message.slash_commands)) {
+        this.cachedCommands = message.slash_commands.map((cmd: unknown) => {
+          if (typeof cmd === 'string') {
+            return { name: cmd, description: '', argumentHint: '' };
+          } else if (typeof cmd === 'object' && cmd !== null) {
+            const cmdObj = cmd as SDKSlashCommand;
+            return {
+              name: cmdObj.name || '',
+              description: cmdObj.description || '',
+              argumentHint: cmdObj.argumentHint || '',
+            };
+          }
+          return { name: String(cmd), description: '', argumentHint: '' };
+        });
+        this.emit('commands-updated', this.cachedCommands);
+      }
+    } else if (message.type === 'assistant') {
+      // Assistant text output and tool use
+      if (message.message?.content) {
+        for (const block of message.message.content) {
+          if ('type' in block && block.type === 'text' && 'text' in block) {
+            this.emit('output', block.text);
+            this.currentAssistantResponse += block.text;
+          } else if ('type' in block && block.type === 'tool_use' && 'name' in block) {
+            // AskUserQuestion tool_use blocks are handled via the canUseTool
+            // callback (which emits 'user-question' and waits for the answer).
+            // No special handling needed here in the stream.
+          }
+        }
+      }
+    } else if (message.type === 'result') {
+      // Emit result text if no assistant output was captured (e.g. slash commands like /context)
+      if (!this.currentAssistantResponse.trim() && 'result' in message && message.result) {
+        const resultText = String(message.result);
+        this.emit('output', resultText);
+        this.currentAssistantResponse = resultText;
+      }
+      // Final result - track assistant response in history
+      if (this.currentAssistantResponse.trim()) {
+        this.conversationHistory.push({ role: 'assistant', content: this.currentAssistantResponse.trim() });
+      }
+
+      this.currentAssistantResponse = '';
+      this.isProcessing = false;
+      this.emit('complete');
+    } else if (message.type === 'tool_progress') {
+      // Tool progress (tool being used)
+      if ('tool_name' in message) {
+        this.emit('output', `\n[Using tool: ${message.tool_name}]\n`);
+      }
+    } else if (message.type === 'tool_use_summary') {
+      // Tool use summary
+      if ('tool_name' in message) {
+        this.emit('output', `[Tool ${message.tool_name} completed]\n`);
+      }
+    }
   }
 
   async sendPrompt(prompt: string, attachments?: ImageAttachment[]): Promise<void> {
@@ -195,7 +386,7 @@ export class SdkSession extends EventEmitter {
     }
 
     this.isProcessing = true;
-    this.abortController = new AbortController();
+    this.currentAssistantResponse = '';
 
     // Track user message in conversation history
     if (prompt.trim()) {
@@ -203,22 +394,6 @@ export class SdkSession extends EventEmitter {
     }
 
     try {
-      const queryOptions: Options = {
-        allowedTools: this.options.allowedTools || ['Read', 'Edit', 'Write', 'Bash', 'Glob', 'Grep'],
-        cwd: this.options.cwd,
-        abortController: this.abortController,
-        permissionMode: this.currentPermissionMode,
-        // Pass model directly - SDK should handle aliases like 'opus', 'sonnet', 'haiku'
-        model: this.currentModel,
-        // Custom permission handler to route to mobile
-        canUseTool: this.createCanUseTool(),
-      };
-
-      // Resume session if we have one
-      if (this.sessionId) {
-        queryOptions.resume = this.sessionId;
-      }
-
       // Build the prompt text, including context if transferring to new session
       let finalPrompt = prompt;
       if (this.pendingContextTransfer && this.conversationHistory.length > 1) {
@@ -232,7 +407,10 @@ export class SdkSession extends EventEmitter {
         this.pendingContextTransfer = false;
       }
 
-      // Always use streaming input mode (AsyncIterable) to enable setModel() and setPermissionMode()
+      // Ensure we have a V2 session
+      const session = this.ensureSession();
+
+      // Build message content
       const contentBlocks: Array<{ type: string; text?: string; source?: { type: string; media_type: string; data: string } }> = [];
 
       // Add images if present
@@ -257,121 +435,18 @@ export class SdkSession extends EventEmitter {
         });
       }
 
-      // Create async iterable for SDKUserMessage (streaming input mode)
-      const sessionId = this.sessionId || '';
-      async function* createUserMessage() {
-        yield {
-          type: 'user' as const,
-          message: {
-            role: 'user' as const,
-            content: contentBlocks.length > 0 ? contentBlocks : [{ type: 'text', text: finalPrompt }],
-          },
-          parent_tool_use_id: null,
-          session_id: sessionId,
-        };
-      }
+      // Build and send the user message via V2 session.send()
+      const userMessage: SDKUserMessage = {
+        type: 'user' as const,
+        message: {
+          role: 'user' as const,
+          content: contentBlocks.length > 0 ? contentBlocks : [{ type: 'text' as const, text: finalPrompt }],
+        },
+        parent_tool_use_id: null,
+        session_id: this.sessionId || '',
+      };
 
-      const queryPrompt = createUserMessage();
-
-      this.currentQuery = query({
-        prompt: queryPrompt,
-        options: queryOptions,
-      });
-
-      // Enable thinking mode if set (use null to enable with SDK default)
-      if (this.thinkingEnabled) {
-        try {
-          await this.currentQuery.setMaxThinkingTokens(null);
-        } catch {
-          // Silently ignore if not supported
-        }
-      }
-
-      // Track assistant response for this turn
-      let assistantResponse = '';
-
-      for await (const message of this.currentQuery) {
-        // Handle different message types based on the SDK types
-        if (message.type === 'system' && 'subtype' in message && message.subtype === 'init') {
-          // Capture session ID for resuming
-          this.sessionId = message.session_id;
-          this.emit('session-started', this.sessionId);
-
-          // Emit permission mode if present
-          if ('permissionMode' in message) {
-            this.emit('permission-mode', message.permissionMode);
-          }
-
-          // Capture slash commands from init message (includes plugins/skills)
-          if ('slash_commands' in message && Array.isArray(message.slash_commands)) {
-            // slash_commands can be either strings or objects
-            this.cachedCommands = message.slash_commands.map((cmd: unknown) => {
-              if (typeof cmd === 'string') {
-                return { name: cmd, description: '', argumentHint: '' };
-              } else if (typeof cmd === 'object' && cmd !== null) {
-                const cmdObj = cmd as SDKSlashCommand;
-                return {
-                  name: cmdObj.name || '',
-                  description: cmdObj.description || '',
-                  argumentHint: cmdObj.argumentHint || '',
-                };
-              }
-              return { name: String(cmd), description: '', argumentHint: '' };
-            });
-            this.emit('commands-updated', this.cachedCommands);
-          }
-        } else if (message.type === 'assistant') {
-          // Assistant text output and tool use
-          if (message.message?.content) {
-            for (const block of message.message.content) {
-              if ('type' in block && block.type === 'text' && 'text' in block) {
-                this.emit('output', block.text);
-                assistantResponse += block.text;
-              } else if ('type' in block && block.type === 'tool_use' && 'name' in block) {
-                // Check for AskUserQuestion tool
-                if (block.name === 'AskUserQuestion' && 'input' in block && 'id' in block) {
-                  const input = block.input as { questions?: Array<{ question: string; header: string; options: Array<{ label: string; description: string }>; multiSelect?: boolean }> };
-                  if (input.questions && Array.isArray(input.questions)) {
-                    const questions: UserQuestion[] = input.questions.map(q => ({
-                      question: q.question,
-                      header: q.header,
-                      options: q.options.map(o => ({ label: o.label, description: o.description })),
-                      multiSelect: q.multiSelect,
-                    }));
-                    const questionData: UserQuestionData = {
-                      toolUseId: block.id as string,
-                      questions,
-                    };
-                    this.emit('user-question', questionData);
-                  }
-                }
-              }
-            }
-          }
-        } else if (message.type === 'result') {
-          // Emit result text if no assistant output was captured (e.g. slash commands like /context)
-          if (!assistantResponse.trim() && 'result' in message && message.result) {
-            const resultText = String(message.result);
-            this.emit('output', resultText);
-            assistantResponse = resultText;
-          }
-          // Final result - track assistant response in history
-          if (assistantResponse.trim()) {
-            this.conversationHistory.push({ role: 'assistant', content: assistantResponse.trim() });
-          }
-          this.emit('complete');
-        } else if (message.type === 'tool_progress') {
-          // Tool progress (tool being used)
-          if ('tool_name' in message) {
-            this.emit('output', `\n[Using tool: ${message.tool_name}]\n`);
-          }
-        } else if (message.type === 'tool_use_summary') {
-          // Tool use summary
-          if ('tool_name' in message) {
-            this.emit('output', `[Tool ${message.tool_name} completed]\n`);
-          }
-        }
-      }
+      await session.send(userMessage);
     } catch (error) {
       if ((error as Error).name === 'AbortError') {
         this.emit('output', '\n[Cancelled]\n');
@@ -379,16 +454,46 @@ export class SdkSession extends EventEmitter {
         this.emit('error', error);
         this.emit('output', `\n[Error: ${(error as Error).message}]\n`);
       }
-    } finally {
       this.isProcessing = false;
-      this.abortController = null;
     }
   }
 
-  cancel(): void {
-    if (this.abortController) {
-      this.abortController.abort();
+  /**
+   * Provide an answer to a pending AskUserQuestion.
+   *
+   * AskUserQuestion flows through the canUseTool callback which blocks
+   * waiting for a Promise to resolve.  This method resolves that Promise
+   * with the user's answers, which causes canUseTool to return
+   * {behavior:'allow', updatedInput:{questions, answers}} → the SDK
+   * sends the control_response back to the subprocess → it unblocks and
+   * builds the tool_result for the Claude API.
+   */
+  async provideAnswer(answerText: string, answers?: Record<string, string>): Promise<void> {
+    // Track in conversation history
+    if (answerText.trim()) {
+      this.conversationHistory.push({ role: 'user', content: answerText });
     }
+
+    if (this.pendingAnswerResolve) {
+      // Resolve the pending canUseTool callback with the answers
+      const resolvedAnswers = answers || { result: answerText };
+      this.pendingAnswerResolve(resolvedAnswers);
+      this.pendingAnswerResolve = null;
+      return;
+    }
+
+    // No pending question - fall back to sendPrompt
+    await this.sendPrompt(answerText);
+  }
+
+  cancel(): void {
+    this.pendingAnswerResolve = null;
+    if (this.v2Session) {
+      this.v2Session.close();
+      this.v2Session = null;
+      this.streamLoopRunning = false;
+    }
+    this.isProcessing = false;
   }
 
   getSessionId(): string | null {
@@ -400,6 +505,12 @@ export class SdkSession extends EventEmitter {
    * The next sendPrompt call will use this session ID.
    */
   resumeSession(sessionId: string): void {
+    // Close existing session if any
+    if (this.v2Session) {
+      this.v2Session.close();
+      this.v2Session = null;
+      this.streamLoopRunning = false;
+    }
     this.sessionId = sessionId;
     this.conversationHistory = []; // Clear local history since we're resuming a different session
     this.emit('session-resumed', sessionId);
@@ -414,17 +525,14 @@ export class SdkSession extends EventEmitter {
 
     this.currentModel = model;
 
-    // If there's an active query, use SDK's runtime setModel() to switch mid-session
-    if (this.currentQuery) {
-      try {
-        await this.currentQuery.setModel(model);
-      } catch {
-        // If runtime setModel fails, fall back to creating a new session on next prompt
-        this.sessionId = null;
-        this.pendingContextTransfer = true;
-      }
+    // Close existing session - a new one will be created with the new model on next sendPrompt()
+    if (this.v2Session) {
+      this.v2Session.close();
+      this.v2Session = null;
+      this.streamLoopRunning = false;
+      this.sessionId = null;
+      this.pendingContextTransfer = true;
     } else if (this.sessionId) {
-      // No active query - will take effect on next sendPrompt() via Options.model
       this.sessionId = null;
       this.pendingContextTransfer = true;
     }
@@ -442,7 +550,12 @@ export class SdkSession extends EventEmitter {
 
   clearHistory(): void {
     this.conversationHistory = [];
-    // Also clear session ID to force a fresh session on next prompt
+    // Close existing session and force a fresh one on next prompt
+    if (this.v2Session) {
+      this.v2Session.close();
+      this.v2Session = null;
+      this.streamLoopRunning = false;
+    }
     this.sessionId = null;
   }
 
@@ -458,27 +571,6 @@ export class SdkSession extends EventEmitter {
     // Return cached SDK models if available
     if (this.cachedModels) {
       return this.cachedModels;
-    }
-
-    if (!this.currentQuery) {
-      return coreModels;
-    }
-
-    try {
-      const sdkModels = await this.currentQuery.supportedModels();
-      if (sdkModels && sdkModels.length > 0) {
-        const mappedModels = sdkModels.map((m: { value?: string; displayName?: string; description?: string }) => ({
-          value: m.value || '',
-          displayName: m.displayName || m.value || '',
-          description: m.description || '',
-        }));
-
-        // Cache for future calls (including new sessions before a query is active)
-        this.cachedModels = mappedModels;
-        return mappedModels;
-      }
-    } catch {
-      // Fall through to core models
     }
 
     return coreModels;
@@ -572,8 +664,6 @@ export class SdkSession extends EventEmitter {
 
   async getSupportedCommands(): Promise<SlashCommand[]> {
     // Fallback commands - known Claude Code built-in commands
-    // Sources: https://shipyard.build/blog/claude-code-cheat-sheet/
-    //          https://www.eesel.ai/blog/slash-commands-claude-code
     const fallbackCommands: SlashCommand[] = [
       // Session management
       { name: 'help', description: 'Show all commands and custom slash commands', argumentHint: '' },
@@ -626,24 +716,6 @@ export class SdkSession extends EventEmitter {
       const existingNames = new Set(allCommands.map(c => c.name));
       const newCached = this.cachedCommands.filter(c => !existingNames.has(c.name));
       allCommands = [...allCommands, ...newCached];
-    } else if (this.currentQuery) {
-      // Try SDK supportedCommands() as fallback
-      try {
-        const sdkCommands = await this.currentQuery.supportedCommands();
-
-        const existingNames = new Set(allCommands.map(c => c.name));
-        for (const cmd of sdkCommands) {
-          if (!existingNames.has(cmd.name)) {
-            allCommands.push({
-              name: cmd.name,
-              description: cmd.description,
-              argumentHint: cmd.argumentHint || '',
-            });
-          }
-        }
-      } catch {
-        // Ignore SDK supportedCommands() errors
-      }
     }
 
     // Add fallback commands

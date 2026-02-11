@@ -295,6 +295,19 @@ export function createStartCommand(): Command {
                 logger.error(`Session error: ${error.message}`);
               });
 
+              newDaemon.on('mobile-input', (prompt: string, attachments?: unknown[]) => {
+                const hasImages = attachments && attachments.length > 0;
+                const imageInfo = hasImages ? ` [+${attachments.length} image${attachments.length > 1 ? 's' : ''}]` : '';
+                logger.info(`[Mobile] ${prompt}${imageInfo}`);
+              });
+
+              newDaemon.on('mobile-output', (data: string) => {
+                const trimmed = data.trim();
+                if (trimmed) {
+                  logger.info(`[Claude] ${trimmed}`);
+                }
+              });
+
               newDaemon.on('mobile-disconnected', async () => {
                 logger.info('Mobile disconnected. Ending session...');
                 try {
