@@ -298,12 +298,12 @@ describe('SdkSession', () => {
       );
     });
 
-    it('should use claude-opus-4-6-20250219 as the default model', async () => {
+    it('should use opus as the default model', async () => {
       await sdkSession.sendPrompt('Hello');
 
       expect(mockedCreateSession).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'claude-opus-4-6-20250219',
+          model: 'opus',
         })
       );
     });

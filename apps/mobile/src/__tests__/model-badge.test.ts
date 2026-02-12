@@ -36,7 +36,7 @@ describe('getModelDisplayName', () => {
     });
 
     it('should return "Opus 4.6" for full opus identifier', () => {
-      expect(getModelDisplayName('claude-opus-4-6-20250219', sampleModels)).toBe('Opus 4.6');
+      expect(getModelDisplayName('claude-opus-4-6', sampleModels)).toBe('Opus 4.6');
     });
 
     it('should return "Haiku 3.5" for full haiku identifier', () => {
@@ -77,7 +77,7 @@ describe('getModelDisplayName', () => {
     });
 
     it('should resolve full opus identifier via the default entry', () => {
-      const result = getModelDisplayName('claude-opus-4-6-20250219', sampleModels);
+      const result = getModelDisplayName('claude-opus-4-6', sampleModels);
       expect(result).toBe('Opus 4.6');
     });
 

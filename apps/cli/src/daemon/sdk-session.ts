@@ -250,7 +250,7 @@ export class SdkSession extends EventEmitter {
    */
   private buildSessionOptions(): SDKSessionOptions {
     const opts: SDKSessionOptions = {
-      model: this.currentModel === 'default' ? 'claude-opus-4-6-20250219' : this.currentModel,
+      model: this.currentModel === 'default' ? 'opus' : this.currentModel,
       allowedTools: this.options.allowedTools || ['Read', 'Edit', 'Write', 'Bash', 'Glob', 'Grep'],
       canUseTool: this.createCanUseTool(),
       permissionMode: this.currentPermissionMode,

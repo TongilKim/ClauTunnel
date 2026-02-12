@@ -130,9 +130,9 @@ export function ModelPicker({
                         ]}
                       >
                         {model.value === 'default'
-                          ? 'claude-opus-4-6-20250219'
+                          ? 'claude-opus-4-6'
                           : model.value === 'opus'
-                          ? 'claude-opus-4-6-20250219'
+                          ? 'claude-opus-4-6'
                           : model.value === 'haiku'
                           ? 'claude-3-5-haiku-20241022'
                           : model.value}
