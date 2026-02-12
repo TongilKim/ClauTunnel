@@ -562,7 +562,7 @@ export class SdkSession extends EventEmitter {
   async getSupportedModels(): Promise<ModelInfo[]> {
     // Fallback models matching SDK response format
     const coreModels: ModelInfo[] = [
-      { value: 'default', displayName: 'Default (recommended)', description: 'Use the default model (currently Sonnet 4.5)' },
+      { value: 'default', displayName: 'Default (recommended)', description: 'Use the default model (currently Opus 4.6)' },
       { value: 'opus', displayName: 'Opus', description: 'Opus 4.6 · Most capable for complex work' },
       { value: 'haiku', displayName: 'Haiku', description: 'Haiku 4.5 · Fastest for quick answers' },
       { value: 'sonnet', displayName: 'Sonnet', description: 'Sonnet 4.5 · Best for everyday tasks' },

@@ -243,9 +243,9 @@ export class Daemon extends EventEmitter {
         // Output confirmation message if model actually changed
         if (previousModel !== message.model) {
           const modelNames: Record<string, string> = {
-            'default': 'Sonnet 4',
+            'default': 'Opus 4.6',
             'sonnet': 'Sonnet 4',
-            'opus': 'Opus 4',
+            'opus': 'Opus 4.6',
             'haiku': 'Haiku 3.5',
           };
           const displayName = modelNames[message.model] || message.model;
