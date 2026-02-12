@@ -5,38 +5,38 @@ import { getModelBadgeState } from '../utils/modelBadgeState';
 
 // Sample model data matching real CLI output
 const sampleModels: ModelInfo[] = [
-  { value: 'default', displayName: 'Sonnet 4 (recommended)', description: 'Claude Sonnet 4 — balanced performance' },
-  { value: 'opus', displayName: 'Opus 4.5', description: 'Claude Opus 4.5 — most capable' },
+  { value: 'default', displayName: 'Opus 4.6 (recommended)', description: 'Claude Opus 4.6 — most capable' },
+  { value: 'opus', displayName: 'Opus 4.6', description: 'Claude Opus 4.6 — most capable' },
   { value: 'haiku', displayName: 'Haiku 3.5', description: 'Claude Haiku 3.5 — fastest' },
-  { value: 'sonnet', displayName: 'Sonnet 4', description: 'Claude Sonnet 4' },
+  { value: 'sonnet', displayName: 'Sonnet 4.5', description: 'Claude Sonnet 4.5 — balanced performance' },
 ];
 
 describe('getModelDisplayName', () => {
   describe('returns correct display name for shorthand model values', () => {
-    it('should return "Sonnet 4" for model "default"', () => {
-      expect(getModelDisplayName('default', sampleModels)).toBe('Sonnet 4');
+    it('should return "Opus 4.6" for model "default"', () => {
+      expect(getModelDisplayName('default', sampleModels)).toBe('Opus 4.6');
     });
 
-    it('should return "Opus 4.5" for model "opus"', () => {
-      expect(getModelDisplayName('opus', sampleModels)).toBe('Opus 4.5');
+    it('should return "Opus 4.6" for model "opus" (resolves via default entry)', () => {
+      expect(getModelDisplayName('opus', sampleModels)).toBe('Opus 4.6');
     });
 
     it('should return "Haiku 3.5" for model "haiku"', () => {
       expect(getModelDisplayName('haiku', sampleModels)).toBe('Haiku 3.5');
     });
 
-    it('should return "Sonnet 4" for model "sonnet" (resolves via default entry)', () => {
-      expect(getModelDisplayName('sonnet', sampleModels)).toBe('Sonnet 4');
+    it('should return "Sonnet 4.5" for model "sonnet"', () => {
+      expect(getModelDisplayName('sonnet', sampleModels)).toBe('Sonnet 4.5');
     });
   });
 
   describe('returns correct display name for full model identifiers', () => {
-    it('should return "Sonnet 4" for full sonnet identifier', () => {
-      expect(getModelDisplayName('claude-sonnet-4-20250514', sampleModels)).toBe('Sonnet 4');
+    it('should return "Sonnet 4.5" for full sonnet identifier', () => {
+      expect(getModelDisplayName('claude-sonnet-4-5-20250929', sampleModels)).toBe('Sonnet 4.5');
     });
 
-    it('should return "Opus 4.5" for full opus identifier', () => {
-      expect(getModelDisplayName('claude-opus-4-5-20250514', sampleModels)).toBe('Opus 4.5');
+    it('should return "Opus 4.6" for full opus identifier', () => {
+      expect(getModelDisplayName('claude-opus-4-6', sampleModels)).toBe('Opus 4.6');
     });
 
     it('should return "Haiku 3.5" for full haiku identifier', () => {
@@ -48,7 +48,7 @@ describe('getModelDisplayName', () => {
     it('should strip "(recommended)" suffix from display name', () => {
       const result = getModelDisplayName('default', sampleModels);
       expect(result).not.toContain('(recommended)');
-      expect(result).toBe('Sonnet 4');
+      expect(result).toBe('Opus 4.6');
     });
   });
 
@@ -71,19 +71,19 @@ describe('getModelDisplayName', () => {
   });
 
   describe('matching logic consistency with ModelPicker.isModelSelected', () => {
-    it('should resolve "default" using the default entry, not the sonnet entry', () => {
+    it('should resolve "default" using the default entry, not the opus entry', () => {
       const result = getModelDisplayName('default', sampleModels);
-      expect(result).toBe('Sonnet 4');
+      expect(result).toBe('Opus 4.6');
     });
 
-    it('should resolve full sonnet identifier via the default entry', () => {
-      const result = getModelDisplayName('claude-sonnet-4-20250514', sampleModels);
-      expect(result).toBe('Sonnet 4');
+    it('should resolve full opus identifier via the default entry', () => {
+      const result = getModelDisplayName('claude-opus-4-6', sampleModels);
+      expect(result).toBe('Opus 4.6');
     });
 
-    it('should resolve full opus identifier via opus shorthand entry', () => {
-      const result = getModelDisplayName('claude-opus-4-5-20250514', sampleModels);
-      expect(result).toBe('Opus 4.5');
+    it('should resolve full sonnet identifier via sonnet shorthand entry', () => {
+      const result = getModelDisplayName('claude-sonnet-4-5-20250929', sampleModels);
+      expect(result).toBe('Sonnet 4.5');
     });
 
     it('should resolve full haiku identifier via haiku shorthand entry', () => {
@@ -130,7 +130,7 @@ describe('getModelBadgeState', () => {
         availableModels: sampleModels,
         isModelChanging: false,
       });
-      expect(state.displayText).toBe('Sonnet 4');
+      expect(state.displayText).toBe('Opus 4.6');
       expect(state.displayText).not.toContain('\u25BE');
     });
 
@@ -167,13 +167,13 @@ describe('getModelBadgeState', () => {
 
   describe('model transitions', () => {
     it('should update display text after model change completes', () => {
-      // Before: Sonnet 4
+      // Before: Opus 4.6
       const before = getModelBadgeState({
         model: 'default',
         availableModels: sampleModels,
         isModelChanging: false,
       });
-      expect(before.displayText).toBe('Sonnet 4');
+      expect(before.displayText).toBe('Opus 4.6');
 
       // During: spinner shown
       const during = getModelBadgeState({
@@ -183,13 +183,13 @@ describe('getModelBadgeState', () => {
       });
       expect(during.showSpinner).toBe(true);
 
-      // After: Opus 4.5
+      // After: Sonnet 4.5
       const after = getModelBadgeState({
-        model: 'opus',
+        model: 'sonnet',
         availableModels: sampleModels,
         isModelChanging: false,
       });
-      expect(after.displayText).toBe('Opus 4.5');
+      expect(after.displayText).toBe('Sonnet 4.5');
       expect(after.showSpinner).toBe(false);
     });
   });

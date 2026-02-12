@@ -298,6 +298,16 @@ describe('SdkSession', () => {
       );
     });
 
+    it('should use opus as the default model', async () => {
+      await sdkSession.sendPrompt('Hello');
+
+      expect(mockedCreateSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: 'opus',
+        })
+      );
+    });
+
     it('should create new session with updated model after setModel', async () => {
       const session1 = createMockSession([
         { type: 'system', subtype: 'init', session_id: 'session-1' },

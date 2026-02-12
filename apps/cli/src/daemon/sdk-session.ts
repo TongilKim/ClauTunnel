@@ -250,7 +250,9 @@ export class SdkSession extends EventEmitter {
    */
   private buildSessionOptions(): SDKSessionOptions {
     const opts: SDKSessionOptions = {
-      model: this.currentModel === 'default' ? 'claude-sonnet-4-5-20250929' : this.currentModel,
+      // SDK accepts shorthand model names: 'opus' | 'sonnet' | 'haiku'
+      // Full model IDs (e.g. 'claude-opus-4-6') are also valid but shorthand is preferred
+      model: this.currentModel === 'default' ? 'opus' : this.currentModel,
       allowedTools: this.options.allowedTools || ['Read', 'Edit', 'Write', 'Bash', 'Glob', 'Grep'],
       canUseTool: this.createCanUseTool(),
       permissionMode: this.currentPermissionMode,
@@ -562,7 +564,7 @@ export class SdkSession extends EventEmitter {
   async getSupportedModels(): Promise<ModelInfo[]> {
     // Fallback models matching SDK response format
     const coreModels: ModelInfo[] = [
-      { value: 'default', displayName: 'Default (recommended)', description: 'Use the default model (currently Sonnet 4.5)' },
+      { value: 'default', displayName: 'Default (recommended)', description: 'Use the default model (currently Opus 4.6)' },
       { value: 'opus', displayName: 'Opus', description: 'Opus 4.6 · Most capable for complex work' },
       { value: 'haiku', displayName: 'Haiku', description: 'Haiku 4.5 · Fastest for quick answers' },
       { value: 'sonnet', displayName: 'Sonnet', description: 'Sonnet 4.5 · Best for everyday tasks' },
