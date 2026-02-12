@@ -250,6 +250,8 @@ export class SdkSession extends EventEmitter {
    */
   private buildSessionOptions(): SDKSessionOptions {
     const opts: SDKSessionOptions = {
+      // SDK accepts shorthand model names: 'opus' | 'sonnet' | 'haiku'
+      // Full model IDs (e.g. 'claude-opus-4-6') are also valid but shorthand is preferred
       model: this.currentModel === 'default' ? 'opus' : this.currentModel,
       allowedTools: this.options.allowedTools || ['Read', 'Edit', 'Write', 'Bash', 'Glob', 'Grep'],
       canUseTool: this.createCanUseTool(),
