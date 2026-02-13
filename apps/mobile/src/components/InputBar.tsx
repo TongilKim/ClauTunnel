@@ -108,7 +108,6 @@ export function InputBar({ disabled }: InputBarProps) {
       const messageContent = input.trim();
       setInput('');
       setSelectedImages([]);
-      setInputHeight(MIN_INPUT_HEIGHT);
 
       await sendInput(messageContent + '\n', attachments.length > 0 ? attachments : undefined);
     } catch {
@@ -199,8 +198,7 @@ export function InputBar({ disabled }: InputBarProps) {
   const handleContentSizeChange = useCallback(
     (event: NativeSyntheticEvent<TextInputContentSizeChangeEventData>) => {
       const contentHeight = event.nativeEvent.contentSize.height;
-      const newHeight = Math.min(Math.max(contentHeight + 12, MIN_INPUT_HEIGHT), MAX_INPUT_HEIGHT);
-      setInputHeight(newHeight);
+      setInputHeight(contentHeight);
     },
     []
   );
@@ -291,21 +289,19 @@ export function InputBar({ disabled }: InputBarProps) {
           style={[
             styles.input,
             isDark && styles.inputDark,
-            { height: inputHeight },
           ]}
           value={input}
           onChangeText={setInput}
           placeholder={placeholderText}
           placeholderTextColor={isDark ? '#6b7280' : '#9ca3af'}
           editable={!isDisabled}
-          onSubmitEditing={handleSend}
-          returnKeyType="send"
           autoCapitalize="sentences"
           autoCorrect={true}
           multiline={true}
           textAlignVertical="top"
           onContentSizeChange={handleContentSizeChange}
           blurOnSubmit={false}
+          scrollEnabled={inputHeight >= MAX_INPUT_HEIGHT}
         />
 
         {/* Image previews */}
@@ -444,8 +440,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#1f2937',
     lineHeight: 20,
-    paddingTop: 0,
-    paddingBottom: 0,
+    paddingTop: 8,
+    paddingBottom: 8,
   },
   inputDark: {
     color: '#e5e5e5',

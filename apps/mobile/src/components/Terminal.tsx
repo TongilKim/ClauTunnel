@@ -832,6 +832,7 @@ const styles = StyleSheet.create({
   bubbleContainer: {
     maxWidth: '75%',
     flexShrink: 1,
+    flexGrow: 1,
   },
   bubbleContainerUser: {
     alignItems: 'flex-end',
