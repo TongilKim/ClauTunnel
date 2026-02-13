@@ -574,6 +574,200 @@ describe('SdkSession', () => {
     });
   });
 
+  describe('isProcessing recovery', () => {
+    it('should reset isProcessing when stream ends without result message', async () => {
+      // Create a session that yields init but no result, then the stream ends
+      // Mark closed=true after stream ends so the while loop exits
+      let streamDone = false;
+      const noResultSession = {
+        get closed() { return streamDone; },
+        get sessionId() { return 'no-result-session'; },
+        send: vi.fn().mockResolvedValue(undefined),
+        stream: async function* () {
+          yield { type: 'system', subtype: 'init', session_id: 'no-result-session' };
+          // Stream ends without yielding a 'result' message
+          streamDone = true;
+        },
+        close: vi.fn(),
+        [Symbol.asyncDispose]: async () => {},
+      };
+      mockedCreateSession.mockReturnValue(noResultSession as any);
+
+      const completeHandler = vi.fn();
+      sdkSession.on('complete', completeHandler);
+
+      await sdkSession.sendPrompt('Hello');
+      // Wait for stream loop to finish
+      await tick();
+      await tick();
+
+      // isProcessing should be reset by the finally block
+      expect(sdkSession.isActive()).toBe(false);
+      // complete event should be emitted so UI knows the request finished
+      expect(completeHandler).toHaveBeenCalled();
+    });
+
+    it('should reset isProcessing when stream loop throws an error', async () => {
+      const errorSession = {
+        closed: false,
+        get sessionId() { return 'error-session'; },
+        send: vi.fn().mockResolvedValue(undefined),
+        stream: async function* () {
+          yield { type: 'system', subtype: 'init', session_id: 'error-session' };
+          errorSession.closed = true;
+          throw new Error('Stream connection lost');
+        },
+        close: vi.fn(),
+        [Symbol.asyncDispose]: async () => {},
+      };
+      mockedCreateSession.mockReturnValue(errorSession as any);
+
+      const errorHandler = vi.fn();
+      sdkSession.on('error', errorHandler);
+
+      await sdkSession.sendPrompt('Hello');
+      await tick();
+      await tick();
+
+      // isProcessing should be reset
+      expect(sdkSession.isActive()).toBe(false);
+    });
+
+    it('should reset isProcessing when setModel is called during processing', async () => {
+      let resolveStream: (() => void) | null = null;
+      const slowSession = {
+        closed: false,
+        get sessionId() { return 'slow-session'; },
+        send: vi.fn().mockResolvedValue(undefined),
+        stream: async function* () {
+          yield { type: 'system', subtype: 'init', session_id: 'slow-session' };
+          await new Promise<void>(r => { resolveStream = r; });
+          yield { type: 'result', subtype: 'success', result: 'done' };
+        },
+        close: vi.fn(() => { slowSession.closed = true; }),
+        [Symbol.asyncDispose]: async () => {},
+      };
+      mockedCreateSession.mockReturnValue(slowSession as any);
+
+      sdkSession.sendPrompt('Hello');
+      await tick();
+
+      // Processing should be active
+      expect(sdkSession.isActive()).toBe(true);
+
+      // Change model while processing
+      await sdkSession.setModel('haiku');
+
+      // isProcessing should be reset
+      expect(sdkSession.isActive()).toBe(false);
+
+      // Clean up
+      if (resolveStream) resolveStream();
+      await tick();
+    });
+
+    it('should reset isProcessing when clearHistory is called during processing', async () => {
+      let resolveStream: (() => void) | null = null;
+      const slowSession = {
+        closed: false,
+        get sessionId() { return 'slow-session'; },
+        send: vi.fn().mockResolvedValue(undefined),
+        stream: async function* () {
+          yield { type: 'system', subtype: 'init', session_id: 'slow-session' };
+          await new Promise<void>(r => { resolveStream = r; });
+          yield { type: 'result', subtype: 'success', result: 'done' };
+        },
+        close: vi.fn(() => { slowSession.closed = true; }),
+        [Symbol.asyncDispose]: async () => {},
+      };
+      mockedCreateSession.mockReturnValue(slowSession as any);
+
+      sdkSession.sendPrompt('Hello');
+      await tick();
+
+      expect(sdkSession.isActive()).toBe(true);
+
+      sdkSession.clearHistory();
+
+      expect(sdkSession.isActive()).toBe(false);
+
+      if (resolveStream) resolveStream();
+      await tick();
+    });
+
+    it('should reset isProcessing when resumeSession is called during processing', async () => {
+      let resolveStream: (() => void) | null = null;
+      const slowSession = {
+        closed: false,
+        get sessionId() { return 'slow-session'; },
+        send: vi.fn().mockResolvedValue(undefined),
+        stream: async function* () {
+          yield { type: 'system', subtype: 'init', session_id: 'slow-session' };
+          await new Promise<void>(r => { resolveStream = r; });
+          yield { type: 'result', subtype: 'success', result: 'done' };
+        },
+        close: vi.fn(() => { slowSession.closed = true; }),
+        [Symbol.asyncDispose]: async () => {},
+      };
+      mockedCreateSession.mockReturnValue(slowSession as any);
+
+      sdkSession.sendPrompt('Hello');
+      await tick();
+
+      expect(sdkSession.isActive()).toBe(true);
+
+      sdkSession.resumeSession('new-session-id');
+
+      expect(sdkSession.isActive()).toBe(false);
+
+      if (resolveStream) resolveStream();
+      await tick();
+    });
+
+    it('should allow new requests after isProcessing is recovered', async () => {
+      // First: a session that ends without result
+      let streamDone = false;
+      const noResultSession = {
+        get closed() { return streamDone; },
+        get sessionId() { return 'no-result-session'; },
+        send: vi.fn().mockResolvedValue(undefined),
+        stream: async function* () {
+          yield { type: 'system', subtype: 'init', session_id: 'no-result-session' };
+          streamDone = true;
+        },
+        close: vi.fn(),
+        [Symbol.asyncDispose]: async () => {},
+      };
+      mockedCreateSession.mockReturnValue(noResultSession as any);
+
+      await sdkSession.sendPrompt('First');
+      await tick();
+      await tick();
+
+      // Should be recovered
+      expect(sdkSession.isActive()).toBe(false);
+
+      // Now a normal session should work
+      const normalSession = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'normal-session' },
+        { type: 'result', subtype: 'success', result: 'done' },
+      ]);
+      mockedCreateSession.mockReturnValue(normalSession as any);
+
+      const rejectedHandler = vi.fn();
+      sdkSession.on('request-rejected', rejectedHandler);
+
+      // This needs a fresh session since the old one closed
+      sdkSession.clearHistory();
+      await sdkSession.sendPrompt('Second');
+      await tick();
+
+      // Should NOT be rejected
+      expect(rejectedHandler).not.toHaveBeenCalled();
+      expect(normalSession._sendMock).toHaveBeenCalled();
+    });
+  });
+
   describe('AskUserQuestion and provideAnswer', () => {
     it('should emit user-question event when canUseTool is called for AskUserQuestion', async () => {
       let capturedCanUseTool: any = null;
