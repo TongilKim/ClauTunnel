@@ -44,7 +44,7 @@ const MAX_INPUT_HEIGHT = 120;
 
 export function InputBar({ disabled }: InputBarProps) {
   const [input, setInput] = useState('');
-  const [inputHeight, setInputHeight] = useState(MIN_INPUT_HEIGHT);
+  const [isScrollEnabled, setIsScrollEnabled] = useState(false);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [showCommandPicker, setShowCommandPicker] = useState(false);
   const [showModelPicker, setShowModelPicker] = useState(false);
@@ -198,7 +198,7 @@ export function InputBar({ disabled }: InputBarProps) {
   const handleContentSizeChange = useCallback(
     (event: NativeSyntheticEvent<TextInputContentSizeChangeEventData>) => {
       const contentHeight = event.nativeEvent.contentSize.height;
-      setInputHeight(contentHeight);
+      setIsScrollEnabled(contentHeight >= MAX_INPUT_HEIGHT);
     },
     []
   );
@@ -301,7 +301,7 @@ export function InputBar({ disabled }: InputBarProps) {
           textAlignVertical="top"
           onContentSizeChange={handleContentSizeChange}
           blurOnSubmit={false}
-          scrollEnabled={inputHeight >= MAX_INPUT_HEIGHT}
+          scrollEnabled={isScrollEnabled}
         />
 
         {/* Image previews */}
