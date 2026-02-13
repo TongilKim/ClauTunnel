@@ -23,6 +23,7 @@ import { ModelPicker } from './ModelPicker';
 import { InteractivePicker } from './InteractivePicker';
 import { ResumeSessionPicker } from './ResumeSessionPicker';
 import type { SlashCommand, InteractiveCommandType } from 'termbridge-shared';
+import { MIN_INPUT_HEIGHT, MAX_INPUT_HEIGHT } from '../utils/inputBarConstants';
 
 // Commands that require interactive UI instead of text input
 const INTERACTIVE_COMMANDS = new Set<string>([
@@ -38,9 +39,6 @@ const INTERACTIVE_COMMANDS = new Set<string>([
 interface InputBarProps {
   disabled?: boolean;
 }
-
-const MIN_INPUT_HEIGHT = 36;
-const MAX_INPUT_HEIGHT = 120;
 
 export function InputBar({ disabled }: InputBarProps) {
   const [input, setInput] = useState('');

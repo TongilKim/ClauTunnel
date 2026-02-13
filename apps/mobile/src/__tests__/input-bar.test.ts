@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { MIN_INPUT_HEIGHT, MAX_INPUT_HEIGHT } from '../utils/inputBarConstants';
 
 /**
  * InputBar layout constants and scroll logic tests.
@@ -6,9 +7,6 @@ import { describe, it, expect } from 'vitest';
  * The TextInput auto-grows via minHeight / maxHeight (no explicit height).
  * scrollEnabled flips to true only when content reaches MAX_INPUT_HEIGHT.
  */
-
-const MIN_INPUT_HEIGHT = 36;
-const MAX_INPUT_HEIGHT = 120;
 
 /** Mirrors the logic inside handleContentSizeChange */
 function computeScrollEnabled(contentHeight: number): boolean {
@@ -30,7 +28,7 @@ describe('InputBar scroll logic', () => {
 
   it('should disable scroll for multi-line content below max', () => {
     expect(computeScrollEnabled(80)).toBe(false);
-    expect(computeScrollEnabled(119)).toBe(false);
+    expect(computeScrollEnabled(MAX_INPUT_HEIGHT - 1)).toBe(false);
   });
 
   it('should enable scroll when content height equals max', () => {

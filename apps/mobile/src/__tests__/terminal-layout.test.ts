@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { parseToolUsage } from '../utils/terminalUtils';
 
 /**
  * Terminal message bubble layout and utility tests.
@@ -6,26 +7,6 @@ import { describe, it, expect } from 'vitest';
  * Validates that bubble containers use correct flex properties so
  * Claude messages fill available width instead of collapsing.
  */
-
-/** Mirrors parseToolUsage from Terminal.tsx */
-function parseToolUsage(content: string): { tools: string[]; cleanContent: string } {
-  const toolPattern = /\[Using tool: ([^\]]+)\]/g;
-  const completedPattern = /\[Tool ([^\]]+) completed\]/g;
-
-  const tools: string[] = [];
-  let match;
-
-  while ((match = toolPattern.exec(content)) !== null) {
-    tools.push(match[1]);
-  }
-
-  const cleanContent = content
-    .replace(toolPattern, '')
-    .replace(completedPattern, '')
-    .trim();
-
-  return { tools, cleanContent };
-}
 
 describe('parseToolUsage', () => {
   it('should return empty tools and original content for plain text', () => {
