@@ -301,6 +301,13 @@ export class SdkSession extends EventEmitter {
       }
     } finally {
       this.streamLoopRunning = false;
+      // If the stream loop exits without a 'result' message (e.g. unexpected
+      // disconnect or error), ensure isProcessing is reset so subsequent
+      // requests are not permanently blocked.
+      if (this.isProcessing) {
+        this.isProcessing = false;
+        this.emit('complete');
+      }
     }
   }
 
@@ -512,6 +519,7 @@ export class SdkSession extends EventEmitter {
       this.streamLoopRunning = false;
     }
     this.sessionId = sessionId;
+    this.isProcessing = false;
     this.conversationHistory = []; // Clear local history since we're resuming a different session
     this.emit('session-resumed', sessionId);
   }
@@ -531,6 +539,7 @@ export class SdkSession extends EventEmitter {
       this.v2Session = null;
       this.streamLoopRunning = false;
       this.sessionId = null;
+      this.isProcessing = false;
       this.pendingContextTransfer = true;
     } else if (this.sessionId) {
       this.sessionId = null;
@@ -557,6 +566,7 @@ export class SdkSession extends EventEmitter {
       this.streamLoopRunning = false;
     }
     this.sessionId = null;
+    this.isProcessing = false;
   }
 
   async getSupportedModels(): Promise<ModelInfo[]> {
