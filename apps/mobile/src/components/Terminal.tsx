@@ -19,6 +19,7 @@ import * as Haptics from 'expo-haptics';
 import { useConnectionStore } from '../stores/connectionStore';
 import { useSessionStore } from '../stores/sessionStore';
 import type { RealtimeMessage } from 'termbridge-shared';
+import { parseToolUsage } from '../utils/terminalUtils';
 
 interface TerminalProps {
   maxLines?: number;
@@ -57,27 +58,6 @@ function ToolBadge({ toolName, isDark }: { toolName: string; isDark: boolean }) 
       </Text>
     </View>
   );
-}
-
-// Parse tool usage from content
-function parseToolUsage(content: string): { tools: string[]; cleanContent: string } {
-  const toolPattern = /\[Using tool: ([^\]]+)\]/g;
-  const completedPattern = /\[Tool ([^\]]+) completed\]/g;
-
-  const tools: string[] = [];
-  let match;
-
-  while ((match = toolPattern.exec(content)) !== null) {
-    tools.push(match[1]);
-  }
-
-  // Remove tool messages from content
-  const cleanContent = content
-    .replace(toolPattern, '')
-    .replace(completedPattern, '')
-    .trim();
-
-  return { tools, cleanContent };
 }
 
 export function Terminal({ maxLines = 1000 }: TerminalProps) {
@@ -832,6 +812,7 @@ const styles = StyleSheet.create({
   bubbleContainer: {
     maxWidth: '75%',
     flexShrink: 1,
+    flexGrow: 1,
   },
   bubbleContainerUser: {
     alignItems: 'flex-end',

@@ -23,6 +23,7 @@ import { ModelPicker } from './ModelPicker';
 import { InteractivePicker } from './InteractivePicker';
 import { ResumeSessionPicker } from './ResumeSessionPicker';
 import type { SlashCommand, InteractiveCommandType } from 'termbridge-shared';
+import { MIN_INPUT_HEIGHT, MAX_INPUT_HEIGHT } from '../utils/inputBarConstants';
 
 // Commands that require interactive UI instead of text input
 const INTERACTIVE_COMMANDS = new Set<string>([
@@ -39,12 +40,9 @@ interface InputBarProps {
   disabled?: boolean;
 }
 
-const MIN_INPUT_HEIGHT = 36;
-const MAX_INPUT_HEIGHT = 120;
-
 export function InputBar({ disabled }: InputBarProps) {
   const [input, setInput] = useState('');
-  const [inputHeight, setInputHeight] = useState(MIN_INPUT_HEIGHT);
+  const [isScrollEnabled, setIsScrollEnabled] = useState(false);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [showCommandPicker, setShowCommandPicker] = useState(false);
   const [showModelPicker, setShowModelPicker] = useState(false);
@@ -108,7 +106,6 @@ export function InputBar({ disabled }: InputBarProps) {
       const messageContent = input.trim();
       setInput('');
       setSelectedImages([]);
-      setInputHeight(MIN_INPUT_HEIGHT);
 
       await sendInput(messageContent + '\n', attachments.length > 0 ? attachments : undefined);
     } catch {
@@ -199,8 +196,7 @@ export function InputBar({ disabled }: InputBarProps) {
   const handleContentSizeChange = useCallback(
     (event: NativeSyntheticEvent<TextInputContentSizeChangeEventData>) => {
       const contentHeight = event.nativeEvent.contentSize.height;
-      const newHeight = Math.min(Math.max(contentHeight + 12, MIN_INPUT_HEIGHT), MAX_INPUT_HEIGHT);
-      setInputHeight(newHeight);
+      setIsScrollEnabled(contentHeight >= MAX_INPUT_HEIGHT);
     },
     []
   );
@@ -291,21 +287,19 @@ export function InputBar({ disabled }: InputBarProps) {
           style={[
             styles.input,
             isDark && styles.inputDark,
-            { height: inputHeight },
           ]}
           value={input}
           onChangeText={setInput}
           placeholder={placeholderText}
           placeholderTextColor={isDark ? '#6b7280' : '#9ca3af'}
           editable={!isDisabled}
-          onSubmitEditing={handleSend}
-          returnKeyType="send"
           autoCapitalize="sentences"
           autoCorrect={true}
           multiline={true}
           textAlignVertical="top"
           onContentSizeChange={handleContentSizeChange}
           blurOnSubmit={false}
+          scrollEnabled={isScrollEnabled}
         />
 
         {/* Image previews */}
@@ -444,8 +438,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#1f2937',
     lineHeight: 20,
-    paddingTop: 0,
-    paddingBottom: 0,
+    paddingTop: 8,
+    paddingBottom: 8,
   },
   inputDark: {
     color: '#e5e5e5',
