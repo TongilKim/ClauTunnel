@@ -129,7 +129,10 @@ export default function SessionsScreen() {
       }
     });
 
-    return Array.from(machineMap.values());
+    // Filter out machines that have no sessions and no active listener
+    return Array.from(machineMap.values()).filter(
+      (section) => section.data.length > 0 || section.hasListener
+    );
   }, [sessions, machines, sessionOnlineStatus, machineOnlineStatus]);
 
   // Calculate total session counts based on presence status
