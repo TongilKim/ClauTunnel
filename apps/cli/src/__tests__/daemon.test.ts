@@ -916,8 +916,8 @@ describe('Daemon', () => {
     });
   });
 
-  describe('request rejection handling', () => {
-    it('should broadcast error when sdkSession emits request-rejected event', async () => {
+  describe('request queuing handling', () => {
+    it('should broadcast request-queued when sdkSession emits request-queued event', async () => {
       daemon = new Daemon({
         cwd: '/test',
         supabase: mockSupabase as SupabaseClient,
@@ -929,25 +929,186 @@ describe('Daemon', () => {
       // Get the sdkSession from daemon
       const sdkSession = (daemon as any).sdkSession;
 
-      // Emit request-rejected event
-      sdkSession.emit('request-rejected', 'Your message was not processed because Claude is still working on the previous request. Please wait.');
+      // Emit request-queued event
+      sdkSession.emit('request-queued');
 
       // Wait for async operations
       await new Promise(resolve => setTimeout(resolve, 10));
 
-      // Verify broadcastError was called via the output channel
+      // Verify broadcastQueued was called via the output channel
       expect(mockOutputChannel.send).toHaveBeenCalledWith({
         type: 'broadcast',
         event: 'output',
         payload: expect.objectContaining({
-          type: 'error',
-          content: 'Your message was not processed because Claude is still working on the previous request. Please wait.',
-          errorCode: 'request_rejected',
+          type: 'request-queued',
         }),
       });
     });
 
-    it('should handle broadcast errors silently when rejecting requests', async () => {
+    it('should re-broadcast pending question on status-request', async () => {
+      let inputHandler: ((payload: any) => void) | null = null;
+
+      mockInputChannel.on = vi.fn((event, filter, handler) => {
+        if (event === 'broadcast' && filter.event === 'input') {
+          inputHandler = handler;
+        }
+        return mockInputChannel as RealtimeChannel;
+      });
+
+      daemon = new Daemon({
+        cwd: '/test',
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'session-789',
+      });
+
+      await daemon.start();
+
+      const sdkSession = (daemon as any).sdkSession;
+
+      // Mock a pending question
+      const mockQuestion = {
+        toolUseId: 'tool-123',
+        questions: [{ question: 'Pick one?', header: 'Choice', options: [{ label: 'A', description: 'Option A' }] }],
+      };
+      vi.spyOn(sdkSession, 'getPendingQuestionData').mockReturnValue(mockQuestion);
+      vi.spyOn(sdkSession, 'getPendingPermissionData').mockReturnValue(null);
+
+      const sendSpy = mockOutputChannel.send;
+
+      // Simulate receiving status-request from mobile
+      if (inputHandler) {
+        inputHandler({
+          payload: {
+            type: 'status-request',
+            timestamp: Date.now(),
+            seq: 1,
+          },
+        });
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      // Verify user-question was re-broadcast
+      expect(sendSpy).toHaveBeenCalledWith({
+        type: 'broadcast',
+        event: 'output',
+        payload: expect.objectContaining({
+          type: 'user-question',
+          userQuestion: mockQuestion,
+        }),
+      });
+    });
+
+    it('should re-broadcast pending permission on status-request', async () => {
+      let inputHandler: ((payload: any) => void) | null = null;
+
+      mockInputChannel.on = vi.fn((event, filter, handler) => {
+        if (event === 'broadcast' && filter.event === 'input') {
+          inputHandler = handler;
+        }
+        return mockInputChannel as RealtimeChannel;
+      });
+
+      daemon = new Daemon({
+        cwd: '/test',
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'session-789',
+      });
+
+      await daemon.start();
+
+      const sdkSession = (daemon as any).sdkSession;
+
+      // Mock a pending permission request
+      const mockPermission = {
+        requestId: 'req-456',
+        toolName: 'Edit',
+        toolInput: { file_path: '/test.ts' },
+        toolUseId: 'tool-456',
+      };
+      vi.spyOn(sdkSession, 'getPendingQuestionData').mockReturnValue(null);
+      vi.spyOn(sdkSession, 'getPendingPermissionData').mockReturnValue(mockPermission);
+
+      const sendSpy = mockOutputChannel.send;
+
+      // Simulate receiving status-request from mobile
+      if (inputHandler) {
+        inputHandler({
+          payload: {
+            type: 'status-request',
+            timestamp: Date.now(),
+            seq: 1,
+          },
+        });
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      // Verify permission-request was re-broadcast
+      expect(sendSpy).toHaveBeenCalledWith({
+        type: 'broadcast',
+        event: 'output',
+        payload: expect.objectContaining({
+          type: 'permission-request',
+          permissionRequest: mockPermission,
+        }),
+      });
+    });
+
+    it('should re-broadcast pending question on status-request while processing', async () => {
+      let inputHandler: ((payload: any) => void) | null = null;
+
+      mockInputChannel.on = vi.fn((event, filter, handler) => {
+        if (event === 'broadcast' && filter.event === 'input') {
+          inputHandler = handler;
+        }
+        return mockInputChannel as RealtimeChannel;
+      });
+
+      daemon = new Daemon({
+        cwd: '/test',
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'session-789',
+      });
+
+      await daemon.start();
+
+      const sdkSession = (daemon as any).sdkSession;
+
+      // Simulate processing state with a pending question
+      const mockQuestion = {
+        toolUseId: 'tool-active',
+        questions: [{ question: 'Pick?', header: 'Q', options: [{ label: 'X', description: 'opt' }] }],
+      };
+      vi.spyOn(sdkSession, 'isActive').mockReturnValue(true);
+      vi.spyOn(sdkSession, 'getPendingQuestionData').mockReturnValue(mockQuestion);
+      vi.spyOn(sdkSession, 'getPendingPermissionData').mockReturnValue(null);
+
+      const sendSpy = mockOutputChannel.send;
+
+      if (inputHandler) {
+        inputHandler({
+          payload: {
+            type: 'status-request',
+            timestamp: Date.now(),
+            seq: 1,
+          },
+        });
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      expect(sendSpy).toHaveBeenCalledWith({
+        type: 'broadcast',
+        event: 'output',
+        payload: expect.objectContaining({
+          type: 'user-question',
+          userQuestion: mockQuestion,
+        }),
+      });
+    });
+
+    it('should handle broadcast errors silently when queuing requests', async () => {
       // Mock output channel to throw error
       mockOutputChannel.send = vi.fn().mockRejectedValue(new Error('Broadcast failed'));
 
@@ -963,7 +1124,7 @@ describe('Daemon', () => {
 
       // Should not throw even if broadcast fails
       expect(() => {
-        sdkSession.emit('request-rejected', 'Test error message');
+        sdkSession.emit('request-queued');
       }).not.toThrow();
 
       // Wait for async operations

@@ -48,8 +48,13 @@ export class SdkSession extends EventEmitter {
   private pendingPermissionRequests: Map<string, PendingPermissionRequest> = new Map();
   // Pending AskUserQuestion answer resolver - resolved by provideAnswer()
   private pendingAnswerResolve: ((answers: Record<string, string>) => void) | null = null;
+  // Track pending question/permission data for re-broadcast on status-request
+  private pendingQuestionData: UserQuestionData | null = null;
+  private pendingPermissionData: PermissionRequestData | null = null;
   // Track current assistant response text for conversation history
   private currentAssistantResponse: string = '';
+  // Queued prompt to send after current processing completes (last-one-wins)
+  private pendingPrompt: { prompt: string; attachments?: ImageAttachment[] } | null = null;
 
   constructor(options: SdkSessionOptions) {
     super();
@@ -69,6 +74,7 @@ export class SdkSession extends EventEmitter {
     }
 
     this.pendingPermissionRequests.delete(response.requestId);
+    this.pendingPermissionData = null;
 
     if (response.behavior === 'allow') {
       const result: PermissionResult = {
@@ -137,7 +143,8 @@ export class SdkSession extends EventEmitter {
             questions,
           };
 
-          // Broadcast to mobile
+          // Store and broadcast to mobile
+          this.pendingQuestionData = questionData;
           this.emit('user-question', questionData);
 
           // Wait for provideAnswer() to supply the answers
@@ -148,12 +155,14 @@ export class SdkSession extends EventEmitter {
               // Clean up if the request is aborted (e.g. session cancelled)
               options.signal.addEventListener('abort', () => {
                 this.pendingAnswerResolve = null;
+                this.pendingQuestionData = null;
                 reject(new Error('Question aborted'));
               });
             }
           );
 
           this.pendingAnswerResolve = null;
+          this.pendingQuestionData = null;
 
           // Return updatedInput so the subprocess can build the tool_result
           return {
@@ -207,7 +216,8 @@ export class SdkSession extends EventEmitter {
         agentId: options.agentID,
       };
 
-      // Emit event for daemon to broadcast to mobile
+      // Store and emit event for daemon to broadcast to mobile
+      this.pendingPermissionData = requestData;
       this.emit('permission-request', requestData);
 
       // Create promise that will be resolved when mobile responds
@@ -221,6 +231,7 @@ export class SdkSession extends EventEmitter {
         // Handle abort
         options.signal.addEventListener('abort', () => {
           this.pendingPermissionRequests.delete(requestId);
+          this.pendingPermissionData = null;
           reject(new Error('Permission request aborted'));
         });
       });
@@ -308,6 +319,7 @@ export class SdkSession extends EventEmitter {
       // requests are not permanently blocked.
       if (this.isProcessing) {
         this.isProcessing = false;
+        this.pendingPrompt = null;
         this.emit('complete');
       }
     }
@@ -373,7 +385,16 @@ export class SdkSession extends EventEmitter {
 
       this.currentAssistantResponse = '';
       this.isProcessing = false;
-      this.emit('complete');
+
+      // Auto-send queued message if one is pending
+      const queued = this.pendingPrompt;
+      if (queued) {
+        this.pendingPrompt = null;
+        // Don't emit 'complete' — mobile isTyping stays true seamlessly
+        this.sendPrompt(queued.prompt, queued.attachments);
+      } else {
+        this.emit('complete');
+      }
     } else if (message.type === 'tool_progress') {
       // Tool progress (tool being used)
       if ('tool_name' in message) {
@@ -389,8 +410,9 @@ export class SdkSession extends EventEmitter {
 
   async sendPrompt(prompt: string, attachments?: ImageAttachment[]): Promise<void> {
     if (this.isProcessing) {
-      this.emit('output', '\n[TermBridge] Previous request still processing...\n');
-      this.emit('request-rejected', 'Your message was not processed because Claude is still working on the previous request. Please wait.');
+      // Queue the message instead of rejecting — last one wins
+      this.pendingPrompt = { prompt, attachments };
+      this.emit('request-queued');
       return;
     }
 
@@ -503,6 +525,7 @@ export class SdkSession extends EventEmitter {
       this.streamLoopRunning = false;
     }
     this.isProcessing = false;
+    this.pendingPrompt = null;
   }
 
   getSessionId(): string | null {
@@ -522,12 +545,21 @@ export class SdkSession extends EventEmitter {
     }
     this.sessionId = sessionId;
     this.isProcessing = false;
+    this.pendingPrompt = null;
     this.conversationHistory = []; // Clear local history since we're resuming a different session
     this.emit('session-resumed', sessionId);
   }
 
   isActive(): boolean {
     return this.isProcessing;
+  }
+
+  getPendingQuestionData(): UserQuestionData | null {
+    return this.pendingQuestionData;
+  }
+
+  getPendingPermissionData(): PermissionRequestData | null {
+    return this.pendingPermissionData;
   }
 
   async setModel(model: string): Promise<void> {
@@ -542,6 +574,7 @@ export class SdkSession extends EventEmitter {
       this.streamLoopRunning = false;
       this.sessionId = null;
       this.isProcessing = false;
+      this.pendingPrompt = null;
       this.pendingContextTransfer = true;
     } else if (this.sessionId) {
       this.sessionId = null;
@@ -569,6 +602,7 @@ export class SdkSession extends EventEmitter {
     }
     this.sessionId = null;
     this.isProcessing = false;
+    this.pendingPrompt = null;
   }
 
   async getSupportedModels(): Promise<ModelInfo[]> {

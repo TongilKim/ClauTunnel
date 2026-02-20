@@ -164,11 +164,11 @@ export class Daemon extends EventEmitter {
       }
     });
 
-    // Wire up request rejection errors to broadcast to mobile
-    this.sdkSession.on('request-rejected', async (errorMessage: string) => {
+    // Wire up request queuing to broadcast to mobile
+    this.sdkSession.on('request-queued', async () => {
       if (this.realtimeClient) {
         try {
-          await this.realtimeClient.broadcastError(errorMessage, 'request_rejected');
+          await this.realtimeClient.broadcastQueued();
         } catch {
           // Silently handle broadcast errors
         }
@@ -276,6 +276,25 @@ export class Daemon extends EventEmitter {
           await this.realtimeClient?.broadcastModel(this.sdkSession.getModel());
         } catch {
           // Silently handle broadcast errors
+        }
+        return;
+      }
+
+      // Handle status request - re-broadcast any pending question or permission
+      if (message.type === 'status-request') {
+        if (this.realtimeClient) {
+          try {
+            const pendingQuestion = this.sdkSession.getPendingQuestionData();
+            if (pendingQuestion) {
+              await this.realtimeClient.broadcastUserQuestion(pendingQuestion);
+            }
+            const pendingPermission = this.sdkSession.getPendingPermissionData();
+            if (pendingPermission) {
+              await this.realtimeClient.broadcastPermissionRequest(pendingPermission);
+            }
+          } catch {
+            // Silently handle broadcast errors
+          }
         }
         return;
       }

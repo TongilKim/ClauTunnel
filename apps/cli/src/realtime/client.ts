@@ -459,6 +459,30 @@ export class RealtimeClient extends EventEmitter {
     this.emit('broadcast', message);
   }
 
+  async broadcastQueued(): Promise<void> {
+    if (!this.outputChannel) {
+      throw new Error('Not connected');
+    }
+
+    if (!this.realtimeEnabled) {
+      return;
+    }
+
+    const message: RealtimeMessage = {
+      type: 'request-queued',
+      timestamp: Date.now(),
+      seq: ++this.seq,
+    };
+
+    await this.outputChannel.send({
+      type: 'broadcast',
+      event: 'output',
+      payload: message,
+    });
+
+    this.emit('broadcast', message);
+  }
+
   async broadcastError(errorMessage: string, errorCode?: string): Promise<void> {
     if (!this.outputChannel) {
       throw new Error('Not connected');
@@ -472,7 +496,7 @@ export class RealtimeClient extends EventEmitter {
     const message: RealtimeMessage = {
       type: 'error',
       content: errorMessage,
-      errorCode: errorCode || 'request_rejected',
+      errorCode: errorCode || 'unknown',
       timestamp: Date.now(),
       seq: ++this.seq,
     };
