@@ -12,6 +12,7 @@ import {
   TextInput,
   Pressable,
   Keyboard,
+  Image,
 } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import * as Clipboard from 'expo-clipboard';
@@ -40,11 +41,12 @@ function UserAvatar() {
   );
 }
 
-function ClaudeAvatar({ isDark }: { isDark: boolean }) {
+function ClaudeAvatar() {
   return (
-    <View style={[avatarStyles.avatar, avatarStyles.claudeAvatar, isDark && avatarStyles.claudeAvatarDark]}>
-      <Text style={[avatarStyles.avatarText, avatarStyles.claudeAvatarText]}>C</Text>
-    </View>
+    <Image
+      source={require('../../assets/claude-icon.png')}
+      style={avatarStyles.claudeAvatarImage}
+    />
   );
 }
 
@@ -245,7 +247,7 @@ interface TypingIndicatorProps {
 function TypingIndicator({ isDark, isQueued }: TypingIndicatorProps) {
   return (
     <View style={styles.messageRow}>
-      <ClaudeAvatar isDark={isDark} />
+      <ClaudeAvatar />
       <View style={styles.bubbleContainerClaude}>
         <View style={[styles.typingBubble, isDark && styles.typingBubbleDark]}>
           <ActivityIndicator size="small" color={isDark ? '#9ca3af' : '#6b7280'} />
@@ -318,7 +320,7 @@ function MessageBubble({ message, isDark }: MessageBubbleProps) {
 
   return (
     <View style={[styles.messageRow, isUser && styles.messageRowUser]}>
-      {!isUser && <ClaudeAvatar isDark={isDark} />}
+      {!isUser && <ClaudeAvatar />}
       <View
         style={[
           styles.bubbleContainer,
@@ -661,22 +663,16 @@ const avatarStyles = StyleSheet.create({
   userAvatar: {
     backgroundColor: '#3b82f6',
   },
-  claudeAvatar: {
-    backgroundColor: '#f3f4f6',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  claudeAvatarDark: {
-    backgroundColor: '#262626',
-    borderColor: '#404040',
+  claudeAvatarImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginTop: 4,
   },
   avatarText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#ffffff',
-  },
-  claudeAvatarText: {
-    color: '#d97706',
   },
 });
 
