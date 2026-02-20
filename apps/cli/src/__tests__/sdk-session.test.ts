@@ -1202,6 +1202,44 @@ describe('SdkSession', () => {
       });
     });
 
+    it('should truncate tool-use content exceeding MAX_TOOL_CONTENT', async () => {
+      const longString = 'x'.repeat(15000);
+      const session = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'test-session-id' },
+        {
+          type: 'assistant',
+          message: {
+            content: [
+              {
+                type: 'tool_use',
+                name: 'Edit',
+                id: 'toolu_edit_long',
+                input: {
+                  file_path: '/src/big-file.ts',
+                  old_string: longString,
+                  new_string: longString,
+                },
+              },
+            ],
+          },
+        },
+        { type: 'result', subtype: 'success', result: 'done' },
+      ]);
+      mockedCreateSession.mockReturnValue(session as any);
+
+      const toolUseHandler = vi.fn();
+      sdkSession.on('tool-use', toolUseHandler);
+
+      await sdkSession.sendPrompt('Big edit');
+      await tick();
+
+      expect(toolUseHandler).toHaveBeenCalledTimes(1);
+      const data = toolUseHandler.mock.calls[0][0];
+      expect(data.action).toBe('Edit');
+      expect(data.oldString.length).toBe(10000);
+      expect(data.newString.length).toBe(10000);
+    });
+
     it('should NOT emit tool-use event for AskUserQuestion blocks', async () => {
       const session = createMockSession([
         { type: 'system', subtype: 'init', session_id: 'test-session-id' },

@@ -1450,6 +1450,36 @@ describe('Daemon', () => {
       );
     });
 
+    it('should log warning when broadcastToolUse fails', async () => {
+      mockOutputChannel.send = vi.fn().mockRejectedValue(new Error('Broadcast failed'));
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      daemon = new Daemon({
+        supabase: mockSupabase as SupabaseClient,
+        userId: 'user-456',
+        cwd: '/home/user',
+      });
+
+      await daemon.start();
+
+      const sdkSession = (daemon as any).sdkSession;
+      sdkSession.emit('tool-use', {
+        action: 'Edit',
+        filePath: '/src/app.ts',
+        oldString: 'old',
+        newString: 'new',
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[Daemon] Failed to broadcast tool-use:',
+        expect.any(Error),
+      );
+
+      warnSpy.mockRestore();
+    });
+
     it('should listen for tool-use event from SDK session', async () => {
       daemon = new Daemon({
         supabase: mockSupabase as SupabaseClient,
