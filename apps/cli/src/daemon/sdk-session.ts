@@ -41,7 +41,7 @@ export class SdkSession extends EventEmitter {
   private streamLoopRunning: boolean = false;
   private cachedCommands: SlashCommand[] | null = null;
   private cachedModels: ModelInfo[] | null = null;
-  private currentModel: string = 'default';
+  private currentModel: string = 'opus';
   private conversationHistory: ConversationMessage[] = [];
   private pendingContextTransfer: boolean = false;
   private thinkingEnabled: boolean = false;
@@ -55,7 +55,7 @@ export class SdkSession extends EventEmitter {
     super();
     this.options = options;
     this.currentPermissionMode = options.permissionMode || 'default';
-    this.currentModel = options.model || 'default';
+    this.currentModel = options.model || 'opus';
   }
 
   /**
@@ -252,7 +252,7 @@ export class SdkSession extends EventEmitter {
     const opts: SDKSessionOptions = {
       // SDK accepts shorthand model names: 'opus' | 'sonnet' | 'haiku'
       // Full model IDs (e.g. 'claude-opus-4-6') are also valid but shorthand is preferred
-      model: this.currentModel === 'default' ? 'opus' : this.currentModel,
+      model: this.currentModel,
       allowedTools: this.options.allowedTools || ['Read', 'Edit', 'Write', 'Bash', 'Glob', 'Grep'],
       canUseTool: this.createCanUseTool(),
       permissionMode: this.currentPermissionMode,
@@ -574,10 +574,9 @@ export class SdkSession extends EventEmitter {
   async getSupportedModels(): Promise<ModelInfo[]> {
     // Fallback models matching SDK response format
     const coreModels: ModelInfo[] = [
-      { value: 'default', displayName: 'Default (recommended)', description: 'Use the default model (currently Opus 4.6)' },
-      { value: 'opus', displayName: 'Opus', description: 'Opus 4.6 · Most capable for complex work' },
-      { value: 'haiku', displayName: 'Haiku', description: 'Haiku 4.5 · Fastest for quick answers' },
-      { value: 'sonnet', displayName: 'Sonnet', description: 'Sonnet 4.5 · Best for everyday tasks' },
+      { value: 'opus', displayName: 'Opus 4.6', description: 'Opus 4.6 · Most capable for complex work' },
+      { value: 'haiku', displayName: 'Haiku 4.5', description: 'Haiku 4.5 · Fastest for quick answers' },
+      { value: 'sonnet', displayName: 'Sonnet 4.5', description: 'Sonnet 4.5 · Best for everyday tasks' },
     ];
 
     // Return cached SDK models if available

@@ -19,28 +19,19 @@ interface ModelPickerProps {
 }
 
 // Check if currentModel matches a model option (handles both shorthand and full identifiers)
-// Note: 'default' and 'opus' are effectively the same model - only highlight 'default' to avoid duplicates
 function isModelSelected(currentModel: string | null, modelValue: string): boolean {
   if (!currentModel) return false;
 
-  // Direct match (but NOT for 'opus' - let 'default' handle all opus variants)
-  if (currentModel === modelValue && modelValue !== 'opus') return true;
-
-  // 'default' represents any opus variant (default, opus, or full opus identifier)
-  if (modelValue === 'default') {
-    return currentModel === 'default' ||
-           currentModel === 'opus' ||
-           currentModel.includes('opus');
-  }
-
-  // 'opus' as a separate option should NOT be highlighted (covered by 'default')
-  if (modelValue === 'opus') return false;
+  // Direct match
+  if (currentModel === modelValue) return true;
 
   // Shorthand to full identifier matching
+  if (modelValue === 'opus' && currentModel.includes('opus')) return true;
   if (modelValue === 'sonnet' && currentModel.includes('sonnet')) return true;
   if (modelValue === 'haiku' && currentModel.includes('haiku')) return true;
 
   // Full identifier to shorthand matching
+  if (currentModel === 'opus' && modelValue.includes('opus')) return true;
   if (currentModel === 'sonnet' && modelValue.includes('sonnet')) return true;
   if (currentModel === 'haiku' && modelValue.includes('haiku')) return true;
 
@@ -129,9 +120,7 @@ export function ModelPicker({
                           isDark && styles.modelVersionDark,
                         ]}
                       >
-                        {model.value === 'default'
-                          ? 'claude-opus-4-6'
-                          : model.value === 'opus'
+                        {model.value === 'opus'
                           ? 'claude-opus-4-6'
                           : model.value === 'haiku'
                           ? 'claude-3-5-haiku-20241022'

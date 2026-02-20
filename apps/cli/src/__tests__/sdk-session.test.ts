@@ -319,7 +319,7 @@ describe('SdkSession', () => {
       await tick();
 
       // Change model - this closes the session
-      await sdkSession.setModel('opus');
+      await sdkSession.setModel('sonnet');
 
       // Session should be closed
       expect(session1._closeMock).toHaveBeenCalled();
@@ -334,10 +334,10 @@ describe('SdkSession', () => {
 
       await sdkSession.sendPrompt('Hello again');
 
-      // New session created with opus model
+      // New session created with sonnet model
       expect(mockedCreateSession).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          model: 'opus',
+          model: 'sonnet',
         })
       );
     });
@@ -346,24 +346,24 @@ describe('SdkSession', () => {
       const modelHandler = vi.fn();
       sdkSession.on('model', modelHandler);
 
-      await sdkSession.setModel('opus');
+      await sdkSession.setModel('sonnet');
 
-      expect(modelHandler).toHaveBeenCalledWith('opus');
+      expect(modelHandler).toHaveBeenCalledWith('sonnet');
     });
 
     it('should return fallback models when no query is active', async () => {
       const models = await sdkSession.getSupportedModels();
 
-      expect(models.length).toBe(4);
-      expect(models[0].value).toBe('default');
-      expect(models.map(m => m.value)).toEqual(['default', 'opus', 'haiku', 'sonnet']);
+      expect(models.length).toBe(3);
+      expect(models[0].value).toBe('opus');
+      expect(models.map(m => m.value)).toEqual(['opus', 'haiku', 'sonnet']);
     });
 
     it('should not emit model event when setting same model', async () => {
       const modelHandler = vi.fn();
       sdkSession.on('model', modelHandler);
 
-      await sdkSession.setModel('default');
+      await sdkSession.setModel('opus');
 
       expect(modelHandler).not.toHaveBeenCalled();
     });
@@ -372,7 +372,7 @@ describe('SdkSession', () => {
       sdkSession.resumeSession('test-session-123');
       expect(sdkSession.getSessionId()).toBe('test-session-123');
 
-      await sdkSession.setModel('opus');
+      await sdkSession.setModel('sonnet');
       expect(sdkSession.getSessionId()).toBeNull();
     });
 
@@ -394,7 +394,7 @@ describe('SdkSession', () => {
       await tick();
 
       // Change model - closes session
-      await sdkSession.setModel('opus');
+      await sdkSession.setModel('sonnet');
       expect(sdkSession.getSessionId()).toBeNull();
 
       // Setup new session for next prompt
