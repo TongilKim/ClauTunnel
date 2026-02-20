@@ -1279,6 +1279,7 @@ const diffStyles = StyleSheet.create({
   scrollContainer: {
     maxHeight: 300,
     padding: 8,
+    flexGrow: 0,
   },
   filePath: {
     fontSize: 11,
