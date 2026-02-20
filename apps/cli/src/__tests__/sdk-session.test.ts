@@ -510,8 +510,8 @@ describe('SdkSession', () => {
     });
   });
 
-  describe('request rejection', () => {
-    it('should emit request-rejected event when sendPrompt is called while already processing', async () => {
+  describe('message queuing', () => {
+    it('should emit request-queued and queue the message when sendPrompt is called while processing', async () => {
       // Create a session that takes time to finish
       let resolveStream: (() => void) | null = null;
       const slowSession = {
@@ -528,10 +528,8 @@ describe('SdkSession', () => {
       };
       mockedCreateSession.mockReturnValue(slowSession as any);
 
-      const requestRejectedHandler = vi.fn();
-      const outputHandler = vi.fn();
-      sdkSession.on('request-rejected', requestRejectedHandler);
-      sdkSession.on('output', outputHandler);
+      const queuedHandler = vi.fn();
+      sdkSession.on('request-queued', queuedHandler);
 
       // Start first request (doesn't complete yet)
       const firstPromise = sdkSession.sendPrompt('First message');
@@ -542,15 +540,8 @@ describe('SdkSession', () => {
       // Try to send second request while first is processing
       await sdkSession.sendPrompt('Second message');
 
-      // Verify request-rejected event was emitted
-      expect(requestRejectedHandler).toHaveBeenCalledWith(
-        'Your message was not processed because Claude is still working on the previous request. Please wait.'
-      );
-
-      // Verify output event was also emitted (for terminal)
-      expect(outputHandler).toHaveBeenCalledWith(
-        '\n[TermBridge] Previous request still processing...\n'
-      );
+      // Verify request-queued event was emitted
+      expect(queuedHandler).toHaveBeenCalled();
 
       // Clean up - resolve the slow stream
       if (resolveStream) resolveStream();
@@ -558,9 +549,79 @@ describe('SdkSession', () => {
       await tick();
     });
 
-    it('should not emit request-rejected when sendPrompt is called after previous request completes', async () => {
-      const requestRejectedHandler = vi.fn();
-      sdkSession.on('request-rejected', requestRejectedHandler);
+    it('should auto-send queued message after first request completes', async () => {
+      let resolveStream: (() => void) | null = null;
+      const slowSession = {
+        get sessionId() { return 'slow-session'; },
+        send: vi.fn().mockResolvedValue(undefined),
+        stream: async function* () {
+          yield { type: 'system', subtype: 'init', session_id: 'slow-session' };
+          await new Promise<void>(r => { resolveStream = r; });
+          yield { type: 'result', subtype: 'success', result: 'done' };
+        },
+        close: vi.fn(),
+        [Symbol.asyncDispose]: async () => {},
+      };
+      mockedCreateSession.mockReturnValue(slowSession as any);
+
+      // Start first request
+      const firstPromise = sdkSession.sendPrompt('First message');
+      await tick();
+
+      // Queue second message while processing
+      await sdkSession.sendPrompt('Second message');
+
+      // First request: one send call
+      expect(slowSession.send).toHaveBeenCalledTimes(1);
+
+      // Complete the first request
+      if (resolveStream) resolveStream();
+      await firstPromise;
+      await tick();
+      await tick();
+
+      // The queued message should have been auto-sent
+      expect(slowSession.send).toHaveBeenCalledTimes(2);
+    });
+
+    it('should only keep the last queued message (last-one-wins)', async () => {
+      let resolveStream: (() => void) | null = null;
+      const slowSession = {
+        get sessionId() { return 'slow-session'; },
+        send: vi.fn().mockResolvedValue(undefined),
+        stream: async function* () {
+          yield { type: 'system', subtype: 'init', session_id: 'slow-session' };
+          await new Promise<void>(r => { resolveStream = r; });
+          yield { type: 'result', subtype: 'success', result: 'done' };
+        },
+        close: vi.fn(),
+        [Symbol.asyncDispose]: async () => {},
+      };
+      mockedCreateSession.mockReturnValue(slowSession as any);
+
+      const firstPromise = sdkSession.sendPrompt('First message');
+      await tick();
+
+      // Queue multiple messages - only last should be kept
+      await sdkSession.sendPrompt('Second message');
+      await sdkSession.sendPrompt('Third message');
+
+      // Complete the first request
+      if (resolveStream) resolveStream();
+      await firstPromise;
+      await tick();
+      await tick();
+
+      // The last queued message ('Third message') should be sent
+      expect(slowSession.send).toHaveBeenCalledTimes(2);
+      const lastSendCall = slowSession.send.mock.calls[1][0];
+      const textBlock = lastSendCall.message.content.find((b: any) => b.type === 'text');
+      expect(textBlock.text).toBe('Third message');
+    });
+
+    it('should not emit request-queued when sendPrompt is called after previous request completes', async () => {
+      const queuedHandler = vi.fn();
+      sdkSession.on('request-queued', queuedHandler);
 
       // Send first request and wait for completion
       await sdkSession.sendPrompt('First message');
@@ -569,8 +630,106 @@ describe('SdkSession', () => {
       // Send second request after first completes
       await sdkSession.sendPrompt('Second message');
 
-      // Verify request-rejected was never emitted
-      expect(requestRejectedHandler).not.toHaveBeenCalled();
+      // Verify request-queued was never emitted
+      expect(queuedHandler).not.toHaveBeenCalled();
+    });
+
+    it('should suppress complete event when queued message exists', async () => {
+      let resolveStream: (() => void) | null = null;
+      const slowSession = {
+        get sessionId() { return 'slow-session'; },
+        send: vi.fn().mockResolvedValue(undefined),
+        stream: async function* () {
+          yield { type: 'system', subtype: 'init', session_id: 'slow-session' };
+          await new Promise<void>(r => { resolveStream = r; });
+          yield { type: 'result', subtype: 'success', result: 'done' };
+        },
+        close: vi.fn(),
+        [Symbol.asyncDispose]: async () => {},
+      };
+      mockedCreateSession.mockReturnValue(slowSession as any);
+
+      const completeHandler = vi.fn();
+      sdkSession.on('complete', completeHandler);
+
+      const firstPromise = sdkSession.sendPrompt('First message');
+      await tick();
+
+      // Queue a message
+      await sdkSession.sendPrompt('Second message');
+
+      // Complete the first request
+      if (resolveStream) resolveStream();
+      await firstPromise;
+      await tick();
+
+      // Complete should NOT have been emitted for the first request (suppressed because queued message exists)
+      // It will be emitted when the queued message finishes
+      expect(completeHandler).not.toHaveBeenCalled();
+    });
+
+    it('should clear pending prompt when cancel is called', async () => {
+      let resolveStream: (() => void) | null = null;
+      const slowSession = {
+        closed: false,
+        get sessionId() { return 'slow-session'; },
+        send: vi.fn().mockResolvedValue(undefined),
+        stream: async function* () {
+          yield { type: 'system', subtype: 'init', session_id: 'slow-session' };
+          await new Promise<void>(r => { resolveStream = r; });
+          yield { type: 'result', subtype: 'success', result: 'done' };
+        },
+        close: vi.fn(() => { slowSession.closed = true; }),
+        [Symbol.asyncDispose]: async () => {},
+      };
+      mockedCreateSession.mockReturnValue(slowSession as any);
+
+      sdkSession.sendPrompt('First message');
+      await tick();
+
+      // Queue a message
+      await sdkSession.sendPrompt('Second message');
+
+      // Cancel while processing
+      sdkSession.cancel();
+
+      expect(sdkSession.isActive()).toBe(false);
+
+      // Clean up
+      if (resolveStream) resolveStream();
+      await tick();
+    });
+
+    it('should clear pending prompt when clearHistory is called', async () => {
+      let resolveStream: (() => void) | null = null;
+      const slowSession = {
+        closed: false,
+        get sessionId() { return 'slow-session'; },
+        send: vi.fn().mockResolvedValue(undefined),
+        stream: async function* () {
+          yield { type: 'system', subtype: 'init', session_id: 'slow-session' };
+          await new Promise<void>(r => { resolveStream = r; });
+          yield { type: 'result', subtype: 'success', result: 'done' };
+        },
+        close: vi.fn(() => { slowSession.closed = true; }),
+        [Symbol.asyncDispose]: async () => {},
+      };
+      mockedCreateSession.mockReturnValue(slowSession as any);
+
+      sdkSession.sendPrompt('First message');
+      await tick();
+
+      // Queue a message
+      await sdkSession.sendPrompt('Second message');
+
+      // Clear history while processing
+      sdkSession.clearHistory();
+
+      expect(sdkSession.isActive()).toBe(false);
+
+      // Clean up
+      if (resolveStream) resolveStream();
+      await tick();
     });
   });
 
@@ -754,16 +913,16 @@ describe('SdkSession', () => {
       ]);
       mockedCreateSession.mockReturnValue(normalSession as any);
 
-      const rejectedHandler = vi.fn();
-      sdkSession.on('request-rejected', rejectedHandler);
+      const queuedHandler = vi.fn();
+      sdkSession.on('request-queued', queuedHandler);
 
       // This needs a fresh session since the old one closed
       sdkSession.clearHistory();
       await sdkSession.sendPrompt('Second');
       await tick();
 
-      // Should NOT be rejected
-      expect(rejectedHandler).not.toHaveBeenCalled();
+      // Should NOT be queued (previous request already recovered)
+      expect(queuedHandler).not.toHaveBeenCalled();
       expect(normalSession._sendMock).toHaveBeenCalled();
     });
   });
@@ -864,6 +1023,54 @@ describe('SdkSession', () => {
         }],
         answers: { '0': 'Option A' },
       });
+    });
+
+    it('should track pending question data and clear it after answer', async () => {
+      let capturedCanUseTool: any = null;
+
+      mockedCreateSession.mockImplementation((opts: any) => {
+        capturedCanUseTool = opts.canUseTool;
+        return createMockSession([
+          { type: 'system', subtype: 'init', session_id: 'test-session-id' },
+        ]) as any;
+      });
+
+      sdkSession.sendPrompt('Start');
+      await tick();
+
+      // No pending question initially
+      expect(sdkSession.getPendingQuestionData()).toBeNull();
+
+      // Simulate canUseTool being called
+      const canUseToolPromise = capturedCanUseTool('AskUserQuestion', {
+        questions: [{
+          question: 'Pick one',
+          header: 'Test',
+          options: [{ label: 'A', description: 'Option A' }],
+        }],
+      }, {
+        signal: new AbortController().signal,
+        toolUseID: 'toolu_789',
+      });
+
+      await tick();
+
+      // Pending question should be tracked
+      expect(sdkSession.getPendingQuestionData()).toEqual(
+        expect.objectContaining({
+          toolUseId: 'toolu_789',
+          questions: expect.arrayContaining([
+            expect.objectContaining({ question: 'Pick one' }),
+          ]),
+        })
+      );
+
+      // Answer the question
+      await sdkSession.provideAnswer('A', { '0': 'A' });
+      await canUseToolPromise;
+
+      // Pending question should be cleared
+      expect(sdkSession.getPendingQuestionData()).toBeNull();
     });
 
     it('should fall back to sendPrompt when no pending question exists', async () => {

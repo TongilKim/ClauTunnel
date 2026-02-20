@@ -65,7 +65,7 @@ export function Terminal({ maxLines = 1000 }: TerminalProps) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
-  const { messages, state, isTyping, sessionId, registerScrollToBottom } = useConnectionStore();
+  const { messages, state, isTyping, isMessageQueued, sessionId, registerScrollToBottom } = useConnectionStore();
   const { sessionOnlineStatus } = useSessionStore();
   const isCliOnline = sessionId ? (sessionOnlineStatus[sessionId] ?? null) : null;
 
@@ -195,7 +195,7 @@ export function Terminal({ maxLines = 1000 }: TerminalProps) {
             ))}
             {isTyping && (
               <AnimatedBubble>
-                <TypingIndicator isDark={isDark} />
+                <TypingIndicator isDark={isDark} isQueued={isMessageQueued} />
               </AnimatedBubble>
             )}
           </>
@@ -239,9 +239,10 @@ function AnimatedBubble({ children }: { children: React.ReactNode }) {
 
 interface TypingIndicatorProps {
   isDark: boolean;
+  isQueued?: boolean;
 }
 
-function TypingIndicator({ isDark }: TypingIndicatorProps) {
+function TypingIndicator({ isDark, isQueued }: TypingIndicatorProps) {
   return (
     <View style={styles.messageRow}>
       <ClaudeAvatar isDark={isDark} />
@@ -249,7 +250,7 @@ function TypingIndicator({ isDark }: TypingIndicatorProps) {
         <View style={[styles.typingBubble, isDark && styles.typingBubbleDark]}>
           <ActivityIndicator size="small" color={isDark ? '#9ca3af' : '#6b7280'} />
           <Text style={[styles.typingText, isDark && styles.typingTextDark]}>
-            Claude is working...
+            {isQueued ? 'Message queued, Claude is finishing up...' : 'Claude is working...'}
           </Text>
         </View>
       </View>

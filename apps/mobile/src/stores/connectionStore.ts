@@ -27,6 +27,7 @@ interface ConnectionStoreState {
   lastSeq: number;
   error: string | null;
   isTyping: boolean;
+  isMessageQueued: boolean;
   isCliOnline: boolean | null; // Tracks if CLI is online via Supabase Presence (null = not yet checked)
   permissionMode: PermissionMode | null;
   commands: SlashCommand[];
@@ -53,6 +54,7 @@ interface ConnectionStoreState {
   sendModelChange: (model: string) => Promise<void>;
   requestCommands: () => Promise<void>;
   requestModels: () => Promise<void>;
+  requestPendingState: () => Promise<void>;
   clearMessages: () => void;
   clearError: () => void;
   sendClearRequest: () => Promise<void>;
@@ -88,6 +90,7 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
   lastSeq: 0,
   error: null,
   isTyping: false,
+  isMessageQueued: false,
   isCliOnline: null, // null = not yet checked
   permissionMode: null,
   commands: [],
@@ -110,6 +113,7 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
         messages: [],
         lastSeq: 0,
         isTyping: false,
+        isMessageQueued: false,
         isCliOnline: null, // Reset to unknown until presence syncs
         permissionMode: null,
         commands: [],
@@ -177,10 +181,17 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
       outputChannel.on('broadcast', { event: 'output' }, (payload) => {
         const message = payload.payload as RealtimeMessage;
 
+        // Handle request-queued - message was queued because Claude is still processing
+        if (message.type === 'request-queued') {
+          set({ isMessageQueued: true });
+          return;
+        }
+
         // Handle error messages - reset isTyping and show error
         if (message.type === 'error') {
           set({
             isTyping: false,
+            isMessageQueued: false,
             error: message.content || 'An error occurred'
           });
           return;
@@ -246,7 +257,7 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
 
         // Handle complete - Claude has finished responding
         if (message.type === 'complete') {
-          set({ isTyping: false });
+          set({ isTyping: false, isMessageQueued: false });
           return;
         }
 
@@ -314,9 +325,10 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
 
       set({ state: 'connected' });
 
-      // Request available commands and models from CLI
+      // Request available commands, models, and any pending state from CLI
       get().requestCommands();
       get().requestModels();
+      get().requestPendingState();
     } catch (error) {
       set({
         state: 'disconnected',
@@ -513,6 +525,24 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
 
     const message: RealtimeMessage = {
       type: 'models-request',
+      timestamp: Date.now(),
+      seq: ++seq,
+    };
+
+    await inputChannel.send({
+      type: 'broadcast',
+      event: 'input',
+      payload: message,
+    });
+  },
+
+  requestPendingState: async () => {
+    if (!inputChannel || get().state !== 'connected') {
+      return;
+    }
+
+    const message: RealtimeMessage = {
+      type: 'status-request',
       timestamp: Date.now(),
       seq: ++seq,
     };

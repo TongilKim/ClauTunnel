@@ -804,7 +804,7 @@ describe('RealtimeClient', () => {
         payload: expect.objectContaining({
           type: 'error',
           content: errorMessage,
-          errorCode: 'request_rejected',
+          errorCode: 'unknown',
         }),
       });
     });
@@ -826,7 +826,7 @@ describe('RealtimeClient', () => {
         expect.objectContaining({
           type: 'error',
           content: 'Test error',
-          errorCode: 'request_rejected',
+          errorCode: 'unknown',
         })
       );
     });

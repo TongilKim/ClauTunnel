@@ -42,6 +42,8 @@ export type RealtimeMessageType =
   | 'user-answer' // User's answer to a question
   | 'permission-request' // SDK is asking for tool permission
   | 'permission-response' // User's response to permission request
+  | 'request-queued' // Message was queued because Claude is still processing
+  | 'status-request' // Mobile requests current pending state (question/permission)
   | 'complete'; // Claude has finished responding (query complete)
 
 export type InteractiveCommandType =
@@ -107,7 +109,7 @@ export interface RealtimeMessage {
   userAnswer?: UserAnswerData; // For user-answer type
   permissionRequest?: PermissionRequestData; // For permission-request type
   permissionResponse?: PermissionResponseData; // For permission-response type
-  errorCode?: string; // For error type messages (e.g., 'request_rejected', 'timeout')
+  errorCode?: string; // For error type messages (e.g., 'timeout')
   timestamp: number;
   seq: number;
 }
