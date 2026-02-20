@@ -381,8 +381,8 @@ export class Daemon extends EventEmitter {
           try {
             await this.realtimeClient.broadcastSystem('[Cancelled]');
             await this.realtimeClient.broadcastComplete();
-          } catch {
-            // Silently handle broadcast errors
+          } catch (error) {
+            console.warn('[Daemon] Failed to broadcast cancel:', error);
           }
         }
         return;
