@@ -792,6 +792,65 @@ describe('Daemon', () => {
       expect(setModelSpy).toHaveBeenCalledWith('opus');
     });
 
+    it('should broadcast current model when selecting already-active model', async () => {
+      let inputHandler: ((payload: any) => void) | null = null;
+
+      mockInputChannel.on = vi.fn((event, filter, handler) => {
+        if (event === 'broadcast' && filter.event === 'input') {
+          inputHandler = handler;
+        }
+        return mockInputChannel as RealtimeChannel;
+      });
+
+      daemon = new Daemon({
+        supabase: mockSupabase as SupabaseClient,
+        userId: 'user-456',
+        cwd: '/home/user',
+      });
+
+      await daemon.start();
+
+      const sdkSession = (daemon as any).sdkSession;
+      // Model is already 'opus' by default
+      vi.spyOn(sdkSession, 'getModel').mockReturnValue('opus');
+      vi.spyOn(sdkSession, 'setModel').mockResolvedValue(undefined);
+
+      const sendSpy = mockOutputChannel.send;
+      sendSpy.mockClear();
+
+      // Simulate selecting the same model that's already active
+      if (inputHandler) {
+        inputHandler({
+          payload: {
+            type: 'model-change',
+            model: 'opus',
+            timestamp: Date.now(),
+            seq: 1,
+          },
+        });
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Should broadcast model so mobile clears loading state
+      expect(sendSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'broadcast',
+          event: 'output',
+          payload: expect.objectContaining({
+            type: 'model',
+            model: 'opus',
+          }),
+        })
+      );
+
+      // Should NOT broadcast a system confirmation message
+      const systemCalls = sendSpy.mock.calls.filter(
+        (call: any[]) => call[0]?.payload?.type === 'system'
+      );
+      expect(systemCalls).toHaveLength(0);
+    });
+
     it('should broadcast model after model change', async () => {
       daemon = new Daemon({
         supabase: mockSupabase as SupabaseClient,
