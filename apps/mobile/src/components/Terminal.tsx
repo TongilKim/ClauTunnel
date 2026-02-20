@@ -711,7 +711,7 @@ function CollapsibleToolUse({ toolUseData, isDark, timestamp }: CollapsibleToolU
 
 function EditDiffContent({ data, isDark }: { data: ToolUseEditData; isDark: boolean }) {
   return (
-    <ScrollView style={diffStyles.scrollContainer} nestedScrollEnabled>
+    <ScrollView style={diffStyles.scrollContainer} nestedScrollEnabled flexGrow={0}>
       <Text style={[diffStyles.filePath, isDark && diffStyles.filePathDark]}>
         {data.filePath}
       </Text>
@@ -743,7 +743,7 @@ function WriteContent({ data, isDark }: { data: ToolUseWriteData; isDark: boolea
     : data.content;
 
   return (
-    <ScrollView style={diffStyles.scrollContainer} nestedScrollEnabled>
+    <ScrollView style={diffStyles.scrollContainer} nestedScrollEnabled flexGrow={0}>
       <Text style={[diffStyles.filePath, isDark && diffStyles.filePathDark]}>
         {data.filePath}
       </Text>
@@ -763,7 +763,7 @@ function GenericToolContent({ data, isDark }: { data: ToolUseGenericData; isDark
     : inputStr;
 
   return (
-    <ScrollView style={diffStyles.scrollContainer} nestedScrollEnabled>
+    <ScrollView style={diffStyles.scrollContainer} nestedScrollEnabled flexGrow={0}>
       <View style={[diffStyles.codeBlock, isDark && diffStyles.codeBlockDark]}>
         <Text style={[diffStyles.codeText, isDark && diffStyles.codeTextDark]}>
           {displayContent}
@@ -1279,6 +1279,7 @@ const diffStyles = StyleSheet.create({
   scrollContainer: {
     maxHeight: 300,
     padding: 8,
+    flexGrow: 0,
   },
   filePath: {
     fontSize: 11,
