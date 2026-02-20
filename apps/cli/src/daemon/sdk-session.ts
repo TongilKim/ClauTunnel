@@ -7,6 +7,9 @@ import type { SDKSession as V2Session, SDKSessionOptions, SDKMessage, SlashComma
 import type { ImageAttachment, ModelInfo, PermissionMode, SlashCommand, UserQuestionData, UserQuestion, PermissionRequestData, PermissionResponseData, PermissionUpdate, ToolUseData } from 'termbridge-shared';
 import { v4 as uuidv4 } from 'uuid';
 
+/** Maximum characters to capture from tool use content */
+const MAX_TOOL_CONTENT = 10000;
+
 /** Commands unsupported in remote/mobile context */
 const UNSUPPORTED_COMMANDS = new Set([
   'keybindings-help', 'help', 'context', 'cost', 'release-notes',
@@ -373,19 +376,17 @@ export class SdkSession extends EventEmitter {
               let toolUseData: ToolUseData;
 
               if (toolName === 'Edit' && input.file_path && input.old_string !== undefined) {
-                const MAX_CONTENT = 10000;
                 toolUseData = {
                   action: 'Edit',
                   filePath: input.file_path,
-                  oldString: String(input.old_string).slice(0, MAX_CONTENT),
-                  newString: String(input.new_string || '').slice(0, MAX_CONTENT),
+                  oldString: String(input.old_string).slice(0, MAX_TOOL_CONTENT),
+                  newString: String(input.new_string || '').slice(0, MAX_TOOL_CONTENT),
                 };
               } else if (toolName === 'Write' && input.file_path) {
-                const MAX_CONTENT = 10000;
                 toolUseData = {
                   action: 'Write',
                   filePath: input.file_path,
-                  content: String(input.content || '').slice(0, MAX_CONTENT),
+                  content: String(input.content || '').slice(0, MAX_TOOL_CONTENT),
                 };
               } else {
                 toolUseData = {

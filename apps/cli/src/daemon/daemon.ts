@@ -192,8 +192,8 @@ export class Daemon extends EventEmitter {
       if (this.realtimeClient) {
         try {
           await this.realtimeClient.broadcastToolUse(toolUseData);
-        } catch {
-          // Silently handle broadcast errors
+        } catch (err) {
+          console.warn('[Daemon] Failed to broadcast tool-use:', err);
         }
       }
     });
