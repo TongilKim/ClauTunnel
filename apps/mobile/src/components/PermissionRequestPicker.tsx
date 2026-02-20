@@ -11,7 +11,6 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
 import type { PermissionRequestData } from 'termbridge-shared';
 
 interface PermissionRequestPickerProps {
@@ -33,13 +32,11 @@ export function PermissionRequestPicker({
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
 
-  const handleAllow = async () => {
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  const handleAllow = () => {
     onAllow();
   };
 
-  const handleDeny = async () => {
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+  const handleDeny = () => {
     onDeny('Permission denied by user');
   };
 
