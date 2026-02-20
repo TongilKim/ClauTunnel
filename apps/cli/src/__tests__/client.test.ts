@@ -761,6 +761,29 @@ describe('RealtimeClient', () => {
     expect(errorOutputChannel.send).not.toHaveBeenCalled();
   });
 
+  describe('broadcastSessionTitle', () => {
+    it('should send message with type session-title', async () => {
+      const client = new RealtimeClient({
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      await client.connect();
+      await client.broadcastSessionTitle('Help me refactor auth');
+
+      expect(mockOutputChannel.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'broadcast',
+          event: 'output',
+          payload: expect.objectContaining({
+            type: 'session-title',
+            sessionTitle: 'Help me refactor auth',
+          }),
+        })
+      );
+    });
+  });
+
   describe('broadcastError', () => {
     it('should broadcast error message with correct structure', async () => {
       const client = new RealtimeClient({

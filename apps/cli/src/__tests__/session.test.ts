@@ -189,4 +189,19 @@ describe('SessionManager', () => {
       sessionManager.updateSessionModel('session-123', 'opus')
     ).rejects.toThrow('Failed to update session model');
   });
+
+  it('should update session title', async () => {
+    const updateMock = vi.fn().mockReturnValue({
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    });
+
+    mockSupabase.from = vi.fn().mockReturnValue({
+      update: updateMock,
+    });
+
+    await sessionManager.updateSessionTitle('session-123', 'Help me refactor auth');
+
+    expect(mockSupabase.from).toHaveBeenCalledWith('sessions');
+    expect(updateMock).toHaveBeenCalledWith({ title: 'Help me refactor auth' });
+  });
 });
