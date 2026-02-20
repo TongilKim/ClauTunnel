@@ -11,6 +11,11 @@ import {
 } from 'react-native';
 import { supabase } from '../services/supabase';
 import type { Session } from 'termbridge-shared';
+import {
+  getSessionLabel,
+  canResumeSession,
+  filterResumableSessions,
+} from '../utils/resumeSessionUtils';
 
 interface ResumeSessionPickerProps {
   visible: boolean;
@@ -54,11 +59,7 @@ export function ResumeSessionPicker({
         return;
       }
 
-      // Filter out current session
-      const filteredSessions = (data || []).filter(
-        (s) => s.id !== currentSessionId
-      );
-      setSessions(filteredSessions);
+      setSessions(filterResumableSessions(data || [], currentSessionId));
     } catch {
       setError('Failed to fetch sessions');
     } finally {
@@ -83,19 +84,6 @@ export function ResumeSessionPicker({
     } else {
       return date.toLocaleDateString();
     }
-  };
-
-  const getSessionLabel = (session: Session) => {
-    if (session.title) {
-      return session.title;
-    }
-    const dir = session.working_directory;
-    if (dir) {
-      // Get last part of path
-      const parts = dir.split('/');
-      return parts[parts.length - 1] || dir;
-    }
-    return 'Session';
   };
 
   return (
@@ -155,7 +143,7 @@ export function ResumeSessionPicker({
               </View>
             ) : (
               sessions.map((session) => {
-                const canResume = !!session.sdk_session_id;
+                const canResume = canResumeSession(session);
                 return (
                   <TouchableOpacity
                     key={session.id}
