@@ -19,17 +19,18 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { useConnectionStore } from '../stores/connectionStore';
 import { useSessionStore } from '../stores/sessionStore';
-import type { RealtimeMessage } from 'termbridge-shared';
-import { parseToolUsage } from '../utils/terminalUtils';
+import type { RealtimeMessage, ToolUseData, ToolUseEditData, ToolUseWriteData, ToolUseGenericData } from 'termbridge-shared';
+import { parseToolUsage, shortenPath } from '../utils/terminalUtils';
 
 interface TerminalProps {
   maxLines?: number;
 }
 
 interface GroupedMessage {
-  type: 'input' | 'output' | 'system';
+  type: 'input' | 'output' | 'system' | 'tool-use';
   content: string;
   timestamp: number;
+  toolUseData?: ToolUseData;
 }
 
 // Avatar components using text-based icons
@@ -113,18 +114,20 @@ export function Terminal({ maxLines = 1000 }: TerminalProps) {
 
     for (const msg of sortedMessages) {
       const msgType = msg.type === 'input' ? 'input' :
-                      msg.type === 'output' ? 'output' : 'system';
+                      msg.type === 'output' ? 'output' :
+                      msg.type === 'tool-use' ? 'tool-use' : 'system';
 
-      // System messages should never be grouped - each one is a separate notification
-      if (msgType === 'system') {
+      // System messages and tool-use messages should never be grouped
+      if (msgType === 'system' || msgType === 'tool-use') {
         if (currentGroup) {
           groups.push(currentGroup);
           currentGroup = null;
         }
         groups.push({
-          type: 'system',
+          type: msgType,
           content: msg.content || '',
           timestamp: msg.timestamp,
+          toolUseData: msg.toolUseData,
         });
       } else if (currentGroup && currentGroup.type === msgType) {
         // Append to current group (only for input/output)
@@ -189,10 +192,18 @@ export function Terminal({ maxLines = 1000 }: TerminalProps) {
           <>
             {groupedMessages.map((group, index) => (
               <AnimatedBubble key={`${group.timestamp}-${index}`}>
-                <MessageBubble
-                  message={group}
-                  isDark={isDark}
-                />
+                {group.type === 'tool-use' && group.toolUseData ? (
+                  <CollapsibleToolUse
+                    toolUseData={group.toolUseData}
+                    isDark={isDark}
+                    timestamp={group.timestamp}
+                  />
+                ) : (
+                  <MessageBubble
+                    message={group}
+                    isDark={isDark}
+                  />
+                )}
               </AnimatedBubble>
             ))}
             {isTyping && (
@@ -627,6 +638,139 @@ function ClaudeMessage({ content, isDark }: ClaudeMessageProps) {
     >
       {processedContent}
     </Markdown>
+  );
+}
+
+// Collapsible tool use component for displaying diffs
+interface CollapsibleToolUseProps {
+  toolUseData: ToolUseData;
+  isDark: boolean;
+  timestamp: number;
+}
+
+function CollapsibleToolUse({ toolUseData, isDark, timestamp }: CollapsibleToolUseProps) {
+  const [expanded, setExpanded] = useState(false);
+  const formattedTime = formatTimestamp(timestamp);
+
+  const getHeaderLabel = () => {
+    switch (toolUseData.action) {
+      case 'Edit':
+        return `Edit: ${shortenPath((toolUseData as ToolUseEditData).filePath)}`;
+      case 'Write':
+        return `Write: ${shortenPath((toolUseData as ToolUseWriteData).filePath)}`;
+      default:
+        return `Tool: ${(toolUseData as ToolUseGenericData).toolName}`;
+    }
+  };
+
+  return (
+    <View style={styles.messageRow}>
+      <ClaudeAvatar />
+      <View style={[styles.bubbleContainer, styles.bubbleContainerClaude]}>
+        <TouchableOpacity
+          onPress={() => setExpanded(!expanded)}
+          style={[
+            diffStyles.header,
+            isDark && diffStyles.headerDark,
+          ]}
+          activeOpacity={0.7}
+        >
+          <View style={diffStyles.headerLeft}>
+            <Text style={[diffStyles.headerIcon, isDark && diffStyles.headerIconDark]}>
+              {toolUseData.action === 'Edit' ? '\u270E' : toolUseData.action === 'Write' ? '\u2710' : '\u2699'}
+            </Text>
+            <Text style={[diffStyles.headerText, isDark && diffStyles.headerTextDark]} numberOfLines={1}>
+              {getHeaderLabel()}
+            </Text>
+          </View>
+          <Text style={[diffStyles.chevron, isDark && diffStyles.chevronDark]}>
+            {expanded ? '\u25B2' : '\u25BC'}
+          </Text>
+        </TouchableOpacity>
+
+        {expanded && (
+          <View style={[diffStyles.body, isDark && diffStyles.bodyDark]}>
+            {toolUseData.action === 'Edit' ? (
+              <EditDiffContent data={toolUseData as ToolUseEditData} isDark={isDark} />
+            ) : toolUseData.action === 'Write' ? (
+              <WriteContent data={toolUseData as ToolUseWriteData} isDark={isDark} />
+            ) : (
+              <GenericToolContent data={toolUseData as ToolUseGenericData} isDark={isDark} />
+            )}
+          </View>
+        )}
+
+        <View style={styles.timestampRow}>
+          <Text style={[styles.timestamp, isDark && styles.timestampDark]}>
+            Claude · {formattedTime}
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function EditDiffContent({ data, isDark }: { data: ToolUseEditData; isDark: boolean }) {
+  return (
+    <ScrollView style={diffStyles.scrollContainer} nestedScrollEnabled>
+      <Text style={[diffStyles.filePath, isDark && diffStyles.filePathDark]}>
+        {data.filePath}
+      </Text>
+      {data.oldString.trim() !== '' && (
+        <View style={[diffStyles.removedBlock, isDark && diffStyles.removedBlockDark]}>
+          {data.oldString.split('\n').map((line, i) => (
+            <Text key={`old-${i}`} style={[diffStyles.diffLine, diffStyles.removedLine, isDark && diffStyles.removedLineDark]}>
+              {'- '}{line}
+            </Text>
+          ))}
+        </View>
+      )}
+      {data.newString.trim() !== '' && (
+        <View style={[diffStyles.addedBlock, isDark && diffStyles.addedBlockDark]}>
+          {data.newString.split('\n').map((line, i) => (
+            <Text key={`new-${i}`} style={[diffStyles.diffLine, diffStyles.addedLine, isDark && diffStyles.addedLineDark]}>
+              {'+ '}{line}
+            </Text>
+          ))}
+        </View>
+      )}
+    </ScrollView>
+  );
+}
+
+function WriteContent({ data, isDark }: { data: ToolUseWriteData; isDark: boolean }) {
+  const displayContent = data.content.length > 2000
+    ? data.content.slice(0, 2000) + '\n... (truncated)'
+    : data.content;
+
+  return (
+    <ScrollView style={diffStyles.scrollContainer} nestedScrollEnabled>
+      <Text style={[diffStyles.filePath, isDark && diffStyles.filePathDark]}>
+        {data.filePath}
+      </Text>
+      <View style={[diffStyles.codeBlock, isDark && diffStyles.codeBlockDark]}>
+        <Text style={[diffStyles.codeText, isDark && diffStyles.codeTextDark]}>
+          {displayContent}
+        </Text>
+      </View>
+    </ScrollView>
+  );
+}
+
+function GenericToolContent({ data, isDark }: { data: ToolUseGenericData; isDark: boolean }) {
+  const inputStr = JSON.stringify(data.input, null, 2);
+  const displayContent = inputStr.length > 1000
+    ? inputStr.slice(0, 1000) + '\n... (truncated)'
+    : inputStr;
+
+  return (
+    <ScrollView style={diffStyles.scrollContainer} nestedScrollEnabled>
+      <View style={[diffStyles.codeBlock, isDark && diffStyles.codeBlockDark]}>
+        <Text style={[diffStyles.codeText, isDark && diffStyles.codeTextDark]}>
+          {displayContent}
+        </Text>
+      </View>
+    </ScrollView>
   );
 }
 
@@ -1071,5 +1215,131 @@ const styles = StyleSheet.create({
   },
   systemTextDark: {
     color: '#9ca3af',
+  },
+});
+
+const diffStyles = StyleSheet.create({
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f3f4f6',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  headerDark: {
+    backgroundColor: '#1f1f1f',
+    borderColor: '#333333',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 6,
+  },
+  headerIcon: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  headerIconDark: {
+    color: '#9ca3af',
+  },
+  headerText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
+    fontFamily: 'monospace',
+    flex: 1,
+  },
+  headerTextDark: {
+    color: '#d1d5db',
+  },
+  chevron: {
+    fontSize: 10,
+    color: '#6b7280',
+    marginLeft: 8,
+  },
+  chevronDark: {
+    color: '#9ca3af',
+  },
+  body: {
+    backgroundColor: '#f9fafb',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    marginTop: 4,
+    overflow: 'hidden',
+  },
+  bodyDark: {
+    backgroundColor: '#111111',
+    borderColor: '#333333',
+  },
+  scrollContainer: {
+    maxHeight: 300,
+    padding: 8,
+  },
+  filePath: {
+    fontSize: 11,
+    fontFamily: 'monospace',
+    color: '#6b7280',
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  filePathDark: {
+    color: '#9ca3af',
+  },
+  removedBlock: {
+    backgroundColor: '#fef2f2',
+    borderRadius: 4,
+    padding: 8,
+    marginBottom: 4,
+  },
+  removedBlockDark: {
+    backgroundColor: '#1c0f0f',
+  },
+  addedBlock: {
+    backgroundColor: '#f0fdf4',
+    borderRadius: 4,
+    padding: 8,
+  },
+  addedBlockDark: {
+    backgroundColor: '#0f1c14',
+  },
+  diffLine: {
+    fontFamily: 'monospace',
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  removedLine: {
+    color: '#dc2626',
+  },
+  removedLineDark: {
+    color: '#f87171',
+  },
+  addedLine: {
+    color: '#16a34a',
+  },
+  addedLineDark: {
+    color: '#4ade80',
+  },
+  codeBlock: {
+    backgroundColor: '#f3f4f6',
+    borderRadius: 4,
+    padding: 8,
+  },
+  codeBlockDark: {
+    backgroundColor: '#1e1e1e',
+  },
+  codeText: {
+    fontFamily: 'monospace',
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#1f2937',
+  },
+  codeTextDark: {
+    color: '#d4d4d4',
   },
 });

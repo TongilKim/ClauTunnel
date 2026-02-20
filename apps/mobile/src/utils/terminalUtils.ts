@@ -18,3 +18,13 @@ export function parseToolUsage(content: string): { tools: string[]; cleanContent
 
   return { tools, cleanContent };
 }
+
+/** Shorten a file path for display in collapsed headers */
+export function shortenPath(filePath: string, maxLength = 40): string {
+  if (filePath.length <= maxLength) return filePath;
+  const parts = filePath.split('/');
+  if (parts.length <= 2) return filePath;
+  const filename = parts[parts.length - 1];
+  const dir = parts[parts.length - 2];
+  return `.../${dir}/${filename}`;
+}

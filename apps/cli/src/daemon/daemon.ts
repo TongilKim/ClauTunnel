@@ -5,7 +5,7 @@ import { SessionManager } from './session.js';
 import { MachineManager } from './machine.js';
 import { ConfigManager } from './config-manager.js';
 import { RealtimeClient } from '../realtime/client.js';
-import type { Session, Machine, RealtimeMessage, ImageAttachment, PermissionMode, UserQuestionData, PermissionRequestData } from 'termbridge-shared';
+import type { Session, Machine, RealtimeMessage, ImageAttachment, PermissionMode, UserQuestionData, PermissionRequestData, ToolUseData } from 'termbridge-shared';
 
 export interface DaemonOptions {
   supabase: SupabaseClient;
@@ -183,6 +183,17 @@ export class Daemon extends EventEmitter {
           await this.realtimeClient.broadcastPermissionRequest(requestData);
         } catch {
           // Silently handle broadcast errors
+        }
+      }
+    });
+
+    // Wire up tool use data to broadcast to mobile (for code diffs)
+    this.sdkSession.on('tool-use', async (toolUseData: ToolUseData) => {
+      if (this.realtimeClient) {
+        try {
+          await this.realtimeClient.broadcastToolUse(toolUseData);
+        } catch (err) {
+          console.warn('[Daemon] Failed to broadcast tool-use:', err);
         }
       }
     });

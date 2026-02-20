@@ -4,8 +4,11 @@ import * as path from 'path';
 import * as os from 'os';
 import { unstable_v2_createSession, unstable_v2_resumeSession } from '@anthropic-ai/claude-agent-sdk';
 import type { SDKSession as V2Session, SDKSessionOptions, SDKMessage, SlashCommand as SDKSlashCommand, CanUseTool, PermissionResult, PermissionUpdate as SDKPermissionUpdate, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
-import type { ImageAttachment, ModelInfo, PermissionMode, SlashCommand, UserQuestionData, UserQuestion, PermissionRequestData, PermissionResponseData, PermissionUpdate } from 'termbridge-shared';
+import type { ImageAttachment, ModelInfo, PermissionMode, SlashCommand, UserQuestionData, UserQuestion, PermissionRequestData, PermissionResponseData, PermissionUpdate, ToolUseData } from 'termbridge-shared';
 import { v4 as uuidv4 } from 'uuid';
+
+/** Maximum characters to capture from tool use content */
+const MAX_TOOL_CONTENT = 10000;
 
 /** Commands unsupported in remote/mobile context */
 const UNSUPPORTED_COMMANDS = new Set([
@@ -367,7 +370,34 @@ export class SdkSession extends EventEmitter {
           } else if ('type' in block && block.type === 'tool_use' && 'name' in block) {
             // AskUserQuestion tool_use blocks are handled via the canUseTool
             // callback (which emits 'user-question' and waits for the answer).
-            // No special handling needed here in the stream.
+            const toolName = (block as any).name as string;
+            if (toolName !== 'AskUserQuestion') {
+              const input = (block as any).input || {};
+              let toolUseData: ToolUseData;
+
+              if (toolName === 'Edit' && input.file_path && input.old_string !== undefined) {
+                toolUseData = {
+                  action: 'Edit',
+                  filePath: input.file_path,
+                  oldString: String(input.old_string).slice(0, MAX_TOOL_CONTENT),
+                  newString: String(input.new_string || '').slice(0, MAX_TOOL_CONTENT),
+                };
+              } else if (toolName === 'Write' && input.file_path) {
+                toolUseData = {
+                  action: 'Write',
+                  filePath: input.file_path,
+                  content: String(input.content || '').slice(0, MAX_TOOL_CONTENT),
+                };
+              } else {
+                toolUseData = {
+                  action: toolName,
+                  toolName,
+                  input,
+                };
+              }
+
+              this.emit('tool-use', toolUseData);
+            }
           }
         }
       }
