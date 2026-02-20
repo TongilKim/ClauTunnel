@@ -1494,4 +1494,69 @@ describe('Daemon', () => {
       expect(listeners.length).toBeGreaterThan(0);
     });
   });
+
+  describe('cancel-request handling', () => {
+    it('should call sdkSession.cancel() and broadcast system message and complete', async () => {
+      let inputHandler: ((payload: any) => void) | null = null;
+
+      mockInputChannel.on = vi.fn((event, filter, handler) => {
+        if (event === 'broadcast' && filter.event === 'input') {
+          inputHandler = handler;
+        }
+        return mockInputChannel as RealtimeChannel;
+      });
+
+      daemon = new Daemon({
+        supabase: mockSupabase as SupabaseClient,
+        userId: 'user-456',
+        cwd: '/home/user',
+      });
+
+      await daemon.start();
+
+      const sdkSession = (daemon as any).sdkSession;
+      const cancelSpy = vi.spyOn(sdkSession, 'cancel').mockImplementation(() => {});
+
+      const sendSpy = mockOutputChannel.send;
+
+      // Simulate receiving cancel-request from mobile
+      if (inputHandler) {
+        inputHandler({
+          payload: {
+            type: 'cancel-request',
+            timestamp: Date.now(),
+            seq: 1,
+          },
+        });
+      }
+
+      // Wait for async operations
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(cancelSpy).toHaveBeenCalled();
+
+      // Should broadcast [Cancelled] system message
+      expect(sendSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'broadcast',
+          event: 'output',
+          payload: expect.objectContaining({
+            type: 'system',
+            content: '[Cancelled]',
+          }),
+        })
+      );
+
+      // Should broadcast complete so mobile resets isTyping
+      expect(sendSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'broadcast',
+          event: 'output',
+          payload: expect.objectContaining({
+            type: 'complete',
+          }),
+        })
+      );
+    });
+  });
 });
