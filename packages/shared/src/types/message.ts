@@ -35,6 +35,7 @@ export type RealtimeMessageType =
   | 'interactive-response'
   | 'interactive-apply'
   | 'interactive-confirm'
+  | 'cancel-request' // Request to cancel/stop Claude's current processing
   | 'clear-request' // Request to clear conversation (doesn't appear in chat)
   | 'resume-request' // Request to resume a different session (doesn't appear in chat)
   | 'resume-history' // Tells mobile to load messages from a previous session

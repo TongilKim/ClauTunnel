@@ -76,6 +76,7 @@ interface ConnectionStoreState {
   requestPendingState: () => Promise<void>;
   clearMessages: () => void;
   clearError: () => void;
+  sendCancelRequest: () => Promise<void>;
   sendClearRequest: () => Promise<void>;
   sendResumeRequest: (sdkSessionId: string) => Promise<void>;
 
@@ -432,6 +433,25 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
 
   clearMessages: () => {
     set({ messages: [], lastSeq: 0 });
+  },
+
+  sendCancelRequest: async () => {
+    if (!inputChannel || get().state !== 'connected') {
+      set({ error: 'Not connected' });
+      return;
+    }
+
+    const message: RealtimeMessage = {
+      type: 'cancel-request',
+      timestamp: Date.now(),
+      seq: ++seq,
+    };
+
+    await inputChannel.send({
+      type: 'broadcast',
+      event: 'input',
+      payload: message,
+    });
   },
 
   sendClearRequest: async () => {

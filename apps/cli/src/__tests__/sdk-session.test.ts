@@ -700,6 +700,46 @@ describe('SdkSession', () => {
       await tick();
     });
 
+    it('should clear pending question and permission data when cancel is called', async () => {
+      let capturedCanUseTool: any = null;
+
+      mockedCreateSession.mockImplementation((opts: any) => {
+        capturedCanUseTool = opts.canUseTool;
+        const session = {
+          closed: false,
+          get sessionId() { return 'cancel-pending-session'; },
+          send: vi.fn().mockResolvedValue(undefined),
+          stream: async function* () {
+            yield { type: 'system', subtype: 'init', session_id: 'cancel-pending-session' };
+            // Block forever to simulate processing
+            await new Promise<void>(() => {});
+          },
+          close: vi.fn(() => { session.closed = true; }),
+          [Symbol.asyncDispose]: async () => {},
+        };
+        return session as any;
+      });
+
+      sdkSession.sendPrompt('Test message');
+      await tick();
+
+      // Simulate a pending question via canUseTool
+      capturedCanUseTool('AskUserQuestion', {
+        questions: [{ question: 'Pick one', header: 'Choice', options: [{ label: 'A', description: 'Option A' }], multiSelect: false }],
+      }, { signal: new AbortController().signal });
+      await tick();
+
+      // Verify pending question is set
+      expect(sdkSession.getPendingQuestionData()).not.toBeNull();
+
+      // Cancel should clear it
+      sdkSession.cancel();
+
+      expect(sdkSession.getPendingQuestionData()).toBeNull();
+      expect(sdkSession.getPendingPermissionData()).toBeNull();
+      expect(sdkSession.isActive()).toBe(false);
+    });
+
     it('should clear pending prompt when clearHistory is called', async () => {
       let resolveStream: (() => void) | null = null;
       const slowSession = {
