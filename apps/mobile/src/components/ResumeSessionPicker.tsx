@@ -11,6 +11,11 @@ import {
 } from 'react-native';
 import { supabase } from '../services/supabase';
 import type { Session } from 'termbridge-shared';
+import {
+  getSessionLabel,
+  canResumeSession,
+  filterResumableSessions,
+} from '../utils/resumeSessionUtils';
 
 interface ResumeSessionPickerProps {
   visible: boolean;
@@ -46,7 +51,6 @@ export function ResumeSessionPicker({
         .from('sessions')
         .select('*')
         .neq('status', 'active')
-        .not('sdk_session_id', 'is', null) // Only sessions with SDK session ID (can be resumed)
         .order('started_at', { ascending: false })
         .limit(20);
 
@@ -55,11 +59,7 @@ export function ResumeSessionPicker({
         return;
       }
 
-      // Filter out current session
-      const filteredSessions = (data || []).filter(
-        (s) => s.id !== currentSessionId && s.sdk_session_id
-      );
-      setSessions(filteredSessions);
+      setSessions(filterResumableSessions(data || [], currentSessionId));
     } catch {
       setError('Failed to fetch sessions');
     } finally {
@@ -84,16 +84,6 @@ export function ResumeSessionPicker({
     } else {
       return date.toLocaleDateString();
     }
-  };
-
-  const getSessionLabel = (session: Session) => {
-    const dir = session.working_directory;
-    if (dir) {
-      // Get last part of path
-      const parts = dir.split('/');
-      return parts[parts.length - 1] || dir;
-    }
-    return 'Session';
   };
 
   return (
@@ -152,41 +142,60 @@ export function ResumeSessionPicker({
                 </Text>
               </View>
             ) : (
-              sessions.map((session) => (
-                <TouchableOpacity
-                  key={session.id}
-                  style={[styles.sessionItem, isDark && styles.sessionItemDark]}
-                  onPress={() => onSelect(session.sdk_session_id!)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.sessionHeader}>
-                    <Text style={[styles.sessionName, isDark && styles.sessionNameDark]}>
-                      {getSessionLabel(session)}
-                    </Text>
-                    <Text style={[styles.sessionTime, isDark && styles.sessionTimeDark]}>
-                      {formatDate(session.started_at)}
-                    </Text>
-                  </View>
-                  {session.working_directory && (
-                    <Text
-                      style={[styles.sessionPath, isDark && styles.sessionPathDark]}
-                      numberOfLines={1}
-                    >
-                      {session.working_directory}
-                    </Text>
-                  )}
-                  <View style={styles.sessionMeta}>
-                    <View style={[styles.statusBadge, styles[`status_${session.status}`]]}>
-                      <Text style={styles.statusText}>{session.status}</Text>
+              sessions.map((session) => {
+                const canResume = canResumeSession(session);
+                return (
+                  <TouchableOpacity
+                    key={session.id}
+                    style={[
+                      styles.sessionItem,
+                      isDark && styles.sessionItemDark,
+                      !canResume && styles.sessionItemDisabled,
+                    ]}
+                    onPress={() => canResume && session.sdk_session_id && onSelect(session.sdk_session_id)}
+                    activeOpacity={canResume ? 0.7 : 1}
+                    disabled={!canResume}
+                  >
+                    <View style={styles.sessionHeader}>
+                      <Text
+                        style={[
+                          styles.sessionName,
+                          isDark && styles.sessionNameDark,
+                          !canResume && styles.sessionNameDisabled,
+                        ]}
+                      >
+                        {getSessionLabel(session)}
+                      </Text>
+                      <Text style={[styles.sessionTime, isDark && styles.sessionTimeDark]}>
+                        {formatDate(session.started_at)}
+                      </Text>
                     </View>
-                    {session.model && (
-                      <Text style={[styles.modelText, isDark && styles.modelTextDark]}>
-                        {session.model}
+                    {session.working_directory && (
+                      <Text
+                        style={[styles.sessionPath, isDark && styles.sessionPathDark]}
+                        numberOfLines={1}
+                      >
+                        {session.working_directory}
                       </Text>
                     )}
-                  </View>
-                </TouchableOpacity>
-              ))
+                    <View style={styles.sessionMeta}>
+                      <View style={[styles.statusBadge, styles[`status_${session.status}`]]}>
+                        <Text style={styles.statusText}>{session.status}</Text>
+                      </View>
+                      {session.model && (
+                        <Text style={[styles.modelText, isDark && styles.modelTextDark]}>
+                          {session.model}
+                        </Text>
+                      )}
+                      {!canResume && (
+                        <Text style={[styles.modelText, isDark && styles.modelTextDark]}>
+                          No conversation
+                        </Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
             )}
           </ScrollView>
         </View>
@@ -318,6 +327,9 @@ const styles = StyleSheet.create({
   sessionItemDark: {
     backgroundColor: '#2d2d2d',
   },
+  sessionItemDisabled: {
+    opacity: 0.5,
+  },
   sessionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -331,6 +343,9 @@ const styles = StyleSheet.create({
   },
   sessionNameDark: {
     color: '#f3f4f6',
+  },
+  sessionNameDisabled: {
+    color: '#9ca3af',
   },
   sessionTime: {
     fontSize: 12,
