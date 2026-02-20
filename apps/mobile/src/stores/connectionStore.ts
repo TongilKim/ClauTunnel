@@ -17,6 +17,7 @@ import type {
   PermissionResponseData,
 } from 'termbridge-shared';
 import { REALTIME_CHANNELS } from 'termbridge-shared';
+import { useSessionStore } from './sessionStore';
 
 type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
 
@@ -258,10 +259,9 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
         // Handle session-title - auto-generated from first user message
         // Update the session store so the header title reflects immediately.
         if (message.type === 'session-title' && message.sessionTitle) {
-          const { useSessionStore } = require('./sessionStore');
           const sessionId = get().sessionId;
           if (sessionId) {
-            useSessionStore.setState((state: { sessions: Array<{ id: string; title?: string }> }) => ({
+            useSessionStore.setState((state) => ({
               sessions: state.sessions.map((s) =>
                 s.id === sessionId
                   ? { ...s, title: message.sessionTitle }
