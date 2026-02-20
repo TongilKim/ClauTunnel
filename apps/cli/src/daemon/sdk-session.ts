@@ -549,6 +549,9 @@ export class SdkSession extends EventEmitter {
 
   cancel(): void {
     this.pendingAnswerResolve = null;
+    this.pendingQuestionData = null;
+    this.pendingPermissionData = null;
+    this.pendingPermissionRequests.clear();
     if (this.v2Session) {
       this.v2Session.close();
       this.v2Session = null;

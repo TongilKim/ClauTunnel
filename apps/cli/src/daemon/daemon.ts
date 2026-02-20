@@ -371,6 +371,23 @@ export class Daemon extends EventEmitter {
         return;
       }
 
+      // Handle cancel request from mobile - stop Claude mid-processing
+      if (message.type === 'cancel-request') {
+        this.sdkSession.cancel();
+        if (this.options.hybrid !== false) {
+          process.stdout.write('\n[Cancelled]\n> ');
+        }
+        if (this.realtimeClient) {
+          try {
+            await this.realtimeClient.broadcastSystem('[Cancelled]');
+            await this.realtimeClient.broadcastComplete();
+          } catch {
+            // Silently handle broadcast errors
+          }
+        }
+        return;
+      }
+
       // Handle clear request from mobile (doesn't appear in chat)
       if (message.type === 'clear-request') {
         this.sdkSession.clearHistory();

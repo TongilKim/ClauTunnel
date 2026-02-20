@@ -55,6 +55,7 @@ export function InputBar({ disabled }: InputBarProps) {
   const {
     sendInput,
     sendModelChange,
+    sendCancelRequest,
     sendClearRequest,
     sendResumeRequest,
     state,
@@ -200,6 +201,10 @@ export function InputBar({ disabled }: InputBarProps) {
     },
     []
   );
+
+  const handleCancel = async () => {
+    await sendCancelRequest();
+  };
 
   const canSend = input.trim() && !isDisabled;
 
@@ -356,20 +361,29 @@ export function InputBar({ disabled }: InputBarProps) {
               </View>
             )}
           </View>
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              isDark && styles.sendButtonDark,
-              canSend && styles.sendButtonActive,
-            ]}
-            onPress={handleSend}
-            disabled={!canSend}
-          >
-            <View style={[styles.sendArrow, canSend && styles.sendArrowActive]}>
-              <View style={[styles.arrowUp, canSend && styles.arrowUpActive]} />
-              <View style={[styles.arrowStem, canSend && styles.arrowStemActive]} />
-            </View>
-          </TouchableOpacity>
+          {isTyping ? (
+            <TouchableOpacity
+              style={[styles.sendButton, styles.stopButtonActive]}
+              onPress={handleCancel}
+            >
+              <View style={styles.stopSquare} />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[
+                styles.sendButton,
+                isDark && styles.sendButtonDark,
+                canSend && styles.sendButtonActive,
+              ]}
+              onPress={handleSend}
+              disabled={!canSend}
+            >
+              <View style={[styles.sendArrow, canSend && styles.sendArrowActive]}>
+                <View style={[styles.arrowUp, canSend && styles.arrowUpActive]} />
+                <View style={[styles.arrowStem, canSend && styles.arrowStemActive]} />
+              </View>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -474,6 +488,15 @@ const styles = StyleSheet.create({
   },
   sendButtonActive: {
     backgroundColor: '#d4a574',
+  },
+  stopButtonActive: {
+    backgroundColor: '#ef4444',
+  },
+  stopSquare: {
+    width: 10,
+    height: 10,
+    borderRadius: 2,
+    backgroundColor: '#ffffff',
   },
   sendArrow: {
     alignItems: 'center',
