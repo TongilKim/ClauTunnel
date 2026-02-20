@@ -97,9 +97,11 @@ export default function SessionScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       {/* Custom Header */}
       <View style={[styles.header, isDark && styles.headerDark, { paddingTop: insets.top }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={[styles.backText, isDark && styles.backTextDark]}>‹ Back</Text>
-        </TouchableOpacity>
+        <View style={styles.headerSide}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Text style={[styles.backText, isDark && styles.backTextDark]}>‹ Back</Text>
+          </TouchableOpacity>
+        </View>
         <TouchableOpacity onPress={handleEditTitle} style={styles.titleButton}>
           <Text
             style={[styles.headerTitle, isDark && styles.headerTitleDark]}
@@ -109,8 +111,7 @@ export default function SessionScreen() {
           </Text>
           <Text style={[styles.editIcon, isDark && styles.editIconDark]}>✎</Text>
         </TouchableOpacity>
-        <View style={styles.headerRight}>
-          {/* Status Badge */}
+        <View style={[styles.headerSide, styles.headerSideRight]}>
           <View style={[styles.statusBadge, styles[`statusBadge_${effectiveStatus}`]]}>
             <View style={[styles.statusDot, styles[`statusDot_${effectiveStatus}`]]} />
             <Text style={[styles.statusText, styles[`statusText_${effectiveStatus}`]]}>
@@ -162,7 +163,6 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingBottom: 12,
     backgroundColor: '#ffffff',
@@ -173,9 +173,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#0a0a0a',
     borderBottomColor: '#374151',
   },
+  headerSide: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerSideRight: {
+    justifyContent: 'flex-end',
+  },
   backButton: {
     paddingVertical: 8,
-    paddingRight: 16,
   },
   backText: {
     fontSize: 17,
@@ -187,9 +194,10 @@ const styles = StyleSheet.create({
   titleButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    maxWidth: '50%',
     gap: 6,
-    flex: 1,
-    marginHorizontal: 8,
   },
   headerTitle: {
     fontSize: 17,
@@ -206,11 +214,6 @@ const styles = StyleSheet.create({
   },
   editIconDark: {
     color: '#9ca3af',
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
   },
   // Status badge
   statusBadge: {
