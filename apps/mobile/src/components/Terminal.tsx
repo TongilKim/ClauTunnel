@@ -126,7 +126,13 @@ export function Terminal({ maxLines = 1000 }: TerminalProps) {
         });
       } else if (currentGroup && currentGroup.type === msgType) {
         // Append to current group (only for input/output)
-        currentGroup.content += msg.content || '';
+        // Add newline between chunks so line breaks are preserved when rendering
+        const chunk = msg.content || '';
+        if (chunk && !currentGroup.content.endsWith('\n') && !chunk.startsWith('\n')) {
+          currentGroup.content += '\n' + chunk;
+        } else {
+          currentGroup.content += chunk;
+        }
       } else {
         // Start new group
         if (currentGroup) {
@@ -602,6 +608,12 @@ function ClaudeMessage({ content, isDark }: ClaudeMessageProps) {
     );
   }, [isDark, copyToClipboard]);
 
+  // Convert single newlines to double newlines so Markdown renders them
+  // as paragraph breaks instead of collapsing them into spaces
+  const processedContent = useMemo(() => {
+    return content.replace(/\n(?!\n)/g, '\n\n');
+  }, [content]);
+
   return (
     <Markdown
       style={markdownStyles}
@@ -610,7 +622,7 @@ function ClaudeMessage({ content, isDark }: ClaudeMessageProps) {
         code_block: renderCodeBlock,
       }}
     >
-      {content}
+      {processedContent}
     </Markdown>
   );
 }
