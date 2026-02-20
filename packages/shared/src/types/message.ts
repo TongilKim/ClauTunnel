@@ -1,4 +1,4 @@
-export type MessageType = 'output' | 'input' | 'error' | 'system';
+export type MessageType = 'output' | 'input' | 'error' | 'system' | 'tool-use';
 
 export type PermissionMode =
   | 'default' // Ask before making changes
@@ -45,6 +45,7 @@ export type RealtimeMessageType =
   | 'request-queued' // Message was queued because Claude is still processing
   | 'status-request' // Mobile requests current pending state (question/permission)
   | 'session-title' // Session title was auto-generated from first user message
+  | 'tool-use' // Tool use data for displaying diffs (Edit, Write, etc.)
   | 'complete'; // Claude has finished responding (query complete)
 
 export type InteractiveCommandType =
@@ -112,6 +113,7 @@ export interface RealtimeMessage {
   permissionRequest?: PermissionRequestData; // For permission-request type
   permissionResponse?: PermissionResponseData; // For permission-response type
   errorCode?: string; // For error type messages (e.g., 'timeout')
+  toolUseData?: ToolUseData; // For tool-use type messages (diffs, file operations)
   timestamp: number;
   seq: number;
 }
@@ -225,6 +227,28 @@ export interface PermissionResponseData {
   updatedInput?: Record<string, unknown>; // For allow - modified input
   updatedPermissions?: PermissionUpdate[]; // For allow - permission updates
 }
+
+// Tool use types for displaying diffs and file operations in mobile UI
+export interface ToolUseEditData {
+  action: 'Edit';
+  filePath: string;
+  oldString: string;
+  newString: string;
+}
+
+export interface ToolUseWriteData {
+  action: 'Write';
+  filePath: string;
+  content: string;
+}
+
+export interface ToolUseGenericData {
+  action: string;
+  toolName: string;
+  input: Record<string, unknown>;
+}
+
+export type ToolUseData = ToolUseEditData | ToolUseWriteData | ToolUseGenericData;
 
 // Machine-level command types (for listen mode)
 export type MachineCommandType =

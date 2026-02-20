@@ -1407,4 +1407,61 @@ describe('Daemon', () => {
       await new Promise(resolve => setTimeout(resolve, 10));
     });
   });
+
+  describe('tool-use handling', () => {
+    it('should broadcast tool-use data when sdkSession emits tool-use event', async () => {
+      daemon = new Daemon({
+        supabase: mockSupabase as SupabaseClient,
+        userId: 'user-456',
+        cwd: '/home/user',
+      });
+
+      await daemon.start();
+
+      const sdkSession = (daemon as any).sdkSession;
+      const sendSpy = mockOutputChannel.send;
+
+      // Emit tool-use event from SDK session
+      sdkSession.emit('tool-use', {
+        action: 'Edit',
+        filePath: '/src/app.ts',
+        oldString: 'const x = 1;',
+        newString: 'const x = 2;',
+      });
+
+      // Wait for async operations
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      // Verify broadcastToolUse was called via the output channel
+      expect(sendSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'broadcast',
+          event: 'output',
+          payload: expect.objectContaining({
+            type: 'tool-use',
+            toolUseData: {
+              action: 'Edit',
+              filePath: '/src/app.ts',
+              oldString: 'const x = 1;',
+              newString: 'const x = 2;',
+            },
+          }),
+        })
+      );
+    });
+
+    it('should listen for tool-use event from SDK session', async () => {
+      daemon = new Daemon({
+        supabase: mockSupabase as SupabaseClient,
+        userId: 'user-456',
+        cwd: '/home/user',
+      });
+
+      await daemon.start();
+
+      const sdkSession = (daemon as any).sdkSession;
+      const listeners = sdkSession.listeners('tool-use');
+      expect(listeners.length).toBeGreaterThan(0);
+    });
+  });
 });

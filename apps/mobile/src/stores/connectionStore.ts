@@ -152,12 +152,18 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
         .order('seq', { ascending: true });
 
       if (!messagesError && historicalMessages && historicalMessages.length > 0) {
-        const messages: RealtimeMessage[] = historicalMessages.map((msg) => ({
-          type: msg.type as RealtimeMessage['type'],
-          content: msg.content,
-          timestamp: new Date(msg.created_at).getTime(),
-          seq: msg.seq,
-        }));
+        const messages: RealtimeMessage[] = historicalMessages.map((msg) => {
+          const base: RealtimeMessage = {
+            type: msg.type as RealtimeMessage['type'],
+            content: msg.content,
+            timestamp: new Date(msg.created_at).getTime(),
+            seq: msg.seq,
+          };
+          if (msg.type === 'tool-use') {
+            try { base.toolUseData = JSON.parse(msg.content); } catch {}
+          }
+          return base;
+        });
         const lastSeq = historicalMessages[historicalMessages.length - 1].seq;
         // Initialize seq counter to continue from where historical messages left off
         seq = lastSeq;
@@ -288,12 +294,18 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
             .order('seq', { ascending: true })
             .then(({ data: historicalMessages, error }) => {
               if (!error && historicalMessages && historicalMessages.length > 0) {
-                const resumedMessages: RealtimeMessage[] = historicalMessages.map((msg) => ({
-                  type: msg.type as RealtimeMessage['type'],
-                  content: msg.content,
-                  timestamp: new Date(msg.created_at).getTime(),
-                  seq: msg.seq,
-                }));
+                const resumedMessages: RealtimeMessage[] = historicalMessages.map((msg) => {
+                  const base: RealtimeMessage = {
+                    type: msg.type as RealtimeMessage['type'],
+                    content: msg.content,
+                    timestamp: new Date(msg.created_at).getTime(),
+                    seq: msg.seq,
+                  };
+                  if (msg.type === 'tool-use') {
+                    try { base.toolUseData = JSON.parse(msg.content); } catch {}
+                  }
+                  return base;
+                });
                 // Prepend resumed messages to current messages
                 set((state) => ({
                   messages: [...resumedMessages, ...state.messages],

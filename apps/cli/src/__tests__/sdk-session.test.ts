@@ -1091,4 +1091,146 @@ describe('SdkSession', () => {
       expect(session._sendMock).toHaveBeenCalledTimes(2);
     });
   });
+
+  describe('tool-use events', () => {
+    it('should emit tool-use event for Edit tool_use blocks', async () => {
+      const session = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'test-session-id' },
+        {
+          type: 'assistant',
+          message: {
+            content: [
+              {
+                type: 'tool_use',
+                name: 'Edit',
+                id: 'toolu_edit_123',
+                input: {
+                  file_path: '/src/app.ts',
+                  old_string: 'const x = 1;',
+                  new_string: 'const x = 2;',
+                },
+              },
+            ],
+          },
+        },
+        { type: 'result', subtype: 'success', result: 'done' },
+      ]);
+      mockedCreateSession.mockReturnValue(session as any);
+
+      const toolUseHandler = vi.fn();
+      sdkSession.on('tool-use', toolUseHandler);
+
+      await sdkSession.sendPrompt('Fix the bug');
+      await tick();
+
+      expect(toolUseHandler).toHaveBeenCalledWith({
+        action: 'Edit',
+        filePath: '/src/app.ts',
+        oldString: 'const x = 1;',
+        newString: 'const x = 2;',
+      });
+    });
+
+    it('should emit tool-use event for Write tool_use blocks', async () => {
+      const session = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'test-session-id' },
+        {
+          type: 'assistant',
+          message: {
+            content: [
+              {
+                type: 'tool_use',
+                name: 'Write',
+                id: 'toolu_write_123',
+                input: {
+                  file_path: '/src/new-file.ts',
+                  content: 'export const hello = "world";',
+                },
+              },
+            ],
+          },
+        },
+        { type: 'result', subtype: 'success', result: 'done' },
+      ]);
+      mockedCreateSession.mockReturnValue(session as any);
+
+      const toolUseHandler = vi.fn();
+      sdkSession.on('tool-use', toolUseHandler);
+
+      await sdkSession.sendPrompt('Create a file');
+      await tick();
+
+      expect(toolUseHandler).toHaveBeenCalledWith({
+        action: 'Write',
+        filePath: '/src/new-file.ts',
+        content: 'export const hello = "world";',
+      });
+    });
+
+    it('should emit generic tool-use event for other tools', async () => {
+      const session = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'test-session-id' },
+        {
+          type: 'assistant',
+          message: {
+            content: [
+              {
+                type: 'tool_use',
+                name: 'Bash',
+                id: 'toolu_bash_123',
+                input: {
+                  command: 'ls -la',
+                },
+              },
+            ],
+          },
+        },
+        { type: 'result', subtype: 'success', result: 'done' },
+      ]);
+      mockedCreateSession.mockReturnValue(session as any);
+
+      const toolUseHandler = vi.fn();
+      sdkSession.on('tool-use', toolUseHandler);
+
+      await sdkSession.sendPrompt('List files');
+      await tick();
+
+      expect(toolUseHandler).toHaveBeenCalledWith({
+        action: 'Bash',
+        toolName: 'Bash',
+        input: { command: 'ls -la' },
+      });
+    });
+
+    it('should NOT emit tool-use event for AskUserQuestion blocks', async () => {
+      const session = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'test-session-id' },
+        {
+          type: 'assistant',
+          message: {
+            content: [
+              {
+                type: 'tool_use',
+                name: 'AskUserQuestion',
+                id: 'toolu_ask_123',
+                input: {
+                  questions: [{ question: 'Which?', header: 'Q', options: [] }],
+                },
+              },
+            ],
+          },
+        },
+        { type: 'result', subtype: 'success', result: 'done' },
+      ]);
+      mockedCreateSession.mockReturnValue(session as any);
+
+      const toolUseHandler = vi.fn();
+      sdkSession.on('tool-use', toolUseHandler);
+
+      await sdkSession.sendPrompt('Help me');
+      await tick();
+
+      expect(toolUseHandler).not.toHaveBeenCalled();
+    });
+  });
 });

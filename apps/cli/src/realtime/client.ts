@@ -11,6 +11,7 @@ import type {
   PresencePayload,
   UserQuestionData,
   PermissionRequestData,
+  ToolUseData,
 } from 'termbridge-shared';
 import { REALTIME_CHANNELS } from 'termbridge-shared';
 import { subscribeWithTimeout } from './utils.js';
@@ -430,6 +431,52 @@ export class RealtimeClient extends EventEmitter {
       event: 'output',
       payload: message,
     });
+
+    this.emit('broadcast', message);
+  }
+
+  async broadcastToolUse(toolUseData: ToolUseData): Promise<void> {
+    if (!this.outputChannel) {
+      throw new Error('Not connected');
+    }
+
+    const message: RealtimeMessage = {
+      type: 'tool-use',
+      toolUseData,
+      content: JSON.stringify(toolUseData),
+      timestamp: Date.now(),
+      seq: ++this.seq,
+    };
+
+    // Persist to database for history
+    try {
+      const { error } = await this.supabase.from('messages').insert({
+        session_id: this.sessionId,
+        type: message.type,
+        content: message.content,
+        seq: message.seq,
+      });
+      if (error) {
+        console.warn('[WARN] Failed to persist tool-use message:', error.message);
+      }
+    } catch (error) {
+      console.warn('[WARN] Failed to persist tool-use message:', error);
+    }
+
+    // Skip realtime broadcasting if not enabled
+    if (!this.realtimeEnabled) {
+      return;
+    }
+
+    try {
+      await this.outputChannel.send({
+        type: 'broadcast',
+        event: 'output',
+        payload: message,
+      });
+    } catch (error) {
+      throw error;
+    }
 
     this.emit('broadcast', message);
   }
