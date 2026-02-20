@@ -265,6 +265,13 @@ export class Daemon extends EventEmitter {
               // Silently handle broadcast errors
             }
           }
+        } else {
+          // Model didn't change — still broadcast current model so mobile clears loading state
+          try {
+            await this.realtimeClient?.broadcastModel(this.sdkSession.getModel());
+          } catch {
+            // Silently handle broadcast errors
+          }
         }
         return;
       }
