@@ -333,13 +333,15 @@ const styles = StyleSheet.create({
   sessionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 4,
   },
   sessionName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1f2937',
+    flex: 1,
+    marginRight: 8,
   },
   sessionNameDark: {
     color: '#f3f4f6',
@@ -350,6 +352,7 @@ const styles = StyleSheet.create({
   sessionTime: {
     fontSize: 12,
     color: '#6b7280',
+    flexShrink: 0,
   },
   sessionTimeDark: {
     color: '#9ca3af',
