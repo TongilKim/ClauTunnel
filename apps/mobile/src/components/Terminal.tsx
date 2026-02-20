@@ -711,7 +711,7 @@ function CollapsibleToolUse({ toolUseData, isDark, timestamp }: CollapsibleToolU
 
 function EditDiffContent({ data, isDark }: { data: ToolUseEditData; isDark: boolean }) {
   return (
-    <ScrollView style={diffStyles.scrollContainer} nestedScrollEnabled flexGrow={0}>
+    <ScrollView style={diffStyles.scrollContainer} nestedScrollEnabled>
       <Text style={[diffStyles.filePath, isDark && diffStyles.filePathDark]}>
         {data.filePath}
       </Text>
@@ -743,7 +743,7 @@ function WriteContent({ data, isDark }: { data: ToolUseWriteData; isDark: boolea
     : data.content;
 
   return (
-    <ScrollView style={diffStyles.scrollContainer} nestedScrollEnabled flexGrow={0}>
+    <ScrollView style={diffStyles.scrollContainer} nestedScrollEnabled>
       <Text style={[diffStyles.filePath, isDark && diffStyles.filePathDark]}>
         {data.filePath}
       </Text>
@@ -763,7 +763,7 @@ function GenericToolContent({ data, isDark }: { data: ToolUseGenericData; isDark
     : inputStr;
 
   return (
-    <ScrollView style={diffStyles.scrollContainer} nestedScrollEnabled flexGrow={0}>
+    <ScrollView style={diffStyles.scrollContainer} nestedScrollEnabled>
       <View style={[diffStyles.codeBlock, isDark && diffStyles.codeBlockDark]}>
         <Text style={[diffStyles.codeText, isDark && diffStyles.codeTextDark]}>
           {displayContent}
