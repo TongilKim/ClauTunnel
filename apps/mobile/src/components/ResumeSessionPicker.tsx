@@ -152,7 +152,7 @@ export function ResumeSessionPicker({
                       isDark && styles.sessionItemDark,
                       !canResume && styles.sessionItemDisabled,
                     ]}
-                    onPress={() => canResume && onSelect(session.sdk_session_id!)}
+                    onPress={() => canResume && session.sdk_session_id && onSelect(session.sdk_session_id)}
                     activeOpacity={canResume ? 0.7 : 1}
                     disabled={!canResume}
                   >
