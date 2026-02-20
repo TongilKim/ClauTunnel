@@ -101,7 +101,10 @@ export default function SessionScreen() {
           <Text style={[styles.backText, isDark && styles.backTextDark]}>‹ Back</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={handleEditTitle} style={styles.titleButton}>
-          <Text style={[styles.headerTitle, isDark && styles.headerTitleDark]}>
+          <Text
+            style={[styles.headerTitle, isDark && styles.headerTitleDark]}
+            numberOfLines={1}
+          >
             {session?.title || 'Session'}
           </Text>
           <Text style={[styles.editIcon, isDark && styles.editIconDark]}>✎</Text>
@@ -185,11 +188,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    flex: 1,
+    marginHorizontal: 8,
   },
   headerTitle: {
     fontSize: 17,
     fontWeight: '600',
     color: '#000000',
+    flexShrink: 1,
   },
   headerTitleDark: {
     color: '#ffffff',

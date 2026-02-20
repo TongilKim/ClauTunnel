@@ -256,9 +256,19 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
         }
 
         // Handle session-title - auto-generated from first user message
-        // Title is already persisted by the daemon; just consume the message
-        // so it doesn't get added to the chat messages array.
-        if (message.type === 'session-title') {
+        // Update the session store so the header title reflects immediately.
+        if (message.type === 'session-title' && message.sessionTitle) {
+          const { useSessionStore } = require('./sessionStore');
+          const sessionId = get().sessionId;
+          if (sessionId) {
+            useSessionStore.setState((state: { sessions: Array<{ id: string; title?: string }> }) => ({
+              sessions: state.sessions.map((s) =>
+                s.id === sessionId
+                  ? { ...s, title: message.sessionTitle }
+                  : s
+              ),
+            }));
+          }
           return;
         }
 

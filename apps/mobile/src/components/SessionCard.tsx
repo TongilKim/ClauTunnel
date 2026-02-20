@@ -181,7 +181,10 @@ export function SessionCard({ session }: SessionCardProps) {
     >
       <View style={styles.header}>
         <View style={styles.titleRow}>
-          <Text style={[styles.machineName, isDark && styles.machineNameDark]}>
+          <Text
+            style={[styles.machineName, isDark && styles.machineNameDark]}
+            numberOfLines={2}
+          >
             {session.title || machine?.name || 'Unknown Machine'}
           </Text>
           <View
@@ -272,11 +275,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flex: 1,
+    marginRight: 8,
   },
   machineName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1f2937',
+    flexShrink: 1,
   },
   machineNameDark: {
     color: '#f3f4f6',
