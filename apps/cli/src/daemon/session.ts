@@ -113,4 +113,18 @@ export class SessionManager {
       throw new Error(`Failed to update SDK session ID: ${error.message}`);
     }
   }
+
+  async updateSessionTitle(
+    sessionId: string,
+    title: string
+  ): Promise<void> {
+    const { error } = await this.supabase
+      .from('sessions')
+      .update({ title })
+      .eq('id', sessionId);
+
+    if (error) {
+      throw new Error(`Failed to update session title: ${error.message}`);
+    }
+  }
 }

@@ -459,6 +459,32 @@ export class RealtimeClient extends EventEmitter {
     this.emit('broadcast', message);
   }
 
+  async broadcastSessionTitle(title: string): Promise<void> {
+    if (!this.outputChannel) {
+      throw new Error('Not connected');
+    }
+
+    // Skip broadcasting if realtime is not enabled
+    if (!this.realtimeEnabled) {
+      return;
+    }
+
+    const message: RealtimeMessage = {
+      type: 'session-title',
+      sessionTitle: title,
+      timestamp: Date.now(),
+      seq: ++this.seq,
+    };
+
+    await this.outputChannel.send({
+      type: 'broadcast',
+      event: 'output',
+      payload: message,
+    });
+
+    this.emit('broadcast', message);
+  }
+
   async broadcastQueued(): Promise<void> {
     if (!this.outputChannel) {
       throw new Error('Not connected');

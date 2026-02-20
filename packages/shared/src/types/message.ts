@@ -44,6 +44,7 @@ export type RealtimeMessageType =
   | 'permission-response' // User's response to permission request
   | 'request-queued' // Message was queued because Claude is still processing
   | 'status-request' // Mobile requests current pending state (question/permission)
+  | 'session-title' // Session title was auto-generated from first user message
   | 'complete'; // Claude has finished responding (query complete)
 
 export type InteractiveCommandType =
@@ -105,6 +106,7 @@ export interface RealtimeMessage {
   interactiveResult?: InteractiveResult;
   resumeSessionId?: string; // SDK session ID for resume-request
   historySessionId?: string; // Supabase session ID to load messages from (for resume-history)
+  sessionTitle?: string; // Auto-generated session title from first user message
   userQuestion?: UserQuestionData; // For user-question type
   userAnswer?: UserAnswerData; // For user-answer type
   permissionRequest?: PermissionRequestData; // For permission-request type

@@ -255,6 +255,13 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
           return;
         }
 
+        // Handle session-title - auto-generated from first user message
+        // Title is already persisted by the daemon; just consume the message
+        // so it doesn't get added to the chat messages array.
+        if (message.type === 'session-title') {
+          return;
+        }
+
         // Handle complete - Claude has finished responding
         if (message.type === 'complete') {
           set({ isTyping: false, isMessageQueued: false });
