@@ -75,15 +75,15 @@ importers:
       expo-constants:
         specifier: ~18.0.13
         version: 18.0.13(expo@54.0.32)(react-native@0.81.5)
-      expo-device:
-        specifier: ~8.0.10
-        version: 8.0.10(expo@54.0.32)
       expo-file-system:
         specifier: ~19.0.21
         version: 19.0.21(expo@54.0.32)(react-native@0.81.5)
       expo-haptics:
         specifier: ~15.0.8
         version: 15.0.8(expo@54.0.32)
+      expo-image:
+        specifier: ~3.0.11
+        version: 3.0.11(expo@54.0.32)(react-native-web@0.21.2)(react-native@0.81.5)(react@19.1.0)
       expo-image-manipulator:
         specifier: ^14.0.8
         version: 14.0.8(expo@54.0.32)
@@ -4524,15 +4524,6 @@ packages:
       - supports-color
     dev: false
 
-  /expo-device@8.0.10(expo@54.0.32):
-    resolution: {integrity: sha512-jd5BxjaF7382JkDMaC+P04aXXknB2UhWaVx5WiQKA05ugm/8GH5uaz9P9ckWdMKZGQVVEOC8MHaUADoT26KmFA==}
-    peerDependencies:
-      expo: '*'
-    dependencies:
-      expo: 54.0.32(@babel/core@7.28.6)(@expo/metro-runtime@6.1.2)(expo-router@6.0.22)(react-native@0.81.5)(react@19.1.0)
-      ua-parser-js: 0.7.41
-    dev: false
-
   /expo-file-system@19.0.21(expo@54.0.32)(react-native@0.81.5):
     resolution: {integrity: sha512-s3DlrDdiscBHtab/6W1osrjGL+C2bvoInPJD7sOwmxfJ5Woynv2oc+Fz1/xVXaE/V7HE/+xrHC/H45tu6lZzzg==}
     peerDependencies:
@@ -4588,6 +4579,23 @@ packages:
     dependencies:
       expo: 54.0.32(@babel/core@7.28.6)(@expo/metro-runtime@6.1.2)(expo-router@6.0.22)(react-native@0.81.5)(react@19.1.0)
       expo-image-loader: 6.0.0(expo@54.0.32)
+    dev: false
+
+  /expo-image@3.0.11(expo@54.0.32)(react-native-web@0.21.2)(react-native@0.81.5)(react@19.1.0):
+    resolution: {integrity: sha512-4TudfUCLgYgENv+f48omnU8tjS2S0Pd9EaON5/s1ZUBRwZ7K8acEr4NfvLPSaeXvxW24iLAiyQ7sV7BXQH3RoA==}
+    peerDependencies:
+      expo: '*'
+      react: '*'
+      react-native: '*'
+      react-native-web: '*'
+    peerDependenciesMeta:
+      react-native-web:
+        optional: true
+    dependencies:
+      expo: 54.0.32(@babel/core@7.28.6)(@expo/metro-runtime@6.1.2)(expo-router@6.0.22)(react-native@0.81.5)(react@19.1.0)
+      react: 19.1.0
+      react-native: 0.81.5(@babel/core@7.28.6)(@types/react@19.1.17)(react@19.1.0)
+      react-native-web: 0.21.2(react-dom@19.1.0)(react@19.1.0)
     dev: false
 
   /expo-keep-awake@15.0.8(expo@54.0.32)(react@19.1.0):
@@ -7258,11 +7266,6 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
     dev: true
-
-  /ua-parser-js@0.7.41:
-    resolution: {integrity: sha512-O3oYyCMPYgNNHuO7Jjk3uacJWZF8loBgwrfd/5LE/HyZ3lUIOdniQ7DNXJcIgZbwioZxk0fLfI4EVnetdiX5jg==}
-    hasBin: true
-    dev: false
 
   /ua-parser-js@1.0.41:
     resolution: {integrity: sha512-LbBDqdIC5s8iROCUjMbW1f5dJQTEFB1+KO9ogbvlb3nm9n4YHa5p4KTvFPWvh2Hs8gZMBuiB1/8+pdfe/tDPug==}

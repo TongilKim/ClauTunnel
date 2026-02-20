@@ -12,8 +12,8 @@ import {
   TextInput,
   Pressable,
   Keyboard,
-  Image,
 } from 'react-native';
+import { Image } from 'expo-image';
 import Markdown from 'react-native-markdown-display';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
@@ -42,11 +42,14 @@ function UserAvatar() {
   );
 }
 
+const claudeIconSource = require('../../assets/claude-icon.png');
+
 function ClaudeAvatar() {
   return (
     <Image
-      source={require('../../assets/claude-icon.png')}
+      source={claudeIconSource}
       style={avatarStyles.claudeAvatarImage}
+      cachePolicy="memory"
     />
   );
 }
