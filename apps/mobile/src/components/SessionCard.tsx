@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import type { Session } from 'termbridge-shared';
 import { useSessionStore } from '../stores/sessionStore';
@@ -58,9 +57,7 @@ export function SessionCard({ session }: SessionCardProps) {
   const isActive = session.status === 'active';
   const machineOnline = machine?.status === 'online';
 
-  const handleDisconnect = async () => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
+  const handleDisconnect = () => {
     Alert.alert(
       'Disconnect Session',
       'Are you sure you want to disconnect this session? This will end the CLI session.',
@@ -84,9 +81,7 @@ export function SessionCard({ session }: SessionCardProps) {
     );
   };
 
-  const handleDelete = async () => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
+  const handleDelete = () => {
     Alert.alert(
       'Delete Session',
       'Are you sure you want to delete this session? This action cannot be undone.',

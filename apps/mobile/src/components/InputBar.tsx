@@ -13,7 +13,6 @@ import {
   Text,
   ActivityIndicator,
 } from 'react-native';
-import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useConnectionStore } from '../stores/connectionStore';
 import { convertImageToBase64 } from '../utils/imageUtils';
@@ -96,7 +95,6 @@ export function InputBar({ disabled }: InputBarProps) {
     }
 
     setIsSending(true);
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     try {
       // Convert images to base64 attachments
@@ -172,8 +170,6 @@ export function InputBar({ disabled }: InputBarProps) {
   };
 
   const handleAttachment = async () => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
     Alert.alert(
       'Add Attachment',
       'Choose an option',
@@ -235,7 +231,6 @@ export function InputBar({ disabled }: InputBarProps) {
             text: 'Clear',
             style: 'destructive',
             onPress: async () => {
-              await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               // Clear local messages
               clearMessages();
               // Send clear request to CLI to reset Claude's session
@@ -274,13 +269,11 @@ export function InputBar({ disabled }: InputBarProps) {
 
   const handleResumeSessionSelect = async (selectedSessionId: string) => {
     setShowResumeSessionPicker(false);
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     // Send resume request (doesn't appear in chat)
     await sendResumeRequest(selectedSessionId);
   };
 
-  const handleCommandsPress = async () => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  const handleCommandsPress = () => {
     setShowCommandPicker(true);
   };
 

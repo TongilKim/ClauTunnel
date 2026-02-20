@@ -16,7 +16,6 @@ import {
 import { Image } from 'expo-image';
 import Markdown from 'react-native-markdown-display';
 import * as Clipboard from 'expo-clipboard';
-import * as Haptics from 'expo-haptics';
 import { useConnectionStore } from '../stores/connectionStore';
 import { useSessionStore } from '../stores/sessionStore';
 import type { RealtimeMessage, ToolUseData, ToolUseEditData, ToolUseWriteData, ToolUseGenericData } from 'termbridge-shared';
@@ -306,7 +305,6 @@ function MessageBubble({ message, isDark }: MessageBubbleProps) {
   // Copy full message to clipboard
   const handleCopy = useCallback(async () => {
     await Clipboard.setStringAsync(cleanContent);
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setShowActionMenu(false);
   }, [cleanContent]);
 
@@ -317,8 +315,7 @@ function MessageBubble({ message, isDark }: MessageBubbleProps) {
   }, []);
 
   // Long press handler to show action menu
-  const handleLongPress = useCallback(async () => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  const handleLongPress = useCallback(() => {
     setShowActionMenu(true);
   }, []);
 
@@ -501,7 +498,6 @@ interface ClaudeMessageProps {
 
 function ClaudeMessage({ content, isDark }: ClaudeMessageProps) {
   const copyToClipboard = useCallback(async (text: string) => {
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await Clipboard.setStringAsync(text);
   }, []);
 

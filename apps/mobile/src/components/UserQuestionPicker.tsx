@@ -12,7 +12,6 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
 import type { UserQuestionData } from 'termbridge-shared';
 
 interface UserQuestionPickerProps {
@@ -50,14 +49,12 @@ export function UserQuestionPicker({
     }
   }, [questionData]);
 
-  const handleOptionSelect = useCallback(async (questionIndex: number, optionLabel: string) => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  const handleOptionSelect = useCallback((questionIndex: number, optionLabel: string) => {
     setSelectedOptions(prev => ({ ...prev, [questionIndex]: optionLabel }));
     setUsingOther(prev => ({ ...prev, [questionIndex]: false }));
   }, []);
 
-  const handleOtherSelect = useCallback(async (questionIndex: number) => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  const handleOtherSelect = useCallback((questionIndex: number) => {
     setUsingOther(prev => ({ ...prev, [questionIndex]: true }));
     setSelectedOptions(prev => {
       const newSelected = { ...prev };
@@ -68,8 +65,6 @@ export function UserQuestionPicker({
 
   const handleSubmit = useCallback(async () => {
     if (!questionData) return;
-
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     // Build answers object
     const answers: Record<string, string> = {};
