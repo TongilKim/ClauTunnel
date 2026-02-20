@@ -28,6 +28,7 @@ export class Daemon extends EventEmitter {
   private running: boolean = false;
   private commandsBroadcast: boolean = false;
   private sdkCommandsBroadcast: boolean = false;
+  private titleSet: boolean = false;
 
   constructor(options: DaemonOptions) {
     super();
@@ -437,6 +438,22 @@ export class Daemon extends EventEmitter {
             process.stdout.write('\n[Conversation cleared]\n> ');
           }
           return;
+        }
+
+        // Auto-set session title from the first user message
+        if (!this.titleSet && this.session) {
+          this.titleSet = true;
+          const title = trimmedPrompt.length > 50
+            ? trimmedPrompt.slice(0, 50) + '...'
+            : trimmedPrompt;
+          this.sessionManager.updateSessionTitle(this.session.id, title).catch(() => {
+            // Non-critical - silently handle
+          });
+          if (this.realtimeClient) {
+            this.realtimeClient.broadcastSessionTitle(title).catch(() => {
+              // Non-critical - silently handle
+            });
+          }
         }
 
         await this.sdkSession.sendPrompt(prompt, attachments);

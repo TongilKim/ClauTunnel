@@ -916,6 +916,223 @@ describe('Daemon', () => {
     });
   });
 
+  describe('auto session title', () => {
+    it('should set title from first user message', async () => {
+      let inputHandler: ((payload: any) => void) | null = null;
+
+      mockInputChannel.on = vi.fn((event, filter, handler) => {
+        if (event === 'broadcast' && filter.event === 'input') {
+          inputHandler = handler;
+        }
+        return mockInputChannel as RealtimeChannel;
+      });
+
+      daemon = new Daemon({
+        supabase: mockSupabase as SupabaseClient,
+        userId: 'user-456',
+        cwd: '/home/user',
+      });
+
+      await daemon.start();
+
+      // Prevent sendPrompt from reaching the unmocked SDK
+      const sdkSession = (daemon as any).sdkSession;
+      vi.spyOn(sdkSession, 'sendPrompt').mockResolvedValue(undefined);
+
+      const sendSpy = mockOutputChannel.send;
+
+      // Simulate first user message
+      if (inputHandler) {
+        inputHandler({
+          payload: {
+            type: 'input',
+            content: 'Help me refactor the auth module',
+            timestamp: Date.now(),
+            seq: 1,
+          },
+        });
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Verify session title was broadcast
+      expect(sendSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'broadcast',
+          event: 'output',
+          payload: expect.objectContaining({
+            type: 'session-title',
+            sessionTitle: 'Help me refactor the auth module',
+          }),
+        })
+      );
+    });
+
+    it('should truncate long titles to 50 chars', async () => {
+      let inputHandler: ((payload: any) => void) | null = null;
+
+      mockInputChannel.on = vi.fn((event, filter, handler) => {
+        if (event === 'broadcast' && filter.event === 'input') {
+          inputHandler = handler;
+        }
+        return mockInputChannel as RealtimeChannel;
+      });
+
+      daemon = new Daemon({
+        supabase: mockSupabase as SupabaseClient,
+        userId: 'user-456',
+        cwd: '/home/user',
+      });
+
+      await daemon.start();
+
+      const sdkSession = (daemon as any).sdkSession;
+      vi.spyOn(sdkSession, 'sendPrompt').mockResolvedValue(undefined);
+
+      const sendSpy = mockOutputChannel.send;
+      const longMessage = 'This is a very long message that exceeds fifty characters and should be truncated';
+
+      if (inputHandler) {
+        inputHandler({
+          payload: {
+            type: 'input',
+            content: longMessage,
+            timestamp: Date.now(),
+            seq: 1,
+          },
+        });
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(sendSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payload: expect.objectContaining({
+            type: 'session-title',
+            sessionTitle: longMessage.slice(0, 50) + '...',
+          }),
+        })
+      );
+    });
+
+    it('should not overwrite title on subsequent messages', async () => {
+      let inputHandler: ((payload: any) => void) | null = null;
+
+      mockInputChannel.on = vi.fn((event, filter, handler) => {
+        if (event === 'broadcast' && filter.event === 'input') {
+          inputHandler = handler;
+        }
+        return mockInputChannel as RealtimeChannel;
+      });
+
+      daemon = new Daemon({
+        supabase: mockSupabase as SupabaseClient,
+        userId: 'user-456',
+        cwd: '/home/user',
+      });
+
+      await daemon.start();
+
+      const sdkSession = (daemon as any).sdkSession;
+      vi.spyOn(sdkSession, 'sendPrompt').mockResolvedValue(undefined);
+
+      const sendSpy = mockOutputChannel.send;
+
+      // Send first message
+      if (inputHandler) {
+        inputHandler({
+          payload: {
+            type: 'input',
+            content: 'First message',
+            timestamp: Date.now(),
+            seq: 1,
+          },
+        });
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Clear spy to check second message
+      sendSpy!.mockClear();
+
+      // Send second message
+      if (inputHandler) {
+        inputHandler({
+          payload: {
+            type: 'input',
+            content: 'Second message',
+            timestamp: Date.now(),
+            seq: 2,
+          },
+        });
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Verify session-title was NOT broadcast again
+      const titleCalls = (sendSpy as any).mock.calls.filter(
+        (call: any[]) => call[0]?.payload?.type === 'session-title'
+      );
+      expect(titleCalls.length).toBe(0);
+    });
+
+    it('should persist title to database', async () => {
+      let inputHandler: ((payload: any) => void) | null = null;
+
+      mockInputChannel.on = vi.fn((event, filter, handler) => {
+        if (event === 'broadcast' && filter.event === 'input') {
+          inputHandler = handler;
+        }
+        return mockInputChannel as RealtimeChannel;
+      });
+
+      const sessionUpdateMock = vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ error: null }),
+      });
+
+      const originalFrom = mockSupabase.from;
+      mockSupabase.from = vi.fn((table) => {
+        if (table === 'sessions') {
+          return {
+            insert: vi.fn().mockReturnValue({
+              select: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({ data: mockSession, error: null }),
+              }),
+            }),
+            update: sessionUpdateMock,
+          };
+        }
+        return (originalFrom as any)(table);
+      });
+
+      daemon = new Daemon({
+        supabase: mockSupabase as SupabaseClient,
+        userId: 'user-456',
+        cwd: '/home/user',
+      });
+
+      await daemon.start();
+
+      const sdkSession = (daemon as any).sdkSession;
+      vi.spyOn(sdkSession, 'sendPrompt').mockResolvedValue(undefined);
+
+      if (inputHandler) {
+        inputHandler({
+          payload: {
+            type: 'input',
+            content: 'Fix the login bug',
+            timestamp: Date.now(),
+            seq: 1,
+          },
+        });
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(sessionUpdateMock).toHaveBeenCalledWith({ title: 'Fix the login bug' });
+    });
+  });
+
   describe('request queuing handling', () => {
     it('should broadcast request-queued when sdkSession emits request-queued event', async () => {
       daemon = new Daemon({
