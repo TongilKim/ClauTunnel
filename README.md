@@ -216,6 +216,9 @@ clautunnel signup
 # Login (returning user)
 clautunnel login
 
+# Logout
+clautunnel logout
+
 # Start listening for session requests from mobile
 clautunnel start
 

@@ -26,14 +26,20 @@ clautunnel setup
 ```
 
 You'll need:
-- **Supabase Project URL**: Dashboard → Settings → API (e.g., `https://xxxx.supabase.co`)
-- **Supabase Anon Key**: Dashboard → Settings → API → `anon` `public` key
+- **Supabase Project ID**: Dashboard → Settings → General → Project ID
+- **Supabase Anon Key**: Dashboard → Settings → API Keys → Legacy anon Tab → Copy anon key
 
 ## Usage
 
 ```bash
-# Authenticate
+# Create account (first time)
+clautunnel signup
+
+# Login (returning user)
 clautunnel login
+
+# Logout
+clautunnel logout
 
 # Start a session
 clautunnel start
