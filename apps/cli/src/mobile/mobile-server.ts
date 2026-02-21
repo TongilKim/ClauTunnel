@@ -245,51 +245,53 @@ export class MobileServerManager {
       // Silently handle spawn errors
     });
 
-    // Capture QR code from stdout, redirect rest to log
+    // Wait for Expo to be ready, print QR code if available
     return new Promise<boolean>((resolve) => {
-      let qrDetected = false;
-      let qrFinished = false;
+      let ready = false;
       let resolved = false;
+      let qrActive = false;
 
       const timeout = setTimeout(() => {
         if (!resolved) {
           resolved = true;
-          // Redirect all remaining output to log
           this.expoProcess?.stdout?.pipe(this.expoLogStream!);
           this.expoProcess?.stderr?.pipe(this.expoLogStream!);
-          resolve(qrDetected);
+          resolve(false);
         }
-      }, 30000); // 30 second timeout for QR code
+      }, 60000); // 60 second timeout
 
       this.expoProcess?.stdout?.on('data', (data: Buffer) => {
         const text = data.toString();
         const lines = text.split('\n');
 
         for (const line of lines) {
-          if (qrFinished) {
-            // After QR code, write to log file
+          if (ready) {
             this.expoLogStream?.write(line + '\n');
             continue;
           }
 
+          // Print QR code lines to terminal
           if (this.isQrCodeLine(line)) {
-            qrDetected = true;
+            qrActive = true;
             process.stdout.write(line + '\n');
-          } else if (qrDetected && this.isExpoReadyLine(line)) {
-            // Print the URL line after QR code
+          } else if (qrActive && !this.isExpoReadyLine(line) && line.trim()) {
+            // Lines between QR code blocks (spacing, URL info)
             process.stdout.write(line + '\n');
-            qrFinished = true;
+          } else if (this.isExpoReadyLine(line)) {
+            // Expo is ready — this is our success signal
+            process.stdout.write(line + '\n');
+            ready = true;
 
             if (!resolved) {
               resolved = true;
               clearTimeout(timeout);
+              // Redirect remaining output to log
+              this.expoProcess?.stdout?.pipe(this.expoLogStream!);
+              this.expoProcess?.stderr?.pipe(this.expoLogStream!);
               resolve(true);
             }
-          } else if (qrDetected && !qrFinished) {
-            // Lines between QR code blocks (spacing, URL info)
-            process.stdout.write(line + '\n');
           } else {
-            // Pre-QR output goes to log
+            // Pre-ready output goes to log
             this.expoLogStream?.write(line + '\n');
           }
         }
