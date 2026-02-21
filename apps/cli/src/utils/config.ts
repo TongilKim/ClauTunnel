@@ -101,10 +101,10 @@ export class Config {
     if (!this.isConfigured()) {
       throw new ConfigurationError(
         'ClauTunnel is not configured.\n\n' +
-          'Please run "clautunnel setup" to configure your Supabase credentials,\n' +
-          'or set the following environment variables:\n' +
-          '  - SUPABASE_URL\n' +
-          '  - SUPABASE_ANON_KEY'
+          'Run "clautunnel setup" to configure your Supabase credentials.\n\n' +
+          'Or set environment variables in your shell profile (~/.zshrc or ~/.bashrc):\n' +
+          '  export SUPABASE_URL=https://<project-id>.supabase.co\n' +
+          '  export SUPABASE_ANON_KEY=<your-anon-key>'
       );
     }
   }

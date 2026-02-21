@@ -65,11 +65,14 @@ export function createStartCommand(): Command {
         const session = await restoreSession(supabase, config);
         if (!session) {
           spinner.fail('Not authenticated');
-          logger.error('Run "clautunnel login" first.');
+          logger.error(
+            'Run "clautunnel login" or "clautunnel signup" first.'
+          );
           process.exit(1);
         }
 
         const { user } = session;
+        spinner.update(`Authenticated as ${user.email}...`);
 
         // Check Full Disk Access (macOS only)
         let fdaStatus: FullDiskAccessStatus | null = null;
@@ -236,9 +239,12 @@ export function createStartCommand(): Command {
         spinner.stop();
 
         if (!connected) {
-          logger.error(
-            'Failed to connect to realtime. Check your network connection.'
-          );
+          logger.error('Failed to connect to Supabase Realtime.');
+          logger.error('');
+          logger.error('This may be a temporary issue. Try the following:');
+          logger.error('  1. Open a new terminal and run "clautunnel start" again');
+          logger.error('  2. Check your network connection');
+          logger.error('  3. Try "clautunnel login" to refresh your session');
           process.exit(1);
         }
 

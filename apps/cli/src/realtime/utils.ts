@@ -8,14 +8,18 @@ export function subscribeWithTimeout(
   timeout: number = DEFAULT_TIMEOUT
 ): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
+    let lastStatus = 'unknown';
+
     const timer = setTimeout(() => {
       console.warn(
-        `[WARN] Realtime subscription timeout for ${channelName}. Mobile sync disabled.`
+        `[WARN] Realtime subscription timeout for ${channelName} (last status: ${lastStatus}).`
       );
       resolve(false);
     }, timeout);
 
     channel.subscribe((status, err) => {
+      lastStatus = status;
+
       if (status === 'SUBSCRIBED') {
         clearTimeout(timer);
         resolve(true);
@@ -26,7 +30,7 @@ export function subscribeWithTimeout(
       ) {
         clearTimeout(timer);
         console.warn(
-          `[WARN] Channel ${channelName} ${status.toLowerCase()}. Mobile sync disabled.`
+          `[WARN] Channel ${channelName} ${status.toLowerCase()}.`
         );
         if (err) {
           console.warn(`[WARN] Error details: ${err.message || err}`);
