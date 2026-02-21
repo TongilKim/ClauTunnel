@@ -16,51 +16,52 @@ export function createSetupCommand(): Command {
         logger.info('ClauTunnel Setup');
         logger.info('================');
         logger.info('');
-        logger.info('Enter your Supabase credentials to connect ClauTunnel.');
+
+        // Step 1: Project ID
+        logger.info('[Step 1/2] Supabase Project ID');
         logger.info('');
-        logger.info('To find your credentials:');
         logger.info('  1. Go to your Supabase project dashboard');
-        logger.info('  2. Settings > General > Copy "Project URL"');
-        logger.info('  3. Settings > API Keys > Copy "anon public" key');
+        logger.info('  2. Settings > General > Copy "Project ID"');
         logger.info('');
 
-        const url = await prompt('Supabase Project URL (e.g., https://xxxx.supabase.co): ');
-        if (!url) {
-          logger.error('Supabase URL is required');
+        const projectId = await prompt('Project ID: ');
+        if (!projectId) {
+          logger.error('Supabase Project ID is required');
           process.exit(1);
         }
 
-        // Validate URL format
-        try {
-          const parsedUrl = new URL(url);
-
-          // Check if it's a dashboard URL (common mistake)
-          if (parsedUrl.hostname === 'supabase.com') {
-            logger.error('');
-            logger.error('This looks like a dashboard URL, not the API URL.');
-            logger.error('');
-            logger.error('Please use the Project URL from Settings > API, which looks like:');
-            logger.error('  https://your-project-id.supabase.co');
-            logger.error('');
-            logger.error('NOT the dashboard URL:');
-            logger.error('  https://supabase.com/dashboard/project/...');
-            process.exit(1);
-          }
-
-          // Validate it ends with .supabase.co
-          if (!parsedUrl.hostname.endsWith('.supabase.co')) {
-            logger.error('');
-            logger.error('Invalid Supabase URL format.');
-            logger.error('The URL should end with .supabase.co');
-            logger.error('Example: https://your-project-id.supabase.co');
-            process.exit(1);
-          }
-        } catch {
-          logger.error('Invalid URL format. Please enter a valid URL (e.g., https://xxxx.supabase.co)');
+        // Check if user accidentally pasted a full URL
+        if (projectId.includes('supabase.co') || projectId.startsWith('http')) {
+          logger.error('');
+          logger.error('Please enter only the Project ID, not the full URL.');
+          logger.error('');
+          logger.error('Example: abcdefghijklmnop');
+          logger.error('NOT: https://abcdefghijklmnop.supabase.co');
           process.exit(1);
         }
 
-        const anonKey = await prompt('Supabase Anon Key: ');
+        // Validate Project ID format (alphanumeric, no spaces/special chars)
+        if (!/^[a-zA-Z0-9-]+$/.test(projectId)) {
+          logger.error('');
+          logger.error('Invalid Project ID format.');
+          logger.error('The Project ID should only contain letters, numbers, and hyphens.');
+          logger.error('');
+          logger.error('You can find it at: Settings > General > Project ID');
+          process.exit(1);
+        }
+
+        const url = `https://${projectId}.supabase.co`;
+        logger.info('✓ Project ID saved');
+        logger.info('');
+
+        // Step 2: Anon Key
+        logger.info('[Step 2/2] Supabase Anon Key');
+        logger.info('');
+        logger.info('  1. Go to your Supabase project dashboard');
+        logger.info('  2. Settings > API Keys > Legacy anon Tab > Copy anon key');
+        logger.info('');
+
+        const anonKey = await prompt('Anon Key: ');
         if (!anonKey) {
           logger.error('Supabase Anon Key is required');
           process.exit(1);
