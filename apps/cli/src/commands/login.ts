@@ -48,6 +48,12 @@ export function createLoginCommand(): Command {
           });
           logger.info('Session saved');
         }
+
+        logger.info('');
+        logger.info('Next steps:');
+        logger.info('  1. Run "clautunnel start" to begin a session');
+        logger.info('  2. Set up the mobile app:');
+        logger.info('     https://github.com/TongilKim/ClauTunnel#mobile-app-setup');
       }
     } catch (error) {
       if (error instanceof ConfigurationError) {
