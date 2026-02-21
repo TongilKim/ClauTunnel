@@ -15,7 +15,7 @@ import type {
   InteractiveCommandData,
   InteractiveOption,
   InteractiveApplyPayload,
-} from 'termbridge-shared';
+} from 'clautunnel-shared';
 
 interface InteractivePickerProps {
   visible: boolean;

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { ImageAttachment, ModelInfo, SlashCommand } from 'termbridge-shared';
+import type { ImageAttachment, ModelInfo, SlashCommand } from 'clautunnel-shared';
 
 // Helper to let the background stream loop process messages
 const tick = () => new Promise(resolve => setTimeout(resolve, 10));

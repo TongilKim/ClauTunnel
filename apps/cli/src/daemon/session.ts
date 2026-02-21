@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Session, SessionStatus } from 'termbridge-shared';
+import type { Session, SessionStatus } from 'clautunnel-shared';
 
 export interface SessionManagerOptions {
   supabase: SupabaseClient;

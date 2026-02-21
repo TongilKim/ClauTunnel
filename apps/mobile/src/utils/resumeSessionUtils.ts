@@ -1,4 +1,4 @@
-import type { Session } from 'termbridge-shared';
+import type { Session } from 'clautunnel-shared';
 
 /**
  * Get a display label for a session.

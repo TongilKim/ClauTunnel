@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { RealtimeMessage, ImageAttachment, PermissionMode, SlashCommand } from 'termbridge-shared';
+import type { RealtimeMessage, ImageAttachment, PermissionMode, SlashCommand } from 'clautunnel-shared';
 import { convertImageToBase64, getMediaTypeFromUri } from '../utils/imageUtils';
 
 // Mock expo-file-system/legacy

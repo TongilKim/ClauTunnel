@@ -1,4 +1,4 @@
-# TermBridge
+# ClauTunnel
 
 Remote monitoring and control for Claude Code CLI from your mobile device.
 
@@ -7,14 +7,14 @@ Remote monitoring and control for Claude Code CLI from your mobile device.
 **npm (Recommended)**
 
 ```bash
-npm install -g @tongil_kim/termbridge
+npm install -g @tongil_kim/clautunnel
 ```
 
 **Homebrew (macOS)**
 
 ```bash
-brew tap TongilKim/termbridge
-brew install termbridge
+brew tap TongilKim/clautunnel
+brew install clautunnel
 ```
 
 ## Setup
@@ -22,7 +22,7 @@ brew install termbridge
 Run the setup command to configure your Supabase credentials:
 
 ```bash
-termbridge setup
+clautunnel setup
 ```
 
 You'll need:
@@ -33,22 +33,22 @@ You'll need:
 
 ```bash
 # Authenticate
-termbridge login
+clautunnel login
 
 # Start a session
-termbridge start
+clautunnel start
 
 # Start in daemon mode (background)
-termbridge start --daemon
+clautunnel start --daemon
 
 # Prevent sleep while running (macOS)
-termbridge start --prevent-sleep
+clautunnel start --prevent-sleep
 
 # Check status
-termbridge status
+clautunnel status
 
 # Stop the daemon
-termbridge stop
+clautunnel stop
 ```
 
 ## Features
@@ -66,8 +66,8 @@ termbridge stop
 
 ## Links
 
-- [GitHub Repository](https://github.com/TongilKim/termbridge)
-- [Mobile App](https://github.com/TongilKim/termbridge/tree/main/apps/mobile)
+- [GitHub Repository](https://github.com/TongilKim/clautunnel)
+- [Mobile App](https://github.com/TongilKim/clautunnel/tree/main/apps/mobile)
 
 ## License
 

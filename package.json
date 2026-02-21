@@ -1,5 +1,5 @@
 {
-  "name": "termbridge-monorepo",
+  "name": "clautunnel-monorepo",
   "version": "0.1.0",
   "private": true,
   "description": "Remote monitoring and control for Claude Code CLI",
@@ -9,9 +9,9 @@
     "dev": "pnpm -r dev",
     "lint": "pnpm -r lint",
     "clean": "pnpm -r clean",
-    "cli": "pnpm --filter termbridge",
-    "mobile": "pnpm --filter @termbridge/mobile",
-    "shared": "pnpm --filter termbridge-shared"
+    "cli": "pnpm --filter @tongil_kim/clautunnel",
+    "mobile": "pnpm --filter @clautunnel/mobile",
+    "shared": "pnpm --filter clautunnel-shared"
   },
   "devDependencies": {
     "typescript": "^5.3.3"

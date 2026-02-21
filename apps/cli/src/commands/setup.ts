@@ -7,16 +7,16 @@ export function createSetupCommand(): Command {
   const command = new Command('setup');
 
   command
-    .description('Configure TermBridge with Supabase credentials')
+    .description('Configure ClauTunnel with Supabase credentials')
     .action(async () => {
       const config = new Config();
       const logger = new Logger();
 
       try {
-        logger.info('TermBridge Setup');
+        logger.info('ClauTunnel Setup');
         logger.info('================');
         logger.info('');
-        logger.info('Enter your Supabase credentials to connect TermBridge.');
+        logger.info('Enter your Supabase credentials to connect ClauTunnel.');
         logger.info('');
         logger.info('To find your credentials:');
         logger.info('  1. Go to your Supabase project dashboard');
@@ -72,8 +72,8 @@ export function createSetupCommand(): Command {
         logger.info('✓ Configuration saved successfully!');
         logger.info('');
         logger.info('Next steps:');
-        logger.info('  1. Run "termbridge login" to authenticate');
-        logger.info('  2. Run "termbridge start" to begin a session');
+        logger.info('  1. Run "clautunnel login" to authenticate');
+        logger.info('  2. Run "clautunnel start" to begin a session');
       } catch (error) {
         logger.error(
           `Setup failed: ${error instanceof Error ? error.message : 'Unknown error'}`

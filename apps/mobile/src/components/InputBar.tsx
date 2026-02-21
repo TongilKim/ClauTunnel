@@ -21,7 +21,7 @@ import { CommandPicker } from './CommandPicker';
 import { ModelPicker } from './ModelPicker';
 import { InteractivePicker } from './InteractivePicker';
 import { ResumeSessionPicker } from './ResumeSessionPicker';
-import type { SlashCommand, InteractiveCommandType } from 'termbridge-shared';
+import type { SlashCommand, InteractiveCommandType } from 'clautunnel-shared';
 import { MIN_INPUT_HEIGHT, MAX_INPUT_HEIGHT } from '../utils/inputBarConstants';
 
 // Commands that require interactive UI instead of text input

@@ -38,7 +38,7 @@ describe('CLI Commands', () => {
 
     it('should have description', () => {
       const cmd = createStartCommand();
-      expect(cmd.description()).toBe('Start TermBridge and listen for session requests from mobile app');
+      expect(cmd.description()).toBe('Start ClauTunnel and listen for session requests from mobile app');
     });
   });
 
@@ -77,7 +77,7 @@ describe('CLI Commands', () => {
 
     it('should have description', () => {
       const cmd = createLoginCommand();
-      expect(cmd.description()).toBe('Authenticate with TermBridge');
+      expect(cmd.description()).toBe('Authenticate with ClauTunnel');
     });
   });
 
@@ -90,7 +90,7 @@ describe('CLI Commands', () => {
 
     it('should have description', () => {
       const cmd = createSetupCommand();
-      expect(cmd.description()).toBe('Configure TermBridge with Supabase credentials');
+      expect(cmd.description()).toBe('Configure ClauTunnel with Supabase credentials');
     });
   });
 });

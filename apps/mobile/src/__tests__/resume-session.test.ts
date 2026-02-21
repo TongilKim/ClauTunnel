@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { Session } from 'termbridge-shared';
+import type { Session } from 'clautunnel-shared';
 import {
   getSessionLabel,
   canResumeSession,

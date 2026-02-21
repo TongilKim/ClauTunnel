@@ -1,5 +1,5 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import type { PresencePayload } from 'termbridge-shared';
+import type { PresencePayload } from 'clautunnel-shared';
 
 export type PresenceStatusCallback = (
   entityId: string,

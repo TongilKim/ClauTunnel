@@ -1,4 +1,4 @@
--- TermBridge Database Schema
+-- ClauTunnel Database Schema
 -- Initial migration for machines, sessions, messages, and push_tokens
 
 -- Machines table: User's computers running CLI

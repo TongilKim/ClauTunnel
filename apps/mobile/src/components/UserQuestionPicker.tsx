@@ -12,7 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { UserQuestionData } from 'termbridge-shared';
+import type { UserQuestionData } from 'clautunnel-shared';
 
 interface UserQuestionPickerProps {
   visible: boolean;

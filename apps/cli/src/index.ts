@@ -37,7 +37,7 @@ import { createSetupCommand } from './commands/setup.js';
 const program = new Command();
 
 program
-  .name('termbridge')
+  .name('clautunnel')
   .description('Remote control for Claude Code CLI')
   .version(version);
 
@@ -48,6 +48,6 @@ program.addCommand(createStatusCommand());
 program.addCommand(createLoginCommand());
 
 // Only parse when run directly (not when imported as library)
-if (process.argv[1]?.includes('termbridge') || process.argv[1]?.endsWith('/index.js') || process.argv[1]?.endsWith('/index.ts')) {
+if (process.argv[1]?.includes('clautunnel') || process.argv[1]?.endsWith('/index.js') || process.argv[1]?.endsWith('/index.ts')) {
   program.parse();
 }

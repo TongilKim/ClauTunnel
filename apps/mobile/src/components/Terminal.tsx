@@ -18,7 +18,7 @@ import Markdown from 'react-native-markdown-display';
 import * as Clipboard from 'expo-clipboard';
 import { useConnectionStore } from '../stores/connectionStore';
 import { useSessionStore } from '../stores/sessionStore';
-import type { RealtimeMessage, ToolUseData, ToolUseEditData, ToolUseWriteData, ToolUseGenericData } from 'termbridge-shared';
+import type { RealtimeMessage, ToolUseData, ToolUseEditData, ToolUseWriteData, ToolUseGenericData } from 'clautunnel-shared';
 import { parseToolUsage, shortenPath } from '../utils/terminalUtils';
 
 interface TerminalProps {

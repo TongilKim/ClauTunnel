@@ -5,7 +5,7 @@ import { SessionManager } from './session.js';
 import { MachineManager } from './machine.js';
 import { ConfigManager } from './config-manager.js';
 import { RealtimeClient } from '../realtime/client.js';
-import type { Session, Machine, RealtimeMessage, ImageAttachment, PermissionMode, UserQuestionData, PermissionRequestData, ToolUseData } from 'termbridge-shared';
+import type { Session, Machine, RealtimeMessage, ImageAttachment, PermissionMode, UserQuestionData, PermissionRequestData, ToolUseData } from 'clautunnel-shared';
 
 export interface DaemonOptions {
   supabase: SupabaseClient;
@@ -321,7 +321,7 @@ export class Daemon extends EventEmitter {
       // Handle mobile disconnect notification
       if (message.type === 'mobile-disconnect') {
         if (this.options.hybrid !== false) {
-          process.stdout.write('\n[TermBridge] Mobile client disconnected.\n');
+          process.stdout.write('\n[ClauTunnel] Mobile client disconnected.\n');
         }
         this.emit('mobile-disconnected');
         return;
@@ -527,7 +527,7 @@ export class Daemon extends EventEmitter {
 
     // Show initial prompt
     if (this.options.hybrid !== false) {
-      process.stdout.write('\n[TermBridge] Ready for input.\n> ');
+      process.stdout.write('\n[ClauTunnel] Ready for input.\n> ');
     }
   }
 

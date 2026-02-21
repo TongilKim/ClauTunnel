@@ -4,7 +4,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { Logger } from '../utils/logger.js';
 
-const PID_FILE = path.join(os.homedir(), '.termbridge', 'daemon.pid');
+const PID_FILE = path.join(os.homedir(), '.clautunnel', 'daemon.pid');
 
 export function createStopCommand(): Command {
   const command = new Command('stop');

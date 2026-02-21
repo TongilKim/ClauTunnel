@@ -42,7 +42,7 @@ importers:
       '@types/ws':
         specifier: ^8.18.1
         version: 8.18.1
-      termbridge-shared:
+      clautunnel-shared:
         specifier: workspace:*
         version: link:../../packages/shared
       tsup:
@@ -142,7 +142,7 @@ importers:
       '@types/react':
         specifier: ~19.1.17
         version: 19.1.17
-      termbridge-shared:
+      clautunnel-shared:
         specifier: workspace:*
         version: link:../../packages/shared
       typescript:
@@ -163,7 +163,7 @@ importers:
 
   tests:
     devDependencies:
-      termbridge-shared:
+      clautunnel-shared:
         specifier: workspace:*
         version: link:../packages/shared
       vitest:

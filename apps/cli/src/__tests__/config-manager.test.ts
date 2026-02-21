@@ -4,7 +4,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { ConfigManager } from '../daemon/config-manager.js';
 
-const TEST_DIR = join(tmpdir(), 'termbridge-config-manager-test-' + Date.now());
+const TEST_DIR = join(tmpdir(), 'clautunnel-config-manager-test-' + Date.now());
 const CLAUDE_DIR = join(TEST_DIR, '.claude');
 
 describe('ConfigManager', () => {

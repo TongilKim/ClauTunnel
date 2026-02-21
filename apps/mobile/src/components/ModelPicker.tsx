@@ -8,7 +8,7 @@ import {
   useColorScheme,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { ModelInfo } from 'termbridge-shared';
+import type { ModelInfo } from 'clautunnel-shared';
 
 interface ModelPickerProps {
   visible: boolean;

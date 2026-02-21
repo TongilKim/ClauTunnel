@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { RealtimeClient } from '../realtime/client.js';
 import type { SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
-import { REALTIME_CHANNELS } from 'termbridge-shared';
+import { REALTIME_CHANNELS } from 'clautunnel-shared';
 
 describe('RealtimeClient', () => {
   let mockSupabase: Partial<SupabaseClient>;

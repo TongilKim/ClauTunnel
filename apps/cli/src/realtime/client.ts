@@ -12,8 +12,8 @@ import type {
   UserQuestionData,
   PermissionRequestData,
   ToolUseData,
-} from 'termbridge-shared';
-import { REALTIME_CHANNELS } from 'termbridge-shared';
+} from 'clautunnel-shared';
+import { REALTIME_CHANNELS } from 'clautunnel-shared';
 import { subscribeWithTimeout } from './utils.js';
 
 export interface RealtimeClientOptions {

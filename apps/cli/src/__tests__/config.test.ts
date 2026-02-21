@@ -4,7 +4,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 
 // Mock environment and filesystem for tests
-const TEST_CONFIG_DIR = join(tmpdir(), 'termbridge-test-' + Date.now());
+const TEST_CONFIG_DIR = join(tmpdir(), 'clautunnel-test-' + Date.now());
 
 describe('Config', () => {
   beforeEach(() => {
@@ -268,7 +268,7 @@ describe('Config', () => {
       const { Config } = await import('../utils/config.js');
       const config = new Config(TEST_CONFIG_DIR);
 
-      expect(() => config.requireConfiguration()).toThrow('termbridge setup');
+      expect(() => config.requireConfiguration()).toThrow('clautunnel setup');
     });
   });
 });

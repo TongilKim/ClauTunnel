@@ -57,7 +57,7 @@ export default function RegisterScreen() {
           Create Account
         </Text>
         <Text style={[styles.subtitle, isDark && styles.subtitleDark]}>
-          Sign up to get started with TermBridge
+          Sign up to get started with ClauTunnel
         </Text>
 
         {displayError && (

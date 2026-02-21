@@ -14,7 +14,7 @@ engine: claude
 
 # PR Review Agent
 
-Review pull request #${{ github.event.pull_request.number }} in the TermBridge repository.
+Review pull request #${{ github.event.pull_request.number }} in the ClauTunnel repository.
 
 This project follows Kent Beck's TDD and Tidy First principles. Review the changes against these standards:
 

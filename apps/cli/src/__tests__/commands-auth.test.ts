@@ -60,7 +60,7 @@ vi.mock('@supabase/supabase-js', () => ({
 }));
 
 // Test config directory - unique per test run
-const TEST_CONFIG_DIR = join(tmpdir(), 'termbridge-auth-test-' + Date.now());
+const TEST_CONFIG_DIR = join(tmpdir(), 'clautunnel-auth-test-' + Date.now());
 
 describe('Command Authentication', () => {
   beforeEach(() => {

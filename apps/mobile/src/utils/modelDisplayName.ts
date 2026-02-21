@@ -1,4 +1,4 @@
-import type { ModelInfo } from 'termbridge-shared';
+import type { ModelInfo } from 'clautunnel-shared';
 
 /**
  * Resolves the raw model string to a short display name for the badge.

@@ -25,7 +25,7 @@ export class Config {
   private data: ConfigData;
 
   constructor(configDir?: string) {
-    this.configDir = configDir ?? join(homedir(), '.termbridge');
+    this.configDir = configDir ?? join(homedir(), '.clautunnel');
     this.configFile = join(this.configDir, 'config.json');
     this.data = this.loadConfig();
   }
@@ -89,8 +89,8 @@ export class Config {
   requireConfiguration(): void {
     if (!this.isConfigured()) {
       throw new ConfigurationError(
-        'TermBridge is not configured.\n\n' +
-          'Please run "termbridge setup" to configure your Supabase credentials,\n' +
+        'ClauTunnel is not configured.\n\n' +
+          'Please run "clautunnel setup" to configure your Supabase credentials,\n' +
           'or set the following environment variables:\n' +
           '  - SUPABASE_URL\n' +
           '  - SUPABASE_ANON_KEY'

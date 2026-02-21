@@ -1,4 +1,4 @@
-# TermBridge - TDD Implementation Plan
+# ClauTunnel - TDD Implementation Plan
 
 This plan follows Test-Driven Development. Each test should be implemented one at a time.
 Mark tests with [x] when passing, [ ] when pending.
@@ -149,9 +149,9 @@ Mark tests with [x] when passing, [ ] when pending.
 - [x] Test: Daemon sends notification on pattern match
 
 ### 2.10 Process Management
-- [x] Test: Daemon writes PID file on start (~/.termbridge/daemon.pid)
+- [x] Test: Daemon writes PID file on start (~/.clautunnel/daemon.pid)
 - [x] Test: Daemon removes PID file on stop
-- [x] Test: Daemon creates ~/.termbridge directory if not exists
+- [x] Test: Daemon creates ~/.clautunnel directory if not exists
 - [x] Test: Daemon handles SIGINT gracefully (calls stop)
 - [x] Test: Daemon handles SIGTERM gracefully (calls stop)
 - [x] Test: Daemon prevents multiple instances via lock file

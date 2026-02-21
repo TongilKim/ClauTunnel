@@ -34,7 +34,7 @@ export default function LoginScreen() {
     >
       <View style={styles.content}>
         <Text style={[styles.title, isDark && styles.titleDark]}>
-          TermBridge
+          ClauTunnel
         </Text>
         <Text style={[styles.subtitle, isDark && styles.subtitleDark]}>
           Remote control for Claude Code

@@ -11,7 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import type { SlashCommand } from 'termbridge-shared';
+import type { SlashCommand } from 'clautunnel-shared';
 
 interface CommandPickerProps {
   visible: boolean;

@@ -5,7 +5,7 @@ import type {
   ModelInfo,
   RealtimeMessage,
   SlashCommand,
-} from 'termbridge-shared';
+} from 'clautunnel-shared';
 
 // Mock Claude Agent SDK
 vi.mock('@anthropic-ai/claude-agent-sdk', () => ({

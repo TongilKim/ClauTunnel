@@ -1,4 +1,4 @@
-import type { ModelInfo } from 'termbridge-shared';
+import type { ModelInfo } from 'clautunnel-shared';
 import { getModelDisplayName } from './modelDisplayName';
 
 export interface ModelBadgeState {

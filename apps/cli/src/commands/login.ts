@@ -7,7 +7,7 @@ import { createSupabaseClient } from '../utils/supabase.js';
 export function createLoginCommand(): Command {
   const command = new Command('login');
 
-  command.description('Authenticate with TermBridge').action(async () => {
+  command.description('Authenticate with ClauTunnel').action(async () => {
     const config = new Config();
     const logger = new Logger();
 

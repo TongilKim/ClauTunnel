@@ -1,5 +1,5 @@
 {
-  "name": "@termbridge/tests",
+  "name": "@clautunnel/tests",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -7,7 +7,7 @@
     "test:watch": "vitest"
   },
   "devDependencies": {
-    "termbridge-shared": "workspace:*",
+    "clautunnel-shared": "workspace:*",
     "vitest": "^1.0.0"
   }
 }

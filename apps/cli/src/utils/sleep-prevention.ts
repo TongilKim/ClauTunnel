@@ -151,7 +151,7 @@ export function getFullDiskAccessStatus(enabled: boolean, terminalApp?: string):
       'To enable:',
       `  1. Open System Settings → Privacy & Security → Full Disk Access`,
       `  2. Toggle ON "${appName}" in the list`,
-      '  3. Restart your terminal and run "termbridge start" again',
+      '  3. Restart your terminal and run "clautunnel start" again',
     ].join('\n'),
   };
 }

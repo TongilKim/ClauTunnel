@@ -1,15 +1,15 @@
 {
-  "name": "termbridge-shared",
+  "name": "clautunnel-shared",
   "version": "0.1.0",
-  "description": "Shared types and utilities for TermBridge",
+  "description": "Shared types and utilities for ClauTunnel",
   "author": "tongil",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/TongilKim/termbridge.git",
+    "url": "git+https://github.com/TongilKim/clautunnel.git",
     "directory": "packages/shared"
   },
-  "keywords": ["termbridge", "claude", "cli", "remote"],
+  "keywords": ["clautunnel", "claude", "cli", "remote"],
   "publishConfig": {
     "access": "public"
   },

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '../services/supabase';
-import type { Session, Machine, MachineCommand } from 'termbridge-shared';
-import { REALTIME_CHANNELS } from 'termbridge-shared';
+import type { Session, Machine, MachineCommand } from 'clautunnel-shared';
+import { REALTIME_CHANNELS } from 'clautunnel-shared';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { setupPresenceHandlers } from '../utils/presenceUtils';
 

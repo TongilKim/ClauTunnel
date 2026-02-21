@@ -11,7 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { PermissionRequestData } from 'termbridge-shared';
+import type { PermissionRequestData } from 'clautunnel-shared';
 
 interface PermissionRequestPickerProps {
   visible: boolean;

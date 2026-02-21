@@ -23,7 +23,7 @@ export function createStatusCommand(): Command {
         const session = await restoreSession(supabase, config);
         if (!session) {
           logger.info('Status: Not authenticated');
-          logger.info('Run "termbridge login" to authenticate');
+          logger.info('Run "clautunnel login" to authenticate');
           return;
         }
 
@@ -34,7 +34,7 @@ export function createStatusCommand(): Command {
         const machineId = config.getMachineId();
         if (!machineId) {
           logger.info('Machine: Not registered');
-          logger.info('Run "termbridge start" to register this machine');
+          logger.info('Run "clautunnel start" to register this machine');
           return;
         }
 

@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useRouter } from 'expo-router';
-import type { Session } from 'termbridge-shared';
+import type { Session } from 'clautunnel-shared';
 import { useSessionStore } from '../stores/sessionStore';
 
 interface SessionCardProps {

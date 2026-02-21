@@ -1,4 +1,4 @@
-# Contributing to TermBridge
+# Contributing to ClauTunnel
 
 ## Development Philosophy
 
@@ -65,8 +65,8 @@ Use small, frequent commits rather than large, infrequent ones.
 pnpm test
 
 # Run CLI tests only
-pnpm --filter @tongil_kim/termbridge test
+pnpm --filter @tongil_kim/clautunnel test
 
 # Watch mode
-pnpm --filter @tongil_kim/termbridge test:watch
+pnpm --filter @tongil_kim/clautunnel test:watch
 ```

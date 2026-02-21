@@ -1,9 +1,9 @@
-# TermBridge
+# ClauTunnel
 
-[![npm version](https://img.shields.io/npm/v/@tongil_kim/termbridge.svg)](https://www.npmjs.com/package/@tongil_kim/termbridge)
+[![npm version](https://img.shields.io/npm/v/@tongil_kim/clautunnel.svg)](https://www.npmjs.com/package/@tongil_kim/clautunnel)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-98.4%25-blue.svg)](https://www.typescriptlang.org/)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/TongilKim/TermBridge/pulls)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/TongilKim/ClauTunnel/pulls)
 
 📱 **Remote control for Claude Code CLI from your mobile device.**
 
@@ -11,13 +11,13 @@ Monitor and send inputs to Claude Code terminal sessions in real-time from your 
 
 ---
 
-## Why TermBridge?
+## Why ClauTunnel?
 
-Running Claude Code on your workstation but need to step away? TermBridge lets you keep the conversation going from your phone. Whether you're reviewing a long-running code generation, approving permission prompts, or sending follow-up instructions — you stay in control without being tied to your desk.
+Running Claude Code on your workstation but need to step away? ClauTunnel lets you keep the conversation going from your phone. Whether you're reviewing a long-running code generation, approving permission prompts, or sending follow-up instructions — you stay in control without being tied to your desk.
 
 ## Overview
 
-TermBridge allows you to monitor and control Claude Code CLI sessions running on your computer from your iOS or Android device. See terminal output in real-time and send inputs remotely.
+ClauTunnel allows you to monitor and control Claude Code CLI sessions running on your computer from your iOS or Android device. See terminal output in real-time and send inputs remotely.
 
 ## Screenshots
 
@@ -49,19 +49,19 @@ Chat with Claude Code in real-time from your mobile device, just like you would 
 
 ```bash
 # Install
-npm install -g @tongil_kim/termbridge
+npm install -g @tongil_kim/clautunnel
 
 # Configure Supabase credentials
-termbridge setup
+clautunnel setup
 
 # Authenticate
-termbridge login
+clautunnel login
 
 # Start listening for mobile connections
-termbridge start
+clautunnel start
 ```
 
-Then open the TermBridge mobile app, and you're connected!
+Then open the ClauTunnel mobile app, and you're connected!
 
 ## Features
 
@@ -82,7 +82,7 @@ Then open the TermBridge mobile app, and you're connected!
 <summary><strong>📁 Project Structure</strong></summary>
 
 ```
-TermBridge/
+ClauTunnel/
 ├── apps/
 │   ├── cli/                    # CLI wrapper package
 │   │   └── src/
@@ -118,22 +118,22 @@ TermBridge/
 **Using npm (Recommended)**
 
 ```bash
-npm install -g @tongil_kim/termbridge
+npm install -g @tongil_kim/clautunnel
 ```
 
 **Using Homebrew (macOS)**
 
 ```bash
-brew tap TongilKim/termbridge
-brew install termbridge
+brew tap TongilKim/clautunnel
+brew install clautunnel
 ```
 
 **From source**
 
 ```bash
 # Clone the repository
-git clone https://github.com/TongilKim/termbridge.git
-cd termbridge
+git clone https://github.com/TongilKim/clautunnel.git
+cd clautunnel
 
 # Install dependencies
 pnpm install
@@ -147,7 +147,7 @@ pnpm build
 After installation, run the setup command to configure your Supabase credentials:
 
 ```bash
-termbridge setup
+clautunnel setup
 ```
 
 This will prompt you for:
@@ -185,25 +185,25 @@ supabase db push
 
 ```bash
 # First-time setup (configure Supabase credentials)
-termbridge setup
+clautunnel setup
 
 # Authenticate
-termbridge login
+clautunnel login
 
 # Start listening for session requests from mobile
-termbridge start
+clautunnel start
 
 # Start with a custom machine name
-termbridge start --name "Work Laptop"
+clautunnel start --name "Work Laptop"
 
 # Start with automatic sleep prevention
-termbridge start --prevent-sleep
+clautunnel start --prevent-sleep
 
 # Check connection status
-termbridge status
+clautunnel status
 
 # Stop the running daemon
-termbridge stop
+clautunnel stop
 ```
 
 ### Mobile App
@@ -251,20 +251,20 @@ pnpm start:tunnel
 pnpm test
 
 # Run CLI tests
-pnpm --filter @tongil_kim/termbridge test
+pnpm --filter @tongil_kim/clautunnel test
 
 # Run mobile tests
-pnpm --filter termbridge-mobile test
+pnpm --filter clautunnel-mobile test
 
 # Run shared package tests
-pnpm --filter termbridge-shared test
+pnpm --filter clautunnel-shared test
 ```
 
 ## Architecture
 
 ### CLI Flow
 
-1. User runs `termbridge start`
+1. User runs `clautunnel start`
 2. CLI spawns Claude Code process via node-pty
 3. CLI creates session in Supabase database
 4. PTY output is broadcast to Supabase Realtime channel

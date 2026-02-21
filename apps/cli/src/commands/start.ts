@@ -20,7 +20,7 @@ import {
   type SleepPreventionState,
   type FullDiskAccessStatus,
 } from '../utils/sleep-prevention.js';
-import type { MachineCommand } from 'termbridge-shared';
+import type { MachineCommand } from 'clautunnel-shared';
 
 // Polyfill WebSocket for Node.js (Supabase Realtime needs this)
 if (typeof globalThis.WebSocket === 'undefined') {
@@ -37,13 +37,13 @@ export function createStartCommand(): Command {
   const command = new Command('start');
 
   command
-    .description('Start TermBridge and listen for session requests from mobile app')
+    .description('Start ClauTunnel and listen for session requests from mobile app')
     .option('-n, --name <name>', 'Machine name')
     .option('--prevent-sleep', 'Auto-enable sleep prevention (skip prompt)')
     .action(async (options: StartOptions) => {
       const config = new Config();
       const logger = new Logger();
-      const spinner = new Spinner('Starting TermBridge...');
+      const spinner = new Spinner('Starting ClauTunnel...');
 
       const daemons: Map<string, Daemon> = new Map(); // sessionId -> Daemon
       let machineClient: MachineRealtimeClient | null = null;
@@ -65,7 +65,7 @@ export function createStartCommand(): Command {
         const session = await restoreSession(supabase, config);
         if (!session) {
           spinner.fail('Not authenticated');
-          logger.error('Run "termbridge login" first.');
+          logger.error('Run "clautunnel login" first.');
           process.exit(1);
         }
 
@@ -132,7 +132,7 @@ export function createStartCommand(): Command {
           const enableSleep =
             options.preventSleep ||
             (await promptYesNo(
-              'Prevent sleep when lid is closed? (keeps termbridge running) [y/N]: '
+              'Prevent sleep when lid is closed? (keeps clautunnel running) [y/N]: '
             ));
 
           if (enableSleep) {
@@ -243,7 +243,7 @@ export function createStartCommand(): Command {
         }
 
         logger.info('');
-        logger.info('✓ TermBridge is ready!');
+        logger.info('✓ ClauTunnel is ready!');
         logger.info(`  Machine: ${machine.name}`);
         if (fdaStatus) {
           if (fdaStatus.enabled) {

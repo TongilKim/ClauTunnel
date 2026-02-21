@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events';
 import type { SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
-import type { MachineCommand, PresencePayload } from 'termbridge-shared';
-import { REALTIME_CHANNELS } from 'termbridge-shared';
+import type { MachineCommand, PresencePayload } from 'clautunnel-shared';
+import { REALTIME_CHANNELS } from 'clautunnel-shared';
 import { subscribeWithTimeout } from './utils.js';
 
 export interface MachineRealtimeClientOptions {

@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { supabase } from '../services/supabase';
-import type { Session } from 'termbridge-shared';
+import type { Session } from 'clautunnel-shared';
 import {
   getSessionLabel,
   canResumeSession,

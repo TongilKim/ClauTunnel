@@ -33,13 +33,13 @@ jobs:
         run: pnpm install
 
       - name: Build shared package
-        run: pnpm --filter termbridge-shared build
+        run: pnpm --filter clautunnel-shared build
 
       - name: Run tests
-        run: pnpm --filter @tongil_kim/termbridge test
+        run: pnpm --filter @tongil_kim/clautunnel test
 
       - name: Build
-        run: pnpm --filter @tongil_kim/termbridge build
+        run: pnpm --filter @tongil_kim/clautunnel build
 
       - name: Extract version from tag or input
         id: version
@@ -66,7 +66,7 @@ jobs:
       - name: Calculate SHA256
         id: sha256
         run: |
-          SHA=$(curl -sL https://registry.npmjs.org/@tongil_kim/termbridge/-/termbridge-${{ steps.version.outputs.VERSION }}.tgz | shasum -a 256 | cut -d' ' -f1)
+          SHA=$(curl -sL https://registry.npmjs.org/@tongil_kim/clautunnel/-/clautunnel-${{ steps.version.outputs.VERSION }}.tgz | shasum -a 256 | cut -d' ' -f1)
           echo "SHA256=$SHA" >> $GITHUB_OUTPUT
 
       - name: Update Homebrew formula
@@ -80,16 +80,16 @@ jobs:
             // Get current formula content
             const { data: file } = await github.rest.repos.getContent({
               owner: 'TongilKim',
-              repo: 'homebrew-termbridge',
-              path: 'Formula/termbridge.rb',
+              repo: 'homebrew-clautunnel',
+              path: 'Formula/clautunnel.rb',
             });
 
             let content = Buffer.from(file.content, 'base64').toString('utf-8');
 
             // Update version and SHA256
             content = content.replace(
-              /url "https:\/\/registry\.npmjs\.org\/@tongil_kim\/termbridge\/-\/termbridge-.*\.tgz"/,
-              `url "https://registry.npmjs.org/@tongil_kim/termbridge/-/termbridge-${version}.tgz"`
+              /url "https:\/\/registry\.npmjs\.org\/@tongil_kim\/clautunnel\/-\/clautunnel-.*\.tgz"/,
+              `url "https://registry.npmjs.org/@tongil_kim/clautunnel/-/clautunnel-${version}.tgz"`
             );
             content = content.replace(
               /sha256 "[a-f0-9]+"/,
@@ -99,9 +99,9 @@ jobs:
             // Commit the update
             await github.rest.repos.createOrUpdateFileContents({
               owner: 'TongilKim',
-              repo: 'homebrew-termbridge',
-              path: 'Formula/termbridge.rb',
-              message: `Update termbridge to ${version}`,
+              repo: 'homebrew-clautunnel',
+              path: 'Formula/clautunnel.rb',
+              message: `Update clautunnel to ${version}`,
               content: Buffer.from(content).toString('base64'),
               sha: file.sha,
             });

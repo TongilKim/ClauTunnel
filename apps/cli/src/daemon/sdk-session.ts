@@ -4,7 +4,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { unstable_v2_createSession, unstable_v2_resumeSession } from '@anthropic-ai/claude-agent-sdk';
 import type { SDKSession as V2Session, SDKSessionOptions, SDKMessage, SlashCommand as SDKSlashCommand, CanUseTool, PermissionResult, PermissionUpdate as SDKPermissionUpdate, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
-import type { ImageAttachment, ModelInfo, PermissionMode, SlashCommand, UserQuestionData, UserQuestion, PermissionRequestData, PermissionResponseData, PermissionUpdate, ToolUseData } from 'termbridge-shared';
+import type { ImageAttachment, ModelInfo, PermissionMode, SlashCommand, UserQuestionData, UserQuestion, PermissionRequestData, PermissionResponseData, PermissionUpdate, ToolUseData } from 'clautunnel-shared';
 import { v4 as uuidv4 } from 'uuid';
 
 /** Maximum characters to capture from tool use content */

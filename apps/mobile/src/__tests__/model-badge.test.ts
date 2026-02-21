@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { ModelInfo } from 'termbridge-shared';
+import type { ModelInfo } from 'clautunnel-shared';
 import { getModelDisplayName } from '../utils/modelDisplayName';
 import { getModelBadgeState } from '../utils/modelBadgeState';
 

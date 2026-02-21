@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Machine, MachineStatus } from 'termbridge-shared';
+import type { Machine, MachineStatus } from 'clautunnel-shared';
 import * as os from 'os';
 
 export interface MachineManagerOptions {

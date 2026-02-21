@@ -202,7 +202,7 @@ export default function SessionsScreen() {
       >
         <EmptyState
           title="No Sessions"
-          message="Start a Claude Code session using 'termbridge start' or run 'termbridge listen' to start sessions from this app. Pull down to refresh."
+          message="Start a Claude Code session using 'clautunnel start' or run 'clautunnel listen' to start sessions from this app. Pull down to refresh."
           icon="💻"
         />
       </ScrollView>

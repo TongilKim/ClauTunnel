@@ -1,4 +1,4 @@
-# TermBridge - Project Context
+# ClauTunnel - Project Context
 
 ## Workflow Rules
 
@@ -6,20 +6,20 @@
 
 ## Overview
 
-TermBridge is a CLI tool for remote monitoring and control of Claude Code sessions. It connects to Supabase for real-time communication.
+ClauTunnel is a CLI tool for remote monitoring and control of Claude Code sessions. It connects to Supabase for real-time communication.
 
 ## Project Structure
 
 ```
 apps/
-  cli/              # Main CLI package (@tongil_kim/termbridge)
+  cli/              # Main CLI package (@tongil_kim/clautunnel)
     src/
       commands/     # CLI commands (start, stop, status, login, setup)
       daemon/       # Background daemon logic
       realtime/     # Supabase realtime connection
       utils/        # Config, logger utilities
 packages/
-  shared/           # Shared types (termbridge-shared)
+  shared/           # Shared types (clautunnel-shared)
 ```
 
 ## Development
@@ -31,10 +31,10 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for TDD methodology and coding standard
 pnpm install
 
 # Build
-pnpm --filter @tongil_kim/termbridge build
+pnpm --filter @tongil_kim/clautunnel build
 
 # Run tests
-pnpm --filter @tongil_kim/termbridge test
+pnpm --filter @tongil_kim/clautunnel test
 ```
 
 ### Local Dev
@@ -69,18 +69,18 @@ gh run watch
 ### Verify Release
 
 ```bash
-npm view @tongil_kim/termbridge version
-curl -s https://raw.githubusercontent.com/TongilKim/homebrew-termbridge/main/Formula/termbridge.rb | head -6
+npm view @tongil_kim/clautunnel version
+curl -s https://raw.githubusercontent.com/TongilKim/homebrew-clautunnel/main/Formula/clautunnel.rb | head -6
 ```
 
 ### Required GitHub Secrets
 
 - `NPM_TOKEN`: npm access token for publishing
-- `HOMEBREW_TAP_TOKEN`: GitHub PAT with repo scope for homebrew-termbridge
+- `HOMEBREW_TAP_TOKEN`: GitHub PAT with repo scope for homebrew-clautunnel
 
 ## SDK Architecture (Claude Agent SDK)
 
-TermBridge uses the V2 Session API (`unstable_v2_createSession`) to communicate with the Claude Code subprocess.
+ClauTunnel uses the V2 Session API (`unstable_v2_createSession`) to communicate with the Claude Code subprocess.
 
 ### Key Concepts
 

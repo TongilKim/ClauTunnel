@@ -15,8 +15,8 @@ import type {
   UserAnswerData,
   PermissionRequestData,
   PermissionResponseData,
-} from 'termbridge-shared';
-import { REALTIME_CHANNELS } from 'termbridge-shared';
+} from 'clautunnel-shared';
+import { REALTIME_CHANNELS } from 'clautunnel-shared';
 import { useSessionStore } from './sessionStore';
 
 type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting';

@@ -7,7 +7,7 @@ import type {
   InteractiveApplyPayload,
   InteractiveResult,
   InteractiveOption,
-} from 'termbridge-shared';
+} from 'clautunnel-shared';
 
 interface ClaudeSettings {
   preferences?: {

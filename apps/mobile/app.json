@@ -1,12 +1,12 @@
 {
   "expo": {
-    "name": "TermBridge",
-    "slug": "termbridge",
+    "name": "ClauTunnel",
+    "slug": "clautunnel",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "scheme": "termbridge",
+    "scheme": "clautunnel",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -17,14 +17,14 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.termbridge.app"
+      "bundleIdentifier": "com.clautunnel.app"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1a1a1a"
       },
-      "package": "com.termbridge.app"
+      "package": "com.clautunnel.app"
     },
     "web": {
       "bundler": "metro",
@@ -37,7 +37,7 @@
       [
         "expo-image-picker",
         {
-          "cameraPermission": "Allow TermBridge to take photos for attachments"
+          "cameraPermission": "Allow ClauTunnel to take photos for attachments"
         }
       ]
     ],
