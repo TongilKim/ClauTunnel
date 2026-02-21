@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { existsSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { tmpdir } from 'os';
+import { tmpdir, homedir } from 'os';
 
 // Mock environment and filesystem for tests
 const TEST_CONFIG_DIR = join(tmpdir(), 'clautunnel-test-' + Date.now());
@@ -269,6 +269,46 @@ describe('Config', () => {
       const config = new Config(TEST_CONFIG_DIR);
 
       expect(() => config.requireConfiguration()).toThrow('clautunnel setup');
+    });
+  });
+
+  describe('Legacy Migration', () => {
+    const legacyDir = join(homedir(), '.termbridge');
+    const newDir = join(homedir(), '.clautunnel');
+    let hadLegacy = false;
+    let hadNew = false;
+
+    beforeEach(() => {
+      hadLegacy = existsSync(legacyDir);
+      hadNew = existsSync(newDir);
+    });
+
+    afterEach(async () => {
+      // Restore original state
+      if (!hadLegacy && existsSync(legacyDir)) {
+        rmSync(legacyDir, { recursive: true, force: true });
+      }
+      if (!hadNew && existsSync(newDir)) {
+        rmSync(newDir, { recursive: true, force: true });
+      }
+    });
+
+    it('should migrate ~/.termbridge to ~/.clautunnel when legacy exists and new does not', async () => {
+      // Skip if either dir already exists in a conflicting way
+      if (hadLegacy || hadNew) return;
+
+      mkdirSync(legacyDir, { recursive: true });
+      writeFileSync(
+        join(legacyDir, 'config.json'),
+        JSON.stringify({ machineId: 'migrated-machine' })
+      );
+
+      const { Config } = await import('../utils/config.js');
+      const config = new Config();
+
+      expect(existsSync(newDir)).toBe(true);
+      expect(existsSync(legacyDir)).toBe(false);
+      expect(config.getMachineId()).toBe('migrated-machine');
     });
   });
 });

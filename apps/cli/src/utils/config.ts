@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 
@@ -27,7 +27,18 @@ export class Config {
   constructor(configDir?: string) {
     this.configDir = configDir ?? join(homedir(), '.clautunnel');
     this.configFile = join(this.configDir, 'config.json');
+    if (!configDir) {
+      this.migrateFromLegacy();
+    }
     this.data = this.loadConfig();
+  }
+
+  private migrateFromLegacy(): void {
+    const legacyDir = join(homedir(), '.termbridge');
+    if (existsSync(legacyDir) && !existsSync(this.configDir)) {
+      renameSync(legacyDir, this.configDir);
+      console.log(`Migrated config from ~/.termbridge to ~/.clautunnel`);
+    }
   }
 
   private loadConfig(): ConfigData {
