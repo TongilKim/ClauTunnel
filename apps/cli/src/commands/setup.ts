@@ -73,8 +73,8 @@ export function createSetupCommand(): Command {
         logger.info('✓ Configuration saved successfully!');
         logger.info('');
         logger.info('Next steps:');
-        logger.info('  1. Run "clautunnel login" to authenticate');
-        logger.info('  2. Run "clautunnel start" to begin a session');
+        logger.info('  - New user?      Run "clautunnel signup" to create an account');
+        logger.info('  - Have account?  Run "clautunnel login" to authenticate');
       } catch (error) {
         logger.error(
           `Setup failed: ${error instanceof Error ? error.message : 'Unknown error'}`
