@@ -26,6 +26,9 @@ importers:
       dotenv:
         specifier: ^17.2.3
         version: 17.2.3
+      qrcode-terminal:
+        specifier: ^0.12.0
+        version: 0.12.0
       uuid:
         specifier: ^13.0.0
         version: 13.0.0
@@ -6313,6 +6316,11 @@ packages:
 
   /qrcode-terminal@0.11.0:
     resolution: {integrity: sha512-Uu7ii+FQy4Qf82G4xu7ShHhjhGahEpCWc3x8UavY3CTcWV+ufmmCtwkr7ZKsX42jdL0kr1B5FKUeqJvAn51jzQ==}
+    hasBin: true
+    dev: false
+
+  /qrcode-terminal@0.12.0:
+    resolution: {integrity: sha512-EXtzRZmC+YGmGlDFbXKxQiMZNwCLEO6BANKXG4iCtSIM0yqc/pappSx3RIKr4r0uh5JsBckOXeKrB3Iz7mdQpQ==}
     hasBin: true
     dev: false
 

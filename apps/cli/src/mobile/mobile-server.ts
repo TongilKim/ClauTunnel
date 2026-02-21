@@ -9,6 +9,7 @@ import {
 import { join } from 'path';
 import { homedir } from 'os';
 import { get } from 'http';
+import qrcode from 'qrcode-terminal';
 
 const REPO_URL = 'https://github.com/TongilKim/ClauTunnel.git';
 const DEFAULT_MOBILE_DIR = join(homedir(), '.clautunnel', 'mobile');
@@ -355,6 +356,19 @@ export class MobileServerManager {
       await this.stop();
       return { started: false, error: 'Failed to start Expo server' };
     }
+
+    // Step 7: Show QR code for Expo Go
+    const expoUrl = `exp+${tunnelUrl}`;
+    console.log('');
+    console.log('  Scan with Expo Go:');
+    qrcode.generate(expoUrl, { small: true }, (code: string) => {
+      // Indent each line for alignment
+      for (const line of code.split('\n')) {
+        console.log(`  ${line}`);
+      }
+    });
+    console.log(`  ${expoUrl}`);
+    console.log('');
 
     return { started: true, tunnelUrl };
   }
