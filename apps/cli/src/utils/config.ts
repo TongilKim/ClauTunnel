@@ -17,6 +17,7 @@ interface ConfigData {
   };
   supabaseUrl?: string;
   supabaseAnonKey?: string;
+  mobileProjectPath?: string;
 }
 
 export class Config {
@@ -134,6 +135,15 @@ export class Config {
 
   clearSessionTokens(): void {
     delete this.data.sessionTokens;
+    this.saveConfig();
+  }
+
+  getMobileProjectPath(): string | undefined {
+    return this.data.mobileProjectPath;
+  }
+
+  setMobileProjectPath(path: string): void {
+    this.data.mobileProjectPath = path;
     this.saveConfig();
   }
 }

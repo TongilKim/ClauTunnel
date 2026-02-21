@@ -272,6 +272,27 @@ describe('Config', () => {
     });
   });
 
+  describe('Mobile Project Path', () => {
+    it('should save and load mobileProjectPath', async () => {
+      const { Config } = await import('../utils/config.js');
+      const config = new Config(TEST_CONFIG_DIR);
+
+      config.setMobileProjectPath('/Users/test/clautunnel/apps/mobile');
+
+      const configFile = join(TEST_CONFIG_DIR, 'config.json');
+      const savedData = JSON.parse(readFileSync(configFile, 'utf-8'));
+      expect(savedData.mobileProjectPath).toBe('/Users/test/clautunnel/apps/mobile');
+      expect(config.getMobileProjectPath()).toBe('/Users/test/clautunnel/apps/mobile');
+    });
+
+    it('should return undefined when mobileProjectPath not set', async () => {
+      const { Config } = await import('../utils/config.js');
+      const config = new Config(TEST_CONFIG_DIR);
+
+      expect(config.getMobileProjectPath()).toBeUndefined();
+    });
+  });
+
   describe('Legacy Migration', () => {
     const legacyDir = join(homedir(), '.termbridge');
     const newDir = join(homedir(), '.clautunnel');

@@ -20,6 +20,7 @@ import {
   type SleepPreventionState,
   type FullDiskAccessStatus,
 } from '../utils/sleep-prevention.js';
+import { MobileServerManager } from '../mobile/mobile-server.js';
 import type { MachineCommand } from 'clautunnel-shared';
 
 // Polyfill WebSocket for Node.js (Supabase Realtime needs this)
@@ -31,6 +32,7 @@ if (typeof globalThis.WebSocket === 'undefined') {
 export interface StartOptions {
   name?: string;
   preventSleep?: boolean;
+  mobile?: boolean;
 }
 
 export function createStartCommand(): Command {
@@ -40,6 +42,7 @@ export function createStartCommand(): Command {
     .description('Start ClauTunnel and listen for session requests from mobile app')
     .option('-n, --name <name>', 'Machine name')
     .option('--prevent-sleep', 'Auto-enable sleep prevention (skip prompt)')
+    .option('--no-mobile', 'Skip mobile server startup')
     .action(async (options: StartOptions) => {
       const config = new Config();
       const logger = new Logger();
@@ -166,8 +169,42 @@ export function createStartCommand(): Command {
           spinner.start();
         }
 
+        // Mobile server
+        let mobileServer: MobileServerManager | null = null;
+
+        if (options.mobile !== false) {
+          const mobileProjectPath = config.getMobileProjectPath();
+          mobileServer = new MobileServerManager({
+            mobileProjectPath,
+            supabaseUrl: config.getSupabaseUrl(),
+            supabaseAnonKey: config.getSupabaseAnonKey(),
+            onProgress: (msg) => spinner.update(msg),
+          });
+
+          const result = await mobileServer.start();
+          spinner.stop();
+
+          if (result.started) {
+            logger.info('');
+            logger.info(`  Tunnel: ${result.tunnelUrl}`);
+            logger.info('');
+          } else {
+            logger.error(`Mobile server failed: ${result.error}`);
+            process.exit(1);
+          }
+
+          spinner.start();
+        }
+
         // Cleanup helper
-        const cleanup = () => {
+        const cleanup = async () => {
+          if (mobileServer) {
+            try {
+              await mobileServer.stop();
+            } catch {
+              // Best-effort cleanup
+            }
+          }
           if (sleepState.pmsetEnabled) {
             console.log('Restoring sleep settings...');
           }
@@ -262,6 +299,9 @@ export function createStartCommand(): Command {
           logger.info(
             `  Sleep prevention: ${sleepState.pmsetEnabled ? 'Lid-closed mode' : 'Basic mode'}`
           );
+        }
+        if (mobileServer) {
+          logger.info('  Mobile server: Running');
         }
         logger.info('');
         logger.info('Open the mobile app to start a session.');

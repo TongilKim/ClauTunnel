@@ -45,14 +45,16 @@ export function createMobileSetupCommand(): Command {
 
         writeFileSync(envPath, envContent);
 
+        // Save mobile project path to config for clautunnel start
+        config.setMobileProjectPath(mobileDir);
+
         logger.info('');
-        logger.info('Mobile app .env file created successfully!');
-        logger.info(`  ${envPath}`);
+        logger.info('Mobile app configured successfully!');
+        logger.info(`  Project: ${mobileDir}`);
+        logger.info(`  .env: ${envPath}`);
         logger.info('');
-        logger.info('Next steps:');
-        logger.info('  1. cd apps/mobile');
-        logger.info('  2. pnpm start');
-        logger.info('  3. Scan the QR code with Expo Go');
+        logger.info('The mobile server will start automatically with "clautunnel start".');
+        logger.info('Use "clautunnel start --no-mobile" to skip mobile server.');
       } catch (error) {
         if (error instanceof ConfigurationError) {
           logger.error(error.message);
