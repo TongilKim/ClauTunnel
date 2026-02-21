@@ -45,9 +45,11 @@ export class MobileServerManager {
   private expoLogStream: WriteStream | null = null;
   private tunnelUrl: string | null = null;
   private onProgress: (message: string) => void;
+  private hasCustomPath: boolean;
 
   constructor(options: MobileServerOptions) {
     this.options = options;
+    this.hasCustomPath = options.mobileProjectPath !== undefined;
     this.mobileProjectPath = options.mobileProjectPath ?? DEFAULT_MOBILE_DIR;
     this.expoPort = options.expoPort ?? 8081;
     this.logDir = options.logDir ?? join(homedir(), '.clautunnel', 'logs');
@@ -93,7 +95,7 @@ export class MobileServerManager {
     }
 
     // If custom path was provided and doesn't exist, don't auto-clone
-    if (this.mobileProjectPath && !existsSync(this.mobileProjectPath)) {
+    if (this.hasCustomPath) {
       return {
         ready: false,
         cloned: false,
