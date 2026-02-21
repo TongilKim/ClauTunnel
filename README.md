@@ -54,8 +54,9 @@ npm install -g @tongil_kim/clautunnel
 # Configure Supabase credentials
 clautunnel setup
 
-# Authenticate
-clautunnel login
+# Create account (first time) or login (returning user)
+clautunnel signup   # new user
+clautunnel login    # existing user
 
 # Start listening for mobile connections
 clautunnel start
@@ -86,7 +87,7 @@ ClauTunnel/
 ├── apps/
 │   ├── cli/                    # CLI wrapper package
 │   │   └── src/
-│   │       ├── commands/       # CLI commands (start, stop, status, login, setup)
+│   │       ├── commands/       # CLI commands (setup, signup, login, start, stop, status)
 │   │       ├── daemon/         # Background daemon logic
 │   │       ├── realtime/       # Supabase realtime connection
 │   │       └── utils/          # Config, logger, prompt, supabase utilities
@@ -150,17 +151,10 @@ After installation, run the setup command to configure your Supabase credentials
 clautunnel setup
 ```
 
-This will prompt you for:
+This will guide you through two steps:
 
-- **Supabase Project URL**: Found in Supabase Dashboard → Settings → API (e.g., `https://xxxx.supabase.co`)
-- **Supabase Anon Key**: Found in Supabase Dashboard → Settings → API → `anon` `public` key
-
-Alternatively, set these in your shell profile (e.g., `~/.zshrc` or `~/.bashrc`):
-
-```bash
-export SUPABASE_URL=https://your-project.supabase.co
-export SUPABASE_ANON_KEY=your-anon-key
-```
+1. **Supabase Project ID**: Found in Supabase Dashboard → Settings → General → Project ID
+2. **Supabase Anon Key**: Found in Supabase Dashboard → Settings → API Keys → Legacy anon Tab → Copy anon key
 
 ### Mobile App Setup
 
@@ -187,7 +181,10 @@ supabase db push
 # First-time setup (configure Supabase credentials)
 clautunnel setup
 
-# Authenticate
+# Create account (first time)
+clautunnel signup
+
+# Login (returning user)
 clautunnel login
 
 # Start listening for session requests from mobile
