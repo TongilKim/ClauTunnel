@@ -142,7 +142,7 @@ export class MobileServerManager {
             timeout: 60000,
           }
         );
-        execSync('git sparse-checkout set apps/mobile', {
+        execSync('git sparse-checkout set apps/mobile packages/shared', {
           cwd: repoDir,
           stdio: 'pipe',
           timeout: 30000,

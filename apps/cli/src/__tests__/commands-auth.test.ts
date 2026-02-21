@@ -14,6 +14,14 @@ vi.mock('node-pty', () => ({
   })),
 }));
 
+// Mock MobileServerManager to prevent actual ngrok/expo startup
+vi.mock('../mobile/mobile-server.js', () => ({
+  MobileServerManager: vi.fn().mockImplementation(() => ({
+    start: vi.fn().mockResolvedValue({ started: true, tunnelUrl: 'https://test.ngrok-free.app' }),
+    stop: vi.fn().mockResolvedValue(undefined),
+  })),
+}));
+
 // Mock sleep-prevention to prevent prompt blocking in tests
 vi.mock('../utils/sleep-prevention.js', () => ({
   promptYesNo: vi.fn().mockResolvedValue(false),
