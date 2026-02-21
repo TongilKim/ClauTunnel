@@ -199,8 +199,14 @@ describe('MobileServerManager', () => {
   });
 
   describe('installDependencies', () => {
-    it('should skip install if node_modules exists', async () => {
+    // Repo root is two levels up from MOBILE_DIR (apps/mobile -> repo root)
+    const REPO_ROOT = join(MOBILE_DIR, '..', '..');
+    const SHARED_DIST = join(REPO_ROOT, 'packages', 'shared', 'dist', 'index.js');
+
+    it('should skip install if node_modules and shared dist exist', async () => {
       mkdirSync(join(MOBILE_DIR, 'node_modules'), { recursive: true });
+      mkdirSync(join(REPO_ROOT, 'packages', 'shared', 'dist'), { recursive: true });
+      writeFileSync(SHARED_DIST, '');
 
       const { MobileServerManager } = await import('../mobile/mobile-server.js');
       const manager = new MobileServerManager({
@@ -215,7 +221,11 @@ describe('MobileServerManager', () => {
       expect(mockedExecSync).not.toHaveBeenCalledWith('pnpm install', expect.anything());
     });
 
-    it('should run pnpm install if node_modules missing', async () => {
+    it('should run pnpm install at repo root and build shared if node_modules missing', async () => {
+      // Create shared tsconfig so build step runs
+      mkdirSync(join(REPO_ROOT, 'packages', 'shared'), { recursive: true });
+      writeFileSync(join(REPO_ROOT, 'packages', 'shared', 'tsconfig.json'), '{}');
+
       mockedExecSync.mockReturnValue(Buffer.from(''));
 
       const { MobileServerManager } = await import('../mobile/mobile-server.js');
@@ -228,11 +238,12 @@ describe('MobileServerManager', () => {
 
       const result = manager.installDependencies();
       expect(result).toBe(true);
-      expect(mockedExecSync).toHaveBeenCalledWith('pnpm install', {
-        cwd: MOBILE_DIR,
-        stdio: 'pipe',
-        timeout: 120000,
-      });
+      expect(mockedExecSync).toHaveBeenCalledWith('pnpm install', expect.objectContaining({
+        cwd: REPO_ROOT,
+      }));
+      expect(mockedExecSync).toHaveBeenCalledWith('pnpm build', expect.objectContaining({
+        cwd: join(REPO_ROOT, 'packages', 'shared'),
+      }));
     });
 
     it('should return false if pnpm install fails', async () => {

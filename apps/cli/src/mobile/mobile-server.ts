@@ -179,14 +179,29 @@ export class MobileServerManager {
 
   installDependencies(): boolean {
     const nodeModulesPath = join(this.mobileProjectPath, 'node_modules');
-    if (existsSync(nodeModulesPath)) return true;
+    const repoRoot = join(this.mobileProjectPath, '..', '..');
+    const sharedDistPath = join(repoRoot, 'packages', 'shared', 'dist', 'index.js');
 
+    if (existsSync(nodeModulesPath) && existsSync(sharedDistPath)) return true;
+
+    // Run pnpm install from repo root so workspace links resolve correctly
     try {
       execSync('pnpm install', {
-        cwd: this.mobileProjectPath,
+        cwd: repoRoot,
         stdio: 'pipe',
         timeout: 120000, // 2 minute timeout
       });
+
+      // Build shared package so dist/index.js exists for Metro
+      const sharedDir = join(repoRoot, 'packages', 'shared');
+      if (existsSync(join(sharedDir, 'tsconfig.json'))) {
+        execSync('pnpm build', {
+          cwd: sharedDir,
+          stdio: 'pipe',
+          timeout: 30000,
+        });
+      }
+
       return true;
     } catch {
       return false;
