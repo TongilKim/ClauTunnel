@@ -358,7 +358,9 @@ export class MobileServerManager {
     }
 
     // Step 7: Show QR code for Expo Go
-    const expoUrl = `exp+${tunnelUrl}`;
+    // Convert https://xxx.ngrok-free.app → exp://xxx.ngrok-free.app:443
+    const host = tunnelUrl.replace(/^https?:\/\//, '');
+    const expoUrl = `exp://${host}:443`;
     console.log('');
     console.log('  Scan with Expo Go:');
     qrcode.generate(expoUrl, { small: true }, (code: string) => {
