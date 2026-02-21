@@ -32,6 +32,7 @@ import { createStartCommand } from './commands/start.js';
 import { createStopCommand } from './commands/stop.js';
 import { createStatusCommand } from './commands/status.js';
 import { createLoginCommand } from './commands/login.js';
+import { createLogoutCommand } from './commands/logout.js';
 import { createSignupCommand } from './commands/signup.js';
 import { createSetupCommand } from './commands/setup.js';
 import { createMobileSetupCommand } from './commands/mobile-setup.js';
@@ -48,6 +49,7 @@ program.addCommand(createStartCommand());
 program.addCommand(createStopCommand());
 program.addCommand(createStatusCommand());
 program.addCommand(createLoginCommand());
+program.addCommand(createLogoutCommand());
 program.addCommand(createSignupCommand());
 program.addCommand(createMobileSetupCommand());
 
