@@ -62,7 +62,7 @@ clautunnel login    # existing user
 clautunnel start
 ```
 
-Then open the ClauTunnel mobile app, and you're connected!
+Then open the ClauTunnel mobile app via Expo Go (see [Mobile App Setup](#mobile-app-setup)), and you're connected!
 
 ## Features
 
@@ -158,13 +158,34 @@ This will guide you through two steps:
 
 ### Mobile App Setup
 
-Create `.env` file for the mobile app:
+The mobile app runs via [Expo Go](https://expo.dev/go) — no app store installation needed.
+
+1. Install **Expo Go** on your phone ([iOS](https://apps.apple.com/app/expo-go/id982107779) / [Android](https://play.google.com/store/apps/details?id=host.exp.exponent))
+
+2. Clone the repository and install dependencies:
+
+```bash
+git clone https://github.com/TongilKim/clautunnel.git
+cd clautunnel
+pnpm install
+```
+
+3. Create `.env` file for the mobile app:
 
 ```bash
 # apps/mobile/.env
-EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+EXPO_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 ```
+
+4. Start the mobile app:
+
+```bash
+cd apps/mobile
+pnpm start
+```
+
+5. Scan the QR code with Expo Go (Android) or the Camera app (iOS)
 
 ### Supabase Setup
 
@@ -208,14 +229,11 @@ clautunnel stop
 ```bash
 cd apps/mobile
 
-# Start development server
+# Start development server (scan QR with Expo Go)
 pnpm start
 
-# Build for iOS
-eas build --platform ios
-
-# Build for Android
-eas build --platform android
+# Or with tunnel (if phone and computer are on different networks)
+pnpm start:tunnel
 ```
 
 ## Development
