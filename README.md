@@ -193,6 +193,13 @@ cd apps/mobile
 pnpm start
 ```
 
+> **Different network?** If your phone and computer are on different Wi-Fi networks, use `pnpm start:tunnel` instead. This requires [ngrok](https://ngrok.com) (free account):
+> ```bash
+> brew install ngrok
+> ngrok config add-authtoken <your-token>  # get token from ngrok.com dashboard
+> pnpm start:tunnel
+> ```
+
 5. Scan the QR code with Expo Go (Android) or the Camera app (iOS)
 
 ### Supabase Setup
@@ -244,6 +251,9 @@ cd apps/mobile
 pnpm start
 
 # Or with tunnel (if phone and computer are on different networks)
+# Requires ngrok: brew install ngrok
+# Sign up at https://ngrok.com and configure:
+#   ngrok config add-authtoken <your-token>
 pnpm start:tunnel
 ```
 
@@ -266,7 +276,7 @@ pnpm start
 cd apps/mobile
 pnpm start
 
-# Or with tunnel for different network:
+# Or with tunnel for different network (requires ngrok setup):
 pnpm start:tunnel
 ```
 
