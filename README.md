@@ -170,7 +170,15 @@ cd clautunnel
 pnpm install
 ```
 
-3. Create `.env` file for the mobile app:
+3. Configure credentials (pick one):
+
+**Option A** — Auto-generate from CLI config (requires `clautunnel setup` done first):
+
+```bash
+clautunnel mobile-setup
+```
+
+**Option B** — Create `.env` manually:
 
 ```bash
 # apps/mobile/.env

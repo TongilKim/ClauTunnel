@@ -34,6 +34,7 @@ import { createStatusCommand } from './commands/status.js';
 import { createLoginCommand } from './commands/login.js';
 import { createSignupCommand } from './commands/signup.js';
 import { createSetupCommand } from './commands/setup.js';
+import { createMobileSetupCommand } from './commands/mobile-setup.js';
 
 const program = new Command();
 
@@ -48,6 +49,7 @@ program.addCommand(createStopCommand());
 program.addCommand(createStatusCommand());
 program.addCommand(createLoginCommand());
 program.addCommand(createSignupCommand());
+program.addCommand(createMobileSetupCommand());
 
 // Only parse when run directly (not when imported as library)
 if (process.argv[1]?.includes('clautunnel') || process.argv[1]?.endsWith('/index.js') || process.argv[1]?.endsWith('/index.ts')) {
