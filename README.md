@@ -68,13 +68,19 @@ Then open the ClauTunnel mobile app via Expo Go (see [Mobile App Setup](#mobile-
 
 - 📱 Real-time terminal output streaming to mobile
 - ⌨️ Send input from mobile to CLI
-- 🔄 Automatic reconnection with exponential backoff
-- 🌙 Dark mode support
+- ⚡ Slash commands — `/clear`, `/compact`, `/resume`, `/rewind`, `/config` from your phone
+- 🤖 Model switching — change the Claude model mid-session
+- 🔒 Permission handling — approve or deny tool usage requests remotely
+- ❓ Interactive questions — answer Claude's prompts from mobile
+- 📸 Image attachments — send images from camera or gallery
+- 🔄 Session resumption — pick up previous conversations where you left off
+- 😴 Sleep prevention — keep macOS awake during long-running tasks (`--prevent-sleep`)
 - 🔐 Secure authentication with Supabase
+- 🌙 Dark mode support
 
 ## Tech Stack
 
-- **CLI Wrapper**: Node.js + TypeScript + node-pty
+- **CLI**: Node.js + TypeScript + [Claude Agent SDK](https://docs.anthropic.com/en/docs/claude-code/sdk)
 - **Mobile App**: React Native + Expo (iOS & Android)
 - **Backend**: Supabase (Realtime, Auth, Database)
 - **Monorepo**: pnpm workspaces
@@ -85,10 +91,10 @@ Then open the ClauTunnel mobile app via Expo Go (see [Mobile App Setup](#mobile-
 ```
 ClauTunnel/
 ├── apps/
-│   ├── cli/                    # CLI wrapper package
+│   ├── cli/                    # CLI package (@tongil_kim/clautunnel)
 │   │   └── src/
 │   │       ├── commands/       # CLI commands (setup, signup, login, start, stop, status)
-│   │       ├── daemon/         # Background daemon logic
+│   │       ├── daemon/         # Daemon, SDK session wrapper, machine/session management
 │   │       ├── realtime/       # Supabase realtime connection
 │   │       └── utils/          # Config, logger, prompt, supabase utilities
 │   └── mobile/                 # Expo mobile app
@@ -298,15 +304,27 @@ pnpm --filter clautunnel-shared test
 
 ## Architecture
 
-### CLI Flow
+### How It Works
 
-1. User runs `clautunnel start`
-2. CLI spawns Claude Code process via node-pty
-3. CLI creates session in Supabase database
-4. PTY output is broadcast to Supabase Realtime channel
-5. Mobile app connects to the same channel to receive output
-6. Input from mobile is sent via Realtime to CLI
-7. CLI writes input to PTY
+```
+┌──────────────┐        Supabase Realtime        ┌──────────────┐
+│   Desktop    │ ◄──────────────────────────────► │   Mobile     │
+│              │   output, status, permissions    │              │
+│  clautunnel  │   input, commands, responses     │  Expo app    │
+│  start       │                                  │              │
+│      │       │                                  └──────────────┘
+│      ▼       │
+│  Claude Code │
+│  (Agent SDK) │
+└──────────────┘
+```
+
+1. User runs `clautunnel start` — CLI registers the machine in Supabase and listens for mobile connections
+2. Mobile app connects and sends a "start session" command
+3. CLI spawns a Claude Code process via the [Claude Agent SDK](https://docs.anthropic.com/en/docs/claude-code/sdk) (V2 Session API)
+4. Claude output is streamed to the mobile app through Supabase Realtime
+5. Input, slash commands, permission responses, and model switches from mobile are relayed back to Claude
+6. Sessions can be paused, resumed, or ended from either side
 
 ## Contributing
 
