@@ -45,24 +45,59 @@ Chat with Claude Code in real-time from your mobile device, just like you would 
     <img src="docs/screenshots/chat.png" width="300" alt="Live chat" />
 </p>
 
-## Quick Start
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- pnpm 8+
+- Supabase account
+- [Expo Go](https://expo.dev/go) installed on your phone ([iOS](https://apps.apple.com/app/expo-go/id982107779) / [Android](https://play.google.com/store/apps/details?id=host.exp.exponent))
+
+### 1. Install CLI
+
+**Using npm (Recommended)**
 
 ```bash
-# Install
 npm install -g @tongil_kim/clautunnel
+```
 
-# Configure Supabase credentials
+**Using Homebrew (macOS)**
+
+```bash
+brew tap TongilKim/clautunnel
+brew install clautunnel
+```
+
+### 2. Supabase Setup
+
+Run the setup command to configure your Supabase credentials:
+
+```bash
 clautunnel setup
+```
 
-# Create account (first time) or login (returning user)
+This will guide you through two steps:
+
+1. **Supabase Project ID**: Found in Supabase Dashboard — Settings — General — Project ID
+2. **Supabase Anon Key**: Found in Supabase Dashboard — Settings — API Keys — Legacy anon Tab — Copy anon key
+
+### 3. Create Account
+
+```bash
 clautunnel signup   # new user
 clautunnel login    # existing user
+```
 
-# Start listening for mobile connections
+### 4. Start Listening
+
+```bash
 clautunnel start
 ```
 
-Then open the ClauTunnel mobile app via Expo Go (see [Mobile App Setup](#mobile-app-setup)), and you're connected!
+### 5. Connect Mobile App
+
+Open the ClauTunnel mobile app via Expo Go and connect to your session.
 
 ## ClauTunnel vs Claude CLI Remote Control
 
@@ -127,157 +162,6 @@ ClauTunnel/
 ```
 
 </details>
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+
-- pnpm 8+
-- Supabase account
-
-### Installation
-
-**Using npm (Recommended)**
-
-```bash
-npm install -g @tongil_kim/clautunnel
-```
-
-**Using Homebrew (macOS)**
-
-```bash
-brew tap TongilKim/clautunnel
-brew install clautunnel
-```
-
-**From source**
-
-```bash
-# Clone the repository
-git clone https://github.com/TongilKim/clautunnel.git
-cd clautunnel
-
-# Install dependencies
-pnpm install
-
-# Build packages
-pnpm build
-```
-
-### CLI Setup
-
-After installation, run the setup command to configure your Supabase credentials:
-
-```bash
-clautunnel setup
-```
-
-This will guide you through two steps:
-
-1. **Supabase Project ID**: Found in Supabase Dashboard → Settings → General → Project ID
-2. **Supabase Anon Key**: Found in Supabase Dashboard → Settings → API Keys → Legacy anon Tab → Copy anon key
-
-### Mobile App Setup
-
-The mobile app runs via [Expo Go](https://expo.dev/go) — no app store installation needed.
-
-1. Install **Expo Go** on your phone ([iOS](https://apps.apple.com/app/expo-go/id982107779) / [Android](https://play.google.com/store/apps/details?id=host.exp.exponent))
-
-2. Clone the repository and install dependencies:
-
-```bash
-git clone https://github.com/TongilKim/clautunnel.git
-cd clautunnel
-pnpm install
-```
-
-3. Configure credentials (pick one):
-
-**Option A** — Auto-generate from CLI config (requires `clautunnel setup` done first):
-
-```bash
-clautunnel mobile-setup
-```
-
-**Option B** — Create `.env` manually:
-
-```bash
-# apps/mobile/.env
-EXPO_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-```
-
-4. Start the mobile app:
-
-```bash
-cd apps/mobile
-pnpm start
-```
-
-> **Different network?** If your phone and computer are on different Wi-Fi networks, use `pnpm start:tunnel` instead. This requires [ngrok](https://ngrok.com) (free account):
-> ```bash
-> brew install ngrok
-> ngrok config add-authtoken <your-token>  # get token from ngrok.com dashboard
-> pnpm start:tunnel
-> ```
-
-5. Scan the QR code with Expo Go (Android) or the Camera app (iOS)
-
-### Supabase Setup
-
-1. Create a new Supabase project
-2. Run the database migration:
-
-```bash
-supabase db push
-```
-
-### CLI Usage
-
-```bash
-# First-time setup (configure Supabase credentials)
-clautunnel setup
-
-# Create account (first time)
-clautunnel signup
-
-# Login (returning user)
-clautunnel login
-
-# Logout
-clautunnel logout
-
-# Start listening for session requests from mobile
-clautunnel start
-
-# Start with a custom machine name
-clautunnel start --name "Work Laptop"
-
-# Start with automatic sleep prevention
-clautunnel start --prevent-sleep
-
-# Check connection status
-clautunnel status
-
-# Stop the running daemon
-clautunnel stop
-```
-
-### Mobile App
-
-```bash
-cd apps/mobile
-
-# Start development server (scan QR with Expo Go)
-pnpm start
-
-# Or with tunnel (if phone and computer are on different networks)
-# Requires ngrok: brew install ngrok
-# Sign up at https://ngrok.com and configure:
-#   ngrok config add-authtoken <your-token>
-pnpm start:tunnel
-```
 
 ## Development
 
