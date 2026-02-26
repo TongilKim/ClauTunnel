@@ -141,40 +141,6 @@ This command does everything automatically:
 3. Log in with the same email and password you used in `clautunnel signup`
 4. Tap **"+ New Session"** on your machine to start chatting with Claude
 
-## Tech Stack
-
-- **CLI**: Node.js + TypeScript + [Claude Agent SDK](https://docs.anthropic.com/en/docs/claude-code/sdk)
-- **Mobile App**: React Native + Expo (iOS & Android)
-- **Backend**: Supabase (Realtime, Auth, Database)
-- **Monorepo**: pnpm workspaces
-
-<details>
-<summary><strong>📁 Project Structure</strong></summary>
-
-```
-ClauTunnel/
-├── apps/
-│   ├── cli/                    # CLI package (@tongil_kim/clautunnel)
-│   │   └── src/
-│   │       ├── commands/       # CLI commands (setup, signup, login, start, stop, status)
-│   │       ├── daemon/         # Daemon, SDK session wrapper, machine/session management
-│   │       ├── realtime/       # Supabase realtime connection
-│   │       └── utils/          # Config, logger, prompt, supabase utilities
-│   └── mobile/                 # Expo mobile app
-│       └── src/
-│           ├── components/     # React Native components
-│           ├── screens/        # App screens
-│           ├── stores/         # Zustand state management
-│           └── utils/          # Presence and shared utilities
-├── packages/
-│   └── shared/                 # Shared types and constants
-├── supabase/
-│   └── migrations/             # Database schema
-└── package.json
-```
-
-</details>
-
 ## Development
 
 ### Local Development
