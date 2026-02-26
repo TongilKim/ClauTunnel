@@ -141,7 +141,7 @@ pnpm --filter clautunnel-shared test
 ## Architecture
 
 ```
-┌──────────────┐        Supabase Realtime        ┌──────────────┐
+┌──────────────┐        Supabase Realtime         ┌──────────────┐
 │   Desktop    │ ◄──────────────────────────────► │   Mobile     │
 │              │   output, status, permissions    │              │
 │  clautunnel  │   input, commands, responses     │  Expo app    │
