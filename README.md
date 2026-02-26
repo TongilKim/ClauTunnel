@@ -15,7 +15,9 @@ Monitor and send inputs to Claude Code terminal sessions in real-time from your 
 
 Running Claude Code on your workstation but need to step away? ClauTunnel lets you keep the conversation going from your phone. Whether you're reviewing a long-running code generation, approving permission prompts, or sending follow-up instructions — you stay in control without being tied to your desk.
 
-Claude Code CLI offers a built-in [`remote-control`](https://code.claude.com/docs/en/remote-control) command, but it has limitations that ClauTunnel addresses:
+### How it compares to Claude CLI's built-in Remote Control
+
+Claude Code CLI offers a built-in [`remote-control`](https://code.claude.com/docs/en/remote-control) command. Here's how ClauTunnel differs:
 
 - **Works with any plan** — Remote Control is only available on Pro and Max plans, not on Team or Enterprise. ClauTunnel works with any plan, including API key users, because it uses your own Supabase infrastructure.
 - **Multiple sessions across machines** — Remote Control supports only one session per instance. ClauTunnel lets you manage multiple sessions across multiple machines from a single mobile app.
