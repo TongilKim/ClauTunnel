@@ -7,8 +7,6 @@
 
 📱 **Remote control for Claude Code CLI from your mobile device.**
 
-Monitor and send inputs to Claude Code terminal sessions in real-time from your iOS or Android device.
-
 ---
 
 ## Why ClauTunnel?
@@ -27,28 +25,12 @@ Claude Code CLI offers a built-in [`remote-control`](https://code.claude.com/doc
 
 ## Screenshots
 
-### 📱 Session List
-
-View and manage all your Claude Code sessions at a glance — see which are active, online, or offline.
-
 <p align="center">
-    <img src="docs/screenshots/sessions.png" width="300" alt="Session list" />
-</p>
-
-### ⚡ Slash Commands
-
-Quickly access powerful commands like /clear, /compact, /resume, /rewind, and /config right from your phone.
-
-<p align="center">
-    <img src="docs/screenshots/commands.png" width="300" alt="Slash commands" />
-</p>
-
-### 💬 Live Chat
-
-Chat with Claude Code in real-time from your mobile device, just like you would from the terminal.
-
-<p align="center">
-    <img src="docs/screenshots/chat.png" width="300" alt="Live chat" />
+    <img src="docs/screenshots/sessions.png" width="250" alt="Session list" />
+    &nbsp;&nbsp;
+    <img src="docs/screenshots/commands.png" width="250" alt="Slash commands" />
+    &nbsp;&nbsp;
+    <img src="docs/screenshots/chat.png" width="250" alt="Live chat" />
 </p>
 
 ## Getting Started
@@ -158,8 +140,6 @@ pnpm --filter clautunnel-shared test
 
 ## Architecture
 
-### How It Works
-
 ```
 ┌──────────────┐        Supabase Realtime        ┌──────────────┐
 │   Desktop    │ ◄──────────────────────────────► │   Mobile     │
@@ -176,13 +156,11 @@ pnpm --filter clautunnel-shared test
 └──────────────┘
 ```
 
-1. User runs `clautunnel start` — CLI registers the machine, auto-clones the mobile app, starts ngrok + Expo, and displays a QR code
-2. User scans the QR code with Expo Go — the mobile app loads with pre-configured Supabase credentials
-3. Mobile app sends a "start session" command via Supabase Realtime
-4. CLI spawns a Claude Code process via the [Claude Agent SDK](https://docs.anthropic.com/en/docs/claude-code/sdk) (V2 Session API)
-5. Claude output is streamed to the mobile app through Supabase Realtime
-6. Input, slash commands, permission responses, and model switches from mobile are relayed back to Claude
-7. Sessions can be paused, resumed, or ended from either side
+1. Mobile app sends a "start session" command via Supabase Realtime
+2. CLI spawns a Claude Code process via the [Claude Agent SDK](https://docs.anthropic.com/en/docs/claude-code/sdk) (V2 Session API)
+3. Claude output is streamed to the mobile app through Supabase Realtime
+4. Input, slash commands, permission responses, and model switches from mobile are relayed back to Claude
+5. Sessions can be paused, resumed, or ended from either side
 
 ## Contributing
 
