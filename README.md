@@ -15,9 +15,13 @@ Monitor and send inputs to Claude Code terminal sessions in real-time from your 
 
 Running Claude Code on your workstation but need to step away? ClauTunnel lets you keep the conversation going from your phone. Whether you're reviewing a long-running code generation, approving permission prompts, or sending follow-up instructions — you stay in control without being tied to your desk.
 
-## Overview
+Claude Code CLI offers a built-in [`remote-control`](https://code.claude.com/docs/en/remote-control) command, but it has limitations that ClauTunnel addresses:
 
-ClauTunnel allows you to monitor and control Claude Code CLI sessions running on your computer from your iOS or Android device. See terminal output in real-time and send inputs remotely.
+- **Works with any plan** — Remote Control is only available on Pro and Max plans, not on Team or Enterprise. ClauTunnel works with any plan, including API key users, because it uses your own Supabase infrastructure.
+- **Multiple sessions across machines** — Remote Control supports only one session per instance. ClauTunnel lets you manage multiple sessions across multiple machines from a single mobile app.
+- **Resilient connections** — Remote Control terminates permanently after ~10 minutes of network loss. ClauTunnel sessions persist through Supabase and reconnect without losing context.
+- **Purpose-built mobile UI** — Remote Control uses the generic claude.ai web interface. ClauTunnel provides a native mobile experience with quick-access slash commands, image attachments from camera/gallery, and a model switcher.
+- **Self-hosted, zero vendor lock-in** — All Remote Control traffic routes through Anthropic's servers. ClauTunnel runs on your own Supabase instance.
 
 ## Screenshots
 
@@ -44,36 +48,6 @@ Chat with Claude Code in real-time from your mobile device, just like you would 
 <p align="center">
     <img src="docs/screenshots/chat.png" width="300" alt="Live chat" />
 </p>
-
-## ClauTunnel vs Claude CLI Remote Control
-
-Claude Code CLI offers a built-in [`remote-control`](https://code.claude.com/docs/en/remote-control) command. Here's why ClauTunnel exists as a separate solution:
-
-### Remote Control cannot be used on Team or Enterprise plans
-
-Remote Control is a **research preview** available only on Pro and Max plans.
-It is explicitly **not available on Team or Enterprise plans** — the exact tiers where organizations manage multiple developers.
-ClauTunnel works with **any plan**, including API key users, because it uses your own Supabase infrastructure.
-
-### One session per instance
-
-Remote Control supports **only one remote session per Claude Code instance**.
-ClauTunnel lets you manage **multiple sessions across multiple machines** from a single mobile app — ideal for developers running Claude Code on several workstations or servers.
-
-### 10-minute network timeout kills the session
-
-If your machine loses network connectivity for ~10 minutes, the Remote Control session **terminates permanently** and must be restarted from scratch.
-ClauTunnel sessions persist through Supabase and can **reconnect without losing context**.
-
-### No mobile-native experience
-
-Remote Control uses the generic claude.ai web interface or the Claude app, which are not optimized for controlling a CLI session on a small screen.
-ClauTunnel provides a **purpose-built mobile UI** with quick-access slash commands, image attachments from camera/gallery, and a model switcher — designed specifically for mobile-to-terminal workflows.
-
-### Self-hosted, zero vendor lock-in
-
-All Remote Control traffic routes through Anthropic's API servers.
-ClauTunnel runs on **your own Supabase instance** — your session data, auth, and relay infrastructure stay under your control.
 
 ## Getting Started
 
