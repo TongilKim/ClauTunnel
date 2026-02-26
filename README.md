@@ -80,7 +80,8 @@ ClauTunnel runs on **your own Supabase instance** — your session data, auth, a
 ### Prerequisites
 
 - Node.js 18+
-- pnpm 8+
+- [ngrok](https://ngrok.com) — used to tunnel the mobile app to your phone
+- git — used to auto-clone the mobile app on first run
 - Supabase account
 - [Expo Go](https://expo.dev/go) installed on your phone ([iOS](https://apps.apple.com/app/expo-go/id982107779) / [Android](https://play.google.com/store/apps/details?id=host.exp.exponent))
 
@@ -119,15 +120,26 @@ clautunnel signup   # new user
 clautunnel login    # existing user
 ```
 
-### 4. Start Listening
+### 4. Start ClauTunnel
 
 ```bash
 clautunnel start
 ```
 
+This command does everything automatically:
+
+1. Authenticates with Supabase using your stored credentials
+2. Registers your machine in the database
+3. Auto-clones the mobile app to `~/.clautunnel/repo/apps/mobile` (first run only)
+4. Starts an **ngrok tunnel** and **Expo dev server**
+5. Prints a **QR code** in your terminal
+
 ### 5. Connect Mobile App
 
-Open the ClauTunnel mobile app via Expo Go and connect to your session.
+1. Open **Expo Go** on your phone
+2. Scan the **QR code** shown in your terminal
+3. Log in with the same email and password you used in `clautunnel signup`
+4. Tap **"+ New Session"** on your machine to start chatting with Claude
 
 ## Tech Stack
 
@@ -211,20 +223,24 @@ pnpm --filter clautunnel-shared test
 │   Desktop    │ ◄──────────────────────────────► │   Mobile     │
 │              │   output, status, permissions    │              │
 │  clautunnel  │   input, commands, responses     │  Expo app    │
-│  start       │                                  │              │
-│      │       │                                  └──────────────┘
-│      ▼       │
+│  start       │                                  │  (via Expo   │
+│    │    │    │                                  │   Go + ngrok)│
+│    │    ▼    │                                  └──────────────┘
+│    │  Expo + │
+│    │  ngrok  │──── QR code ──── scan with phone
+│    ▼         │
 │  Claude Code │
 │  (Agent SDK) │
 └──────────────┘
 ```
 
-1. User runs `clautunnel start` — CLI registers the machine in Supabase and listens for mobile connections
-2. Mobile app connects and sends a "start session" command
-3. CLI spawns a Claude Code process via the [Claude Agent SDK](https://docs.anthropic.com/en/docs/claude-code/sdk) (V2 Session API)
-4. Claude output is streamed to the mobile app through Supabase Realtime
-5. Input, slash commands, permission responses, and model switches from mobile are relayed back to Claude
-6. Sessions can be paused, resumed, or ended from either side
+1. User runs `clautunnel start` — CLI registers the machine, auto-clones the mobile app, starts ngrok + Expo, and displays a QR code
+2. User scans the QR code with Expo Go — the mobile app loads with pre-configured Supabase credentials
+3. Mobile app sends a "start session" command via Supabase Realtime
+4. CLI spawns a Claude Code process via the [Claude Agent SDK](https://docs.anthropic.com/en/docs/claude-code/sdk) (V2 Session API)
+5. Claude output is streamed to the mobile app through Supabase Realtime
+6. Input, slash commands, permission responses, and model switches from mobile are relayed back to Claude
+7. Sessions can be paused, resumed, or ended from either side
 
 ## Contributing
 
