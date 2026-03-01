@@ -175,7 +175,10 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
         const lastSeq = historicalMessages[historicalMessages.length - 1].seq;
         // Initialize seq counter to continue from where historical messages left off
         seq = lastSeq;
-        set({ messages, lastSeq });
+        // If the last message is user input, Claude is likely still processing — show typing
+        const lastMsg = historicalMessages[historicalMessages.length - 1];
+        const isLikelyProcessing = lastMsg.type === 'input';
+        set({ messages, lastSeq, isTyping: isLikelyProcessing });
       } else {
         // Reset seq counter for new session with no history
         seq = 0;
@@ -195,7 +198,6 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
 
       outputChannel.on('broadcast', { event: 'output' }, (payload) => {
         const message = payload.payload as RealtimeMessage;
-
         // Handle request-queued - message was queued because Claude is still processing
         if (message.type === 'request-queued') {
           set({ isMessageQueued: true });
@@ -283,6 +285,15 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
               ),
             }));
           }
+          return;
+        }
+
+        // Handle status-response - restore processing state on reconnect
+        if (message.type === 'status-response') {
+          set({
+            isTyping: message.isProcessing ?? false,
+            isMessageQueued: message.isMessageQueued ?? false,
+          });
           return;
         }
 
