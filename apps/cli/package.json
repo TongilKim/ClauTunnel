@@ -1,6 +1,6 @@
 {
   "name": "@tongil_kim/clautunnel",
-  "version": "1.3.6",
+  "version": "1.4.0",
   "type": "module",
   "description": "Remote monitoring and control for Claude Code CLI",
   "author": "TongilKim",
