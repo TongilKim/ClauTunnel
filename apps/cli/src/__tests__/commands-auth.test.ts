@@ -44,10 +44,15 @@ const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
 // Mock @supabase/supabase-js
 const mockSetSession = vi.fn();
 const mockGetUser = vi.fn();
+const mockUnsubscribe = vi.fn();
+const mockOnAuthStateChange = vi.fn().mockReturnValue({
+  data: { subscription: { unsubscribe: mockUnsubscribe } },
+});
 const mockSupabaseClient = {
   auth: {
     setSession: mockSetSession,
     getUser: mockGetUser,
+    onAuthStateChange: mockOnAuthStateChange,
   },
   channel: vi.fn(() => ({
     on: vi.fn().mockReturnThis(),
@@ -124,7 +129,15 @@ describe('Command Authentication', () => {
       );
 
       // Mock successful session restoration
-      mockSetSession.mockResolvedValue({ error: null });
+      mockSetSession.mockResolvedValue({
+        data: {
+          session: {
+            access_token: 'test-access-token',
+            refresh_token: 'test-refresh-token',
+          },
+        },
+        error: null,
+      });
       mockGetUser.mockResolvedValue({
         data: { user: { id: 'user-123', email: 'test@example.com' } },
         error: null,
@@ -174,6 +187,7 @@ describe('Command Authentication', () => {
 
       // Mock session expiration
       mockSetSession.mockResolvedValue({
+        data: { session: null },
         error: { message: 'Invalid refresh token' },
       });
 
@@ -225,7 +239,15 @@ describe('Command Authentication', () => {
         })
       );
 
-      mockSetSession.mockResolvedValue({ error: null });
+      mockSetSession.mockResolvedValue({
+        data: {
+          session: {
+            access_token: 'valid-access-token',
+            refresh_token: 'valid-refresh-token',
+          },
+        },
+        error: null,
+      });
       mockGetUser.mockResolvedValue({
         data: { user: { id: 'user-123', email: 'test@example.com' } },
         error: null,

@@ -17,6 +17,7 @@ describe('restoreSession', () => {
 
     mockConfig = {
       getSessionTokens: vi.fn(),
+      setSessionTokens: vi.fn(),
       clearSessionTokens: vi.fn(),
     };
   });
@@ -36,6 +37,7 @@ describe('restoreSession', () => {
       refreshToken: 'expired-refresh',
     });
     mockSupabase.auth.setSession.mockResolvedValue({
+      data: { session: null },
       error: new Error('Session expired'),
     });
 
@@ -50,7 +52,15 @@ describe('restoreSession', () => {
       accessToken: 'valid-token',
       refreshToken: 'valid-refresh',
     });
-    mockSupabase.auth.setSession.mockResolvedValue({ error: null });
+    mockSupabase.auth.setSession.mockResolvedValue({
+      data: {
+        session: {
+          access_token: 'valid-token',
+          refresh_token: 'valid-refresh',
+        },
+      },
+      error: null,
+    });
     mockSupabase.auth.getUser.mockResolvedValue({
       data: { user: null },
       error: new Error('Auth error'),
@@ -68,7 +78,15 @@ describe('restoreSession', () => {
       accessToken: 'valid-token',
       refreshToken: 'valid-refresh',
     });
-    mockSupabase.auth.setSession.mockResolvedValue({ error: null });
+    mockSupabase.auth.setSession.mockResolvedValue({
+      data: {
+        session: {
+          access_token: 'valid-token',
+          refresh_token: 'valid-refresh',
+        },
+      },
+      error: null,
+    });
     mockSupabase.auth.getUser.mockResolvedValue({
       data: { user: mockUser },
       error: null,
@@ -81,5 +99,84 @@ describe('restoreSession', () => {
       access_token: 'valid-token',
       refresh_token: 'valid-refresh',
     });
+  });
+
+  it('should persist refreshed tokens when setSession returns different tokens', async () => {
+    const mockUser = { id: 'user-123', email: 'test@example.com' };
+
+    mockConfig.getSessionTokens.mockReturnValue({
+      accessToken: 'old-access',
+      refreshToken: 'old-refresh',
+    });
+    mockSupabase.auth.setSession.mockResolvedValue({
+      data: {
+        session: {
+          access_token: 'new-access',
+          refresh_token: 'new-refresh',
+        },
+      },
+      error: null,
+    });
+    mockSupabase.auth.getUser.mockResolvedValue({
+      data: { user: mockUser },
+      error: null,
+    });
+
+    const result = await restoreSession(mockSupabase, mockConfig);
+
+    expect(result).toEqual({ user: mockUser });
+    expect(mockConfig.setSessionTokens).toHaveBeenCalledWith({
+      accessToken: 'new-access',
+      refreshToken: 'new-refresh',
+    });
+  });
+
+  it('should NOT persist tokens when they are unchanged', async () => {
+    const mockUser = { id: 'user-123', email: 'test@example.com' };
+
+    mockConfig.getSessionTokens.mockReturnValue({
+      accessToken: 'same-token',
+      refreshToken: 'same-refresh',
+    });
+    mockSupabase.auth.setSession.mockResolvedValue({
+      data: {
+        session: {
+          access_token: 'same-token',
+          refresh_token: 'same-refresh',
+        },
+      },
+      error: null,
+    });
+    mockSupabase.auth.getUser.mockResolvedValue({
+      data: { user: mockUser },
+      error: null,
+    });
+
+    const result = await restoreSession(mockSupabase, mockConfig);
+
+    expect(result).toEqual({ user: mockUser });
+    expect(mockConfig.setSessionTokens).not.toHaveBeenCalled();
+  });
+
+  it('should NOT persist tokens when setSession returns no session data', async () => {
+    const mockUser = { id: 'user-123', email: 'test@example.com' };
+
+    mockConfig.getSessionTokens.mockReturnValue({
+      accessToken: 'valid-token',
+      refreshToken: 'valid-refresh',
+    });
+    mockSupabase.auth.setSession.mockResolvedValue({
+      data: { session: null },
+      error: null,
+    });
+    mockSupabase.auth.getUser.mockResolvedValue({
+      data: { user: mockUser },
+      error: null,
+    });
+
+    const result = await restoreSession(mockSupabase, mockConfig);
+
+    expect(result).toEqual({ user: mockUser });
+    expect(mockConfig.setSessionTokens).not.toHaveBeenCalled();
   });
 });

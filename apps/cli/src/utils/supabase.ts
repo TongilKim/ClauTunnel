@@ -23,6 +23,7 @@ export function createSupabaseClient(
 
 export interface SessionTokenStore {
   getSessionTokens(): { accessToken: string; refreshToken: string } | null;
+  setSessionTokens(tokens: { accessToken: string; refreshToken: string }): void;
   clearSessionTokens(): void;
 }
 
@@ -35,14 +36,30 @@ export async function restoreSession(
     return null;
   }
 
-  const { error: sessionError } = await supabase.auth.setSession({
-    access_token: sessionTokens.accessToken,
-    refresh_token: sessionTokens.refreshToken,
-  });
+  const { data: sessionData, error: sessionError } =
+    await supabase.auth.setSession({
+      access_token: sessionTokens.accessToken,
+      refresh_token: sessionTokens.refreshToken,
+    });
 
   if (sessionError) {
     config.clearSessionTokens();
     return null;
+  }
+
+  // Persist refreshed tokens if Supabase rotated them
+  if (sessionData?.session) {
+    const newAccess = sessionData.session.access_token;
+    const newRefresh = sessionData.session.refresh_token;
+    if (
+      newAccess !== sessionTokens.accessToken ||
+      newRefresh !== sessionTokens.refreshToken
+    ) {
+      config.setSessionTokens({
+        accessToken: newAccess,
+        refreshToken: newRefresh,
+      });
+    }
   }
 
   const {

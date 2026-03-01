@@ -75,6 +75,19 @@ export function createStartCommand(): Command {
         }
 
         const { user } = session;
+
+        // Persist tokens when Supabase auto-refreshes during long-running sessions
+        const {
+          data: { subscription: authSubscription },
+        } = supabase.auth.onAuthStateChange((event, authSession) => {
+          if (event === 'TOKEN_REFRESHED' && authSession) {
+            config.setSessionTokens({
+              accessToken: authSession.access_token,
+              refreshToken: authSession.refresh_token,
+            });
+          }
+        });
+
         spinner.update(`Authenticated as ${user.email}...`);
 
         // Check Full Disk Access (macOS only)
@@ -234,6 +247,7 @@ export function createStartCommand(): Command {
               await machineClient.disconnect();
               machineClient = null;
             }
+            authSubscription.unsubscribe();
             console.log('[Cleanup] All sessions ended in database');
             await cleanup();
           } catch (error) {
