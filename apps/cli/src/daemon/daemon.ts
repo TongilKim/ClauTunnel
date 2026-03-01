@@ -314,7 +314,8 @@ export class Daemon extends EventEmitter {
         return;
       }
 
-      // Handle status request - re-broadcast any pending question or permission
+      // Handle status request - re-broadcast any pending question or permission,
+      // then report current processing state so mobile can restore isTyping
       if (message.type === 'status-request') {
         if (this.realtimeClient) {
           try {
@@ -326,6 +327,13 @@ export class Daemon extends EventEmitter {
             if (pendingPermission) {
               await this.realtimeClient.broadcastPermissionRequest(pendingPermission);
             }
+
+            // Broadcast processing state last so it doesn't flash typing indicator
+            // before a pending question/permission modal appears
+            const isProcessing = this.sdkSession.isActive();
+            const isActivelyWorking = isProcessing && !pendingQuestion && !pendingPermission;
+            const isMessageQueued = this.sdkSession.hasPendingPrompt();
+            await this.realtimeClient.broadcastStatusResponse(isActivelyWorking, isMessageQueued);
           } catch {
             // Silently handle broadcast errors
           }

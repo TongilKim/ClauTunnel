@@ -646,6 +646,10 @@ export class SdkSession extends EventEmitter {
     return this.pendingPermissionData;
   }
 
+  hasPendingPrompt(): boolean {
+    return this.pendingPrompt !== null;
+  }
+
   async setModel(model: string): Promise<void> {
     if (model === this.currentModel) return;
 

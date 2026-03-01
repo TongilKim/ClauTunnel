@@ -1384,6 +1384,163 @@ describe('Daemon', () => {
       });
     });
 
+    it('should broadcast status-response with processing state on status-request', async () => {
+      let inputHandler: ((payload: any) => void) | null = null;
+
+      mockInputChannel.on = vi.fn((event, filter, handler) => {
+        if (event === 'broadcast' && filter.event === 'input') {
+          inputHandler = handler;
+        }
+        return mockInputChannel as RealtimeChannel;
+      });
+
+      daemon = new Daemon({
+        cwd: '/test',
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'session-789',
+      });
+
+      await daemon.start();
+
+      const sdkSession = (daemon as any).sdkSession;
+
+      // Simulate actively processing with no pending question/permission
+      vi.spyOn(sdkSession, 'isActive').mockReturnValue(true);
+      vi.spyOn(sdkSession, 'getPendingQuestionData').mockReturnValue(null);
+      vi.spyOn(sdkSession, 'getPendingPermissionData').mockReturnValue(null);
+      vi.spyOn(sdkSession, 'hasPendingPrompt').mockReturnValue(false);
+
+      const sendSpy = mockOutputChannel.send;
+
+      if (inputHandler) {
+        inputHandler({
+          payload: {
+            type: 'status-request',
+            timestamp: Date.now(),
+            seq: 1,
+          },
+        });
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      expect(sendSpy).toHaveBeenCalledWith({
+        type: 'broadcast',
+        event: 'output',
+        payload: expect.objectContaining({
+          type: 'status-response',
+          isProcessing: true,
+          isMessageQueued: false,
+        }),
+      });
+    });
+
+    it('should broadcast isProcessing=false when idle on status-request', async () => {
+      let inputHandler: ((payload: any) => void) | null = null;
+
+      mockInputChannel.on = vi.fn((event, filter, handler) => {
+        if (event === 'broadcast' && filter.event === 'input') {
+          inputHandler = handler;
+        }
+        return mockInputChannel as RealtimeChannel;
+      });
+
+      daemon = new Daemon({
+        cwd: '/test',
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'session-789',
+      });
+
+      await daemon.start();
+
+      const sdkSession = (daemon as any).sdkSession;
+
+      vi.spyOn(sdkSession, 'isActive').mockReturnValue(false);
+      vi.spyOn(sdkSession, 'getPendingQuestionData').mockReturnValue(null);
+      vi.spyOn(sdkSession, 'getPendingPermissionData').mockReturnValue(null);
+      vi.spyOn(sdkSession, 'hasPendingPrompt').mockReturnValue(false);
+
+      const sendSpy = mockOutputChannel.send;
+
+      if (inputHandler) {
+        inputHandler({
+          payload: {
+            type: 'status-request',
+            timestamp: Date.now(),
+            seq: 1,
+          },
+        });
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      expect(sendSpy).toHaveBeenCalledWith({
+        type: 'broadcast',
+        event: 'output',
+        payload: expect.objectContaining({
+          type: 'status-response',
+          isProcessing: false,
+          isMessageQueued: false,
+        }),
+      });
+    });
+
+    it('should not report isProcessing when blocked on pending question', async () => {
+      let inputHandler: ((payload: any) => void) | null = null;
+
+      mockInputChannel.on = vi.fn((event, filter, handler) => {
+        if (event === 'broadcast' && filter.event === 'input') {
+          inputHandler = handler;
+        }
+        return mockInputChannel as RealtimeChannel;
+      });
+
+      daemon = new Daemon({
+        cwd: '/test',
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'session-789',
+      });
+
+      await daemon.start();
+
+      const sdkSession = (daemon as any).sdkSession;
+
+      // Processing is true but there's a pending question — isActivelyWorking should be false
+      const mockQuestion = {
+        toolUseId: 'tool-123',
+        questions: [{ question: 'Pick?', header: 'Q', options: [{ label: 'A', description: 'opt' }] }],
+      };
+      vi.spyOn(sdkSession, 'isActive').mockReturnValue(true);
+      vi.spyOn(sdkSession, 'getPendingQuestionData').mockReturnValue(mockQuestion);
+      vi.spyOn(sdkSession, 'getPendingPermissionData').mockReturnValue(null);
+      vi.spyOn(sdkSession, 'hasPendingPrompt').mockReturnValue(false);
+
+      const sendSpy = mockOutputChannel.send;
+
+      if (inputHandler) {
+        inputHandler({
+          payload: {
+            type: 'status-request',
+            timestamp: Date.now(),
+            seq: 1,
+          },
+        });
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      // isProcessing should be false because the pending question takes priority
+      expect(sendSpy).toHaveBeenCalledWith({
+        type: 'broadcast',
+        event: 'output',
+        payload: expect.objectContaining({
+          type: 'status-response',
+          isProcessing: false,
+          isMessageQueued: false,
+        }),
+      });
+    });
+
     it('should handle broadcast errors silently when queuing requests', async () => {
       // Mock output channel to throw error
       mockOutputChannel.send = vi.fn().mockRejectedValue(new Error('Broadcast failed'));

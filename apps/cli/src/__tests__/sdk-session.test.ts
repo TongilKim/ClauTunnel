@@ -634,6 +634,69 @@ describe('SdkSession', () => {
       expect(queuedHandler).not.toHaveBeenCalled();
     });
 
+    it('should report hasPendingPrompt as false initially', () => {
+      expect(sdkSession.hasPendingPrompt()).toBe(false);
+    });
+
+    it('should report hasPendingPrompt as true when a message is queued', async () => {
+      let resolveStream: (() => void) | null = null;
+      const slowSession = {
+        get sessionId() { return 'slow-session'; },
+        send: vi.fn().mockResolvedValue(undefined),
+        stream: async function* () {
+          yield { type: 'system', subtype: 'init', session_id: 'slow-session' };
+          await new Promise<void>(r => { resolveStream = r; });
+          yield { type: 'result', subtype: 'success', result: 'done' };
+        },
+        close: vi.fn(),
+        [Symbol.asyncDispose]: async () => {},
+      };
+      mockedCreateSession.mockReturnValue(slowSession as any);
+
+      const firstPromise = sdkSession.sendPrompt('First');
+      await tick();
+
+      // Queue a second message while processing
+      await sdkSession.sendPrompt('Second');
+
+      expect(sdkSession.hasPendingPrompt()).toBe(true);
+
+      // Clean up
+      if (resolveStream) resolveStream();
+      await firstPromise;
+      await tick();
+    });
+
+    it('should report hasPendingPrompt as false after queued message is consumed', async () => {
+      let resolveStream: (() => void) | null = null;
+      const slowSession = {
+        get sessionId() { return 'slow-session'; },
+        send: vi.fn().mockResolvedValue(undefined),
+        stream: async function* () {
+          yield { type: 'system', subtype: 'init', session_id: 'slow-session' };
+          await new Promise<void>(r => { resolveStream = r; });
+          yield { type: 'result', subtype: 'success', result: 'done' };
+        },
+        close: vi.fn(),
+        [Symbol.asyncDispose]: async () => {},
+      };
+      mockedCreateSession.mockReturnValue(slowSession as any);
+
+      const firstPromise = sdkSession.sendPrompt('First');
+      await tick();
+
+      await sdkSession.sendPrompt('Second');
+      expect(sdkSession.hasPendingPrompt()).toBe(true);
+
+      // Complete first request — queued message should be consumed
+      if (resolveStream) resolveStream();
+      await firstPromise;
+      await tick();
+      await tick();
+
+      expect(sdkSession.hasPendingPrompt()).toBe(false);
+    });
+
     it('should suppress complete event when queued message exists', async () => {
       let resolveStream: (() => void) | null = null;
       const slowSession = {

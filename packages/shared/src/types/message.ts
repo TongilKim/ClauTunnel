@@ -45,6 +45,7 @@ export type RealtimeMessageType =
   | 'permission-response' // User's response to permission request
   | 'request-queued' // Message was queued because Claude is still processing
   | 'status-request' // Mobile requests current pending state (question/permission)
+  | 'status-response' // CLI responds with current processing state
   | 'session-title' // Session title was auto-generated from first user message
   | 'tool-use' // Tool use data for displaying diffs (Edit, Write, etc.)
   | 'complete'; // Claude has finished responding (query complete)
@@ -114,6 +115,8 @@ export interface RealtimeMessage {
   permissionRequest?: PermissionRequestData; // For permission-request type
   permissionResponse?: PermissionResponseData; // For permission-response type
   errorCode?: string; // For error type messages (e.g., 'timeout')
+  isProcessing?: boolean; // For status-response: whether Claude is actively working
+  isMessageQueued?: boolean; // For status-response: whether a queued message is pending
   toolUseData?: ToolUseData; // For tool-use type messages (diffs, file operations)
   timestamp: number;
   seq: number;

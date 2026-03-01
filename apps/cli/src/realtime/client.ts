@@ -481,6 +481,32 @@ export class RealtimeClient extends EventEmitter {
     this.emit('broadcast', message);
   }
 
+  async broadcastStatusResponse(isProcessing: boolean, isMessageQueued: boolean): Promise<void> {
+    if (!this.outputChannel) {
+      throw new Error('Not connected');
+    }
+
+    if (!this.realtimeEnabled) {
+      return;
+    }
+
+    const message: RealtimeMessage = {
+      type: 'status-response',
+      isProcessing,
+      isMessageQueued,
+      timestamp: Date.now(),
+      seq: ++this.seq,
+    };
+
+    await this.outputChannel.send({
+      type: 'broadcast',
+      event: 'output',
+      payload: message,
+    });
+
+    this.emit('broadcast', message);
+  }
+
   async broadcastComplete(): Promise<void> {
     if (!this.outputChannel) {
       throw new Error('Not connected');

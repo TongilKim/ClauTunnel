@@ -615,6 +615,50 @@ describe('RealtimeClient', () => {
     });
   });
 
+  describe('broadcastStatusResponse', () => {
+    it('should send message with type status-response', async () => {
+      const client = new RealtimeClient({
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      await client.connect();
+      await client.broadcastStatusResponse(true, false);
+
+      expect(mockOutputChannel.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'broadcast',
+          event: 'output',
+          payload: expect.objectContaining({
+            type: 'status-response',
+            isProcessing: true,
+            isMessageQueued: false,
+          }),
+        })
+      );
+    });
+
+    it('should include both processing and queued flags', async () => {
+      const client = new RealtimeClient({
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      await client.connect();
+      await client.broadcastStatusResponse(false, true);
+
+      expect(mockOutputChannel.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payload: expect.objectContaining({
+            type: 'status-response',
+            isProcessing: false,
+            isMessageQueued: true,
+          }),
+        })
+      );
+    });
+  });
+
   describe('broadcastSystem', () => {
     it('should send message with type system', async () => {
       const client = new RealtimeClient({
