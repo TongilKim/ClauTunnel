@@ -298,6 +298,29 @@ export class SdkSession extends EventEmitter {
   }
 
   /**
+   * Clear session state and retry the saved resume prompt with a fresh session.
+   * Returns the saved prompt if a retry should happen, or null if not applicable.
+   */
+  private consumeResumeAttempt(): { prompt: string; attachments?: ImageAttachment[] } | null {
+    const savedPrompt = this.resumeAttemptPrompt;
+    if (!savedPrompt) return null;
+
+    this.resumeAttemptPrompt = null;
+    this.v2Session = null;
+    this.sessionId = null;
+    this.streamLoopRunning = false;
+    this.isProcessing = false;
+
+    // Remove the duplicate user history entry pushed by sendPrompt
+    if (this.conversationHistory.length > 0 && this.conversationHistory[this.conversationHistory.length - 1].role === 'user') {
+      this.conversationHistory.pop();
+    }
+
+    this.emit('resume-failed');
+    return savedPrompt;
+  }
+
+  /**
    * Background loop that processes messages from the V2 session stream.
    * Runs continuously for the lifetime of the session.
    */
@@ -315,23 +338,16 @@ export class SdkSession extends EventEmitter {
         }
       }
     } catch (error) {
-      // Resume failed in the stream — retry with a fresh session
-      const savedPrompt = this.resumeAttemptPrompt;
-      if (savedPrompt && (error as Error).name !== 'AbortError') {
-        this.resumeAttemptPrompt = null;
-        this.v2Session = null;
-        this.sessionId = null;
-        this.streamLoopRunning = false;
-        this.isProcessing = false;
-        retrying = true;
-        // Remove the duplicate user history entry pushed by sendPrompt
-        if (this.conversationHistory.length > 0 && this.conversationHistory[this.conversationHistory.length - 1].role === 'user') {
-          this.conversationHistory.pop();
+      if ((error as Error).name !== 'AbortError') {
+        const savedPrompt = this.consumeResumeAttempt();
+        if (savedPrompt) {
+          retrying = true;
+          this.sendPrompt(savedPrompt.prompt, savedPrompt.attachments).catch((retryErr) => {
+            this.emit('error', retryErr);
+          });
+        } else {
+          this.emit('error', error);
         }
-        this.emit('resume-failed');
-        this.sendPrompt(savedPrompt.prompt, savedPrompt.attachments);
-      } else if ((error as Error).name !== 'AbortError') {
-        this.emit('error', error);
       }
     } finally {
       this.streamLoopRunning = false;
@@ -536,21 +552,12 @@ export class SdkSession extends EventEmitter {
 
       await session.send(userMessage);
     } catch (error) {
-      // Resume failed — retry with a fresh session
-      const savedPrompt = this.resumeAttemptPrompt;
-      if (savedPrompt && (error as Error).name !== 'AbortError') {
-        this.resumeAttemptPrompt = null;
-        this.v2Session = null;
-        this.sessionId = null;
-        this.streamLoopRunning = false;
-        this.isProcessing = false;
-        // Remove the duplicate user history entry pushed at the top of sendPrompt
-        if (this.conversationHistory.length > 0 && this.conversationHistory[this.conversationHistory.length - 1].role === 'user') {
-          this.conversationHistory.pop();
+      if ((error as Error).name !== 'AbortError') {
+        const savedPrompt = this.consumeResumeAttempt();
+        if (savedPrompt) {
+          await this.sendPrompt(savedPrompt.prompt, savedPrompt.attachments);
+          return;
         }
-        this.emit('resume-failed');
-        await this.sendPrompt(savedPrompt.prompt, savedPrompt.attachments);
-        return;
       }
 
       if ((error as Error).name === 'AbortError') {
