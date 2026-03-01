@@ -58,6 +58,8 @@ export class SdkSession extends EventEmitter {
   private currentAssistantResponse: string = '';
   // Queued prompt to send after current processing completes (last-one-wins)
   private pendingPrompt: { prompt: string; attachments?: ImageAttachment[] } | null = null;
+  // Tracks prompt during a resume attempt — used to auto-retry with a fresh session on failure
+  private resumeAttemptPrompt: { prompt: string; attachments?: ImageAttachment[] } | null = null;
 
   constructor(options: SdkSessionOptions) {
     super();
@@ -296,6 +298,29 @@ export class SdkSession extends EventEmitter {
   }
 
   /**
+   * Clear session state and retry the saved resume prompt with a fresh session.
+   * Returns the saved prompt if a retry should happen, or null if not applicable.
+   */
+  private consumeResumeAttempt(): { prompt: string; attachments?: ImageAttachment[] } | null {
+    const savedPrompt = this.resumeAttemptPrompt;
+    if (!savedPrompt) return null;
+
+    this.resumeAttemptPrompt = null;
+    this.v2Session = null;
+    this.sessionId = null;
+    this.streamLoopRunning = false;
+    this.isProcessing = false;
+
+    // Remove the duplicate user history entry pushed by sendPrompt
+    if (this.conversationHistory.length > 0 && this.conversationHistory[this.conversationHistory.length - 1].role === 'user') {
+      this.conversationHistory.pop();
+    }
+
+    this.emit('resume-failed');
+    return savedPrompt;
+  }
+
+  /**
    * Background loop that processes messages from the V2 session stream.
    * Runs continuously for the lifetime of the session.
    */
@@ -303,6 +328,7 @@ export class SdkSession extends EventEmitter {
     if (this.streamLoopRunning || !this.v2Session) return;
     this.streamLoopRunning = true;
 
+    let retrying = false;
     try {
       // The V2 stream() returns after each 'result' message.
       // For multi-turn sessions, we need to call stream() again after each result.
@@ -313,14 +339,23 @@ export class SdkSession extends EventEmitter {
       }
     } catch (error) {
       if ((error as Error).name !== 'AbortError') {
-        this.emit('error', error);
+        const savedPrompt = this.consumeResumeAttempt();
+        if (savedPrompt) {
+          retrying = true;
+          this.sendPrompt(savedPrompt.prompt, savedPrompt.attachments).catch((retryErr) => {
+            this.emit('error', retryErr);
+          });
+        } else {
+          this.emit('error', error);
+        }
       }
     } finally {
       this.streamLoopRunning = false;
       // If the stream loop exits without a 'result' message (e.g. unexpected
       // disconnect or error), ensure isProcessing is reset so subsequent
       // requests are not permanently blocked.
-      if (this.isProcessing) {
+      // Skip cleanup if we're retrying with a fresh session.
+      if (this.isProcessing && !retrying) {
         this.isProcessing = false;
         this.pendingPrompt = null;
         this.emit('complete');
@@ -334,6 +369,9 @@ export class SdkSession extends EventEmitter {
   private processMessage(message: SDKMessage): void {
     // Handle different message types
     if (message.type === 'system' && 'subtype' in message && message.subtype === 'init') {
+      // Resume succeeded — clear the tracking flag
+      this.resumeAttemptPrompt = null;
+
       // Capture session ID for resuming
       this.sessionId = message.session_id;
       this.emit('session-started', this.sessionId);
@@ -455,6 +493,11 @@ export class SdkSession extends EventEmitter {
     }
 
     try {
+      // Track resume attempt: if sessionId is set but no live session, we're about to resume
+      if (this.sessionId && !this.v2Session) {
+        this.resumeAttemptPrompt = { prompt, attachments };
+      }
+
       // Build the prompt text, including context if transferring to new session
       let finalPrompt = prompt;
       if (this.pendingContextTransfer && this.conversationHistory.length > 1) {
@@ -509,6 +552,14 @@ export class SdkSession extends EventEmitter {
 
       await session.send(userMessage);
     } catch (error) {
+      if ((error as Error).name !== 'AbortError') {
+        const savedPrompt = this.consumeResumeAttempt();
+        if (savedPrompt) {
+          await this.sendPrompt(savedPrompt.prompt, savedPrompt.attachments);
+          return;
+        }
+      }
+
       if ((error as Error).name === 'AbortError') {
         this.emit('output', '\n[Cancelled]\n');
       } else {

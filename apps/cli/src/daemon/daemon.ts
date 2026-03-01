@@ -110,6 +110,21 @@ export class Daemon extends EventEmitter {
       await this.broadcastCommands();
     });
 
+    // Resume failed — notify mobile that we're falling back to a new session
+    this.sdkSession.on('resume-failed', async () => {
+      const msg = '[Could not resume previous session. Starting a new session instead.]';
+      if (this.options.hybrid !== false) {
+        process.stdout.write(`\n${msg}\n`);
+      }
+      if (this.realtimeClient) {
+        try {
+          await this.realtimeClient.broadcastSystem(msg);
+        } catch {
+          // Silently handle broadcast errors
+        }
+      }
+    });
+
     // Save SDK session ID to Supabase for resume functionality
     this.sdkSession.on('session-started', async (sdkSessionId: string) => {
       if (!this.session) return;

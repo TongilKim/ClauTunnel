@@ -1311,4 +1311,181 @@ describe('SdkSession', () => {
       expect(toolUseHandler).not.toHaveBeenCalled();
     });
   });
+
+  describe('resume fallback', () => {
+    it('should fall back to createSession when resumeSession stream fails', async () => {
+      // Simulate a resumed session that fails in the stream
+      const failingSession = {
+        closed: false,
+        get sessionId() { return 'dead-session'; },
+        send: vi.fn().mockResolvedValue(undefined),
+        stream: async function* () {
+          throw new Error('process exited with code 1');
+        },
+        close: vi.fn(() => { failingSession.closed = true; }),
+        [Symbol.asyncDispose]: async () => {},
+      };
+      mockedResumeSession.mockReturnValue(failingSession as any);
+
+      // Set up a fresh session for the fallback
+      const freshSession = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'fresh-session-id' },
+        { type: 'result', subtype: 'success', result: 'done' },
+      ]);
+      mockedCreateSession.mockReturnValue(freshSession as any);
+
+      const resumeFailedHandler = vi.fn();
+      sdkSession.on('resume-failed', resumeFailedHandler);
+
+      // Resume and send prompt
+      sdkSession.resumeSession('dead-session');
+      await sdkSession.sendPrompt('Hello');
+      // Stream error and fallback sendPrompt happen asynchronously
+      await tick();
+      await tick();
+      await tick();
+      await tick();
+
+      // Should have emitted resume-failed
+      expect(resumeFailedHandler).toHaveBeenCalled();
+
+      // Should have fallen back to createSession
+      expect(mockedCreateSession).toHaveBeenCalled();
+
+      // New session should be active
+      expect(sdkSession.getSessionId()).toBe('fresh-session-id');
+    });
+
+    it('should fall back to createSession when resumeSession send fails', async () => {
+      // Simulate a resumed session where send() throws
+      const failingSession = {
+        closed: false,
+        get sessionId() { return 'dead-session'; },
+        send: vi.fn().mockRejectedValue(new Error('process exited with code 1')),
+        stream: async function* () {
+          await new Promise(() => {}); // block forever
+        },
+        close: vi.fn(() => { failingSession.closed = true; }),
+        [Symbol.asyncDispose]: async () => {},
+      };
+      mockedResumeSession.mockReturnValue(failingSession as any);
+
+      // Set up a fresh session for the fallback
+      const freshSession = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'fresh-session-2' },
+        { type: 'result', subtype: 'success', result: 'done' },
+      ]);
+      mockedCreateSession.mockReturnValue(freshSession as any);
+
+      const resumeFailedHandler = vi.fn();
+      sdkSession.on('resume-failed', resumeFailedHandler);
+
+      sdkSession.resumeSession('dead-session');
+      await sdkSession.sendPrompt('Hello');
+      await tick();
+
+      expect(resumeFailedHandler).toHaveBeenCalled();
+      expect(mockedCreateSession).toHaveBeenCalled();
+      expect(sdkSession.getSessionId()).toBe('fresh-session-2');
+    });
+
+    it('should retry the original prompt with the new session', async () => {
+      const failingSession = {
+        closed: false,
+        get sessionId() { return 'dead-session'; },
+        send: vi.fn().mockResolvedValue(undefined),
+        stream: async function* () {
+          throw new Error('process exited with code 1');
+        },
+        close: vi.fn(() => { failingSession.closed = true; }),
+        [Symbol.asyncDispose]: async () => {},
+      };
+      mockedResumeSession.mockReturnValue(failingSession as any);
+
+      const freshSession = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'fresh-session-id' },
+        { type: 'result', subtype: 'success', result: 'done' },
+      ]);
+      mockedCreateSession.mockReturnValue(freshSession as any);
+
+      sdkSession.resumeSession('dead-session');
+      await sdkSession.sendPrompt('My original prompt');
+      await tick();
+      await tick();
+
+      // The fresh session should have received the original prompt via send()
+      expect(freshSession._sendMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'user',
+          message: expect.objectContaining({
+            content: expect.arrayContaining([
+              expect.objectContaining({ type: 'text', text: 'My original prompt' }),
+            ]),
+          }),
+        })
+      );
+    });
+
+    it('should not retry infinitely — second failure goes through normal error path', async () => {
+      const failingSession1 = {
+        closed: false,
+        get sessionId() { return 'dead-session'; },
+        send: vi.fn().mockResolvedValue(undefined),
+        stream: async function* () {
+          throw new Error('process exited with code 1');
+        },
+        close: vi.fn(() => { failingSession1.closed = true; }),
+        [Symbol.asyncDispose]: async () => {},
+      };
+      mockedResumeSession.mockReturnValue(failingSession1 as any);
+
+      // The fallback session also fails
+      const failingSession2 = {
+        closed: false,
+        get sessionId() { return 'also-broken'; },
+        send: vi.fn().mockRejectedValue(new Error('second failure')),
+        stream: async function* () {
+          await new Promise(() => {}); // block
+        },
+        close: vi.fn(() => { failingSession2.closed = true; }),
+        [Symbol.asyncDispose]: async () => {},
+      };
+      mockedCreateSession.mockReturnValue(failingSession2 as any);
+
+      const errorHandler = vi.fn();
+      const resumeFailedHandler = vi.fn();
+      sdkSession.on('error', errorHandler);
+      sdkSession.on('resume-failed', resumeFailedHandler);
+
+      sdkSession.resumeSession('dead-session');
+      await sdkSession.sendPrompt('Hello');
+      await tick();
+      await tick();
+
+      // Resume-failed fires once (from first failure)
+      expect(resumeFailedHandler).toHaveBeenCalledTimes(1);
+
+      // Second failure goes through normal error path
+      expect(errorHandler).toHaveBeenCalled();
+    });
+
+    it('should not trigger fallback on successful resume', async () => {
+      const successSession = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'resumed-ok' },
+        { type: 'result', subtype: 'success', result: 'done' },
+      ]);
+      mockedResumeSession.mockReturnValue(successSession as any);
+
+      const resumeFailedHandler = vi.fn();
+      sdkSession.on('resume-failed', resumeFailedHandler);
+
+      sdkSession.resumeSession('resumed-ok');
+      await sdkSession.sendPrompt('Hello');
+      await tick();
+
+      expect(resumeFailedHandler).not.toHaveBeenCalled();
+      expect(mockedCreateSession).not.toHaveBeenCalled();
+      expect(sdkSession.getSessionId()).toBe('resumed-ok');
+    });
+  });
 });
