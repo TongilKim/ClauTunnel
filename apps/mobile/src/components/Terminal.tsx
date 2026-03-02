@@ -984,6 +984,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 10,
+    flexShrink: 1,
+    overflow: 'hidden',
   },
   bubbleUser: {
     backgroundColor: '#3b82f6',
