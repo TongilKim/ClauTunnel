@@ -511,6 +511,9 @@ function ClaudeMessage({ content, isDark }: ClaudeMessageProps) {
     paragraph: {
       marginTop: 0,
       marginBottom: 8,
+      flexWrap: 'wrap',
+      flexDirection: 'row',
+      width: 'auto',
     },
     heading1: {
       color: isDark ? '#ffffff' : '#111827',
@@ -964,7 +967,6 @@ const styles = StyleSheet.create({
   bubbleContainer: {
     maxWidth: '75%',
     flexShrink: 1,
-    flexGrow: 1,
   },
   bubbleContainerUser: {
     alignItems: 'flex-end',
