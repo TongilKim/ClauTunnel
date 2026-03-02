@@ -511,9 +511,6 @@ function ClaudeMessage({ content, isDark }: ClaudeMessageProps) {
     paragraph: {
       marginTop: 0,
       marginBottom: 8,
-      flexWrap: 'wrap',
-      flexDirection: 'row',
-      width: 'auto',
     },
     heading1: {
       color: isDark ? '#ffffff' : '#111827',
@@ -967,6 +964,7 @@ const styles = StyleSheet.create({
   bubbleContainer: {
     maxWidth: '75%',
     flexShrink: 1,
+    flexGrow: 1,
   },
   bubbleContainerUser: {
     alignItems: 'flex-end',
@@ -986,8 +984,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    flexShrink: 1,
-    overflow: 'hidden',
   },
   bubbleUser: {
     backgroundColor: '#3b82f6',
