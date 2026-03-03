@@ -1,59 +1,83 @@
 {
-  "name": "@tongil_kim/clautunnel",
-  "version": "1.4.0",
-  "type": "module",
-  "description": "Remote monitoring and control for Claude Code CLI",
-  "author": "TongilKim",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/TongilKim/clautunnel.git",
-    "directory": "apps/cli"
-  },
-  "homepage": "https://github.com/TongilKim/clautunnel#readme",
-  "keywords": [
-    "claude",
-    "claude-code",
-    "cli",
-    "remote",
-    "monitoring",
-    "terminal"
-  ],
-  "publishConfig": {
-    "access": "public"
-  },
-  "files": [
-    "dist",
-    "bin"
-  ],
-  "bin": {
-    "clautunnel": "./bin/clautunnel"
-  },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "scripts": {
-    "build": "tsup",
-    "start": "tsup && node dist/index.js start",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "clean": "rm -rf dist"
-  },
-  "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.37",
-    "@supabase/supabase-js": "^2.39.0",
-    "commander": "^11.1.0",
-    "dotenv": "^17.2.3",
-    "qrcode-terminal": "^0.12.0",
-    "uuid": "^13.0.0",
-    "ws": "^8.19.0"
-  },
-  "devDependencies": {
-    "@types/node": "^20.10.0",
-    "@types/uuid": "^11.0.0",
-    "@types/ws": "^8.18.1",
-    "clautunnel-shared": "workspace:*",
-    "tsup": "^8.5.1",
-    "typescript": "^5.3.3",
-    "vitest": "^1.2.0"
-  }
+    "name": "@tongil_kim/clautunnel",
+    "version": "1.4.0",
+    "type": "module",
+    "description": "Remote monitoring and control tool for Claude Code CLI — stream terminal output, send input, and receive push notifications from your mobile device via iOS & Android",
+    "author": {
+          "name": "Tongil Kim",
+          "url": "https://github.com/TongilKim"
+    },
+    "license": "MIT",
+    "repository": {
+          "type": "git",
+          "url": "git+https://github.com/TongilKim/clautunnel.git",
+          "directory": "apps/cli"
+    },
+    "homepage": "https://github.com/TongilKim/clautunnel#readme",
+    "bugs": {
+          "url": "https://github.com/TongilKim/clautunnel/issues"
+    },
+    "keywords": [
+          "claude",
+          "claude-code",
+          "cli",
+          "remote",
+          "monitoring",
+          "terminal",
+          "mobile",
+          "push-notifications",
+          "real-time",
+          "streaming",
+          "daemon",
+          "anthropic",
+          "ai",
+          "developer-tools",
+          "devtools",
+          "tunnel",
+          "remote-control",
+          "supabase",
+          "react-native",
+          "ios",
+          "android"
+    ],
+    "engines": {
+          "node": ">=18.0.0"
+    },
+    "publishConfig": {
+          "access": "public"
+    },
+    "files": [
+          "dist",
+          "bin"
+    ],
+    "bin": {
+          "clautunnel": "./bin/clautunnel"
+    },
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "scripts": {
+          "build": "tsup",
+          "start": "tsup && node dist/index.js start",
+          "test": "vitest run",
+          "test:watch": "vitest",
+          "clean": "rm -rf dist"
+    },
+    "dependencies": {
+          "@anthropic-ai/claude-agent-sdk": "^0.2.37",
+          "@supabase/supabase-js": "^2.39.0",
+          "commander": "^11.1.0",
+          "dotenv": "^17.2.3",
+          "qrcode-terminal": "^0.12.0",
+          "uuid": "^13.0.0",
+          "ws": "^8.19.0"
+    },
+    "devDependencies": {
+          "@types/node": "^20.10.0",
+          "@types/uuid": "^11.0.0",
+          "@types/ws": "^8.18.1",
+          "clautunnel-shared": "workspace:*",
+          "tsup": "^8.5.1",
+          "typescript": "^5.3.3",
+          "vitest": "^1.2.0"
+    }
 }
