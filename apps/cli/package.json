@@ -1,6 +1,6 @@
 {
     "name": "@tongil_kim/clautunnel",
-    "version": "1.4.1",
+    "version": "1.5.0",
     "type": "module",
     "description": "Remote monitoring and control tool for Claude Code CLI — stream terminal output, send input, and receive push notifications from your mobile device via iOS & Android",
     "author": {
