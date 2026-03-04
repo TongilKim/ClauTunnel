@@ -21,6 +21,8 @@ import { useSessionStore } from './sessionStore';
 
 type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
 
+const PAGE_SIZE = 50;
+
 /** Parse a database message row into a RealtimeMessage, hydrating toolUseData for tool-use types */
 function parseDbMessage(msg: { type: string; content: string; created_at: string; seq: number }): RealtimeMessage {
   const base: RealtimeMessage = {
@@ -93,6 +95,12 @@ interface ConnectionStoreState {
   sendPermissionResponse: (behavior: 'allow' | 'deny', message?: string) => Promise<void>;
   clearPendingPermissionRequest: () => void;
 
+  // Pagination
+  hasMoreMessages: boolean;
+  isLoadingMore: boolean;
+  oldestLoadedSeq: number | null;
+  fetchOlderMessages: () => Promise<void>;
+
   // Scroll callback for chat UI
   registerScrollToBottom: (callback: () => void) => void;
   scrollToBottom: () => void;
@@ -122,6 +130,9 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
   interactiveError: null,
   pendingQuestion: null,
   pendingPermissionRequest: null,
+  hasMoreMessages: true,
+  isLoadingMore: false,
+  oldestLoadedSeq: null,
 
   connect: async (sessionId: string) => {
     try {
@@ -145,6 +156,9 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
         interactiveError: null,
         pendingQuestion: null,
         pendingPermissionRequest: null,
+        hasMoreMessages: true,
+        isLoadingMore: false,
+        oldestLoadedSeq: null,
       });
 
       // First check if the session is still active
@@ -163,25 +177,36 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
         return;
       }
 
-      // Fetch message history from database
+      // Fetch most recent PAGE_SIZE messages (descending to get latest, then reverse)
       const { data: historicalMessages, error: messagesError } = await supabase
         .from('messages')
         .select('*')
         .eq('session_id', sessionId)
-        .order('seq', { ascending: true });
+        .order('seq', { ascending: false })
+        .limit(PAGE_SIZE);
 
       if (!messagesError && historicalMessages && historicalMessages.length > 0) {
+        // Reverse back to chronological order
+        historicalMessages.reverse();
         const messages: RealtimeMessage[] = historicalMessages.map(parseDbMessage);
         const lastSeq = historicalMessages[historicalMessages.length - 1].seq;
+        const oldestLoadedSeq = historicalMessages[0].seq;
         // Initialize seq counter to continue from where historical messages left off
         seq = lastSeq;
         // If the last message is user input, Claude is likely still processing — show typing
         const lastMsg = historicalMessages[historicalMessages.length - 1];
         const isLikelyProcessing = lastMsg.type === 'input';
-        set({ messages, lastSeq, isTyping: isLikelyProcessing });
+        set({
+          messages,
+          lastSeq,
+          isTyping: isLikelyProcessing,
+          oldestLoadedSeq,
+          hasMoreMessages: historicalMessages.length === PAGE_SIZE,
+        });
       } else {
         // Reset seq counter for new session with no history
         seq = 0;
+        set({ hasMoreMessages: false, oldestLoadedSeq: null });
       }
 
       // Clean up existing channels
@@ -443,7 +468,53 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
   },
 
   clearMessages: () => {
-    set({ messages: [], lastSeq: 0 });
+    set({ messages: [], lastSeq: 0, hasMoreMessages: true, isLoadingMore: false, oldestLoadedSeq: null });
+  },
+
+  fetchOlderMessages: async () => {
+    const { sessionId, isLoadingMore, hasMoreMessages, oldestLoadedSeq } = get();
+
+    if (isLoadingMore || !hasMoreMessages || !sessionId || !oldestLoadedSeq) {
+      return;
+    }
+
+    set({ isLoadingMore: true });
+
+    try {
+      const { data: olderMessages, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('session_id', sessionId)
+        .lt('seq', oldestLoadedSeq)
+        .order('seq', { ascending: false })
+        .limit(PAGE_SIZE);
+
+      if (error) {
+        console.warn('[connectionStore] Failed to fetch older messages:', error);
+        set({ isLoadingMore: false });
+        return;
+      }
+
+      if (!olderMessages || olderMessages.length === 0) {
+        set({ isLoadingMore: false, hasMoreMessages: false });
+        return;
+      }
+
+      // Reverse to chronological order
+      olderMessages.reverse();
+      const parsedMessages: RealtimeMessage[] = olderMessages.map(parseDbMessage);
+      const newOldestSeq = olderMessages[0].seq;
+
+      set((state) => ({
+        messages: [...parsedMessages, ...state.messages],
+        isLoadingMore: false,
+        oldestLoadedSeq: newOldestSeq,
+        hasMoreMessages: olderMessages.length === PAGE_SIZE,
+      }));
+    } catch (err) {
+      console.warn('[connectionStore] Error fetching older messages:', err);
+      set({ isLoadingMore: false });
+    }
   },
 
   sendCancelRequest: async () => {

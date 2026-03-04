@@ -21,15 +21,13 @@ import { useSessionStore } from '../stores/sessionStore';
 import type { RealtimeMessage, ToolUseData, ToolUseEditData, ToolUseWriteData, ToolUseGenericData } from 'clautunnel-shared';
 import { parseToolUsage, shortenPath } from '../utils/terminalUtils';
 
-interface TerminalProps {
-  maxLines?: number;
-}
-
 interface GroupedMessage {
   type: 'input' | 'output' | 'system' | 'tool-use';
   content: string;
   timestamp: number;
   toolUseData?: ToolUseData;
+  /** Stable key derived from the first message's seq in the group */
+  key: string;
 }
 
 // Avatar components using text-based icons
@@ -65,20 +63,44 @@ function ToolBadge({ toolName, isDark }: { toolName: string; isDark: boolean }) 
   );
 }
 
-export function Terminal({ maxLines = 1000 }: TerminalProps) {
+export function Terminal() {
   const scrollViewRef = useRef<ScrollView>(null);
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
-  const { messages, state, isTyping, isMessageQueued, sessionId, registerScrollToBottom } = useConnectionStore();
+  const {
+    messages, state, isTyping, isMessageQueued, sessionId,
+    registerScrollToBottom, fetchOlderMessages, isLoadingMore, hasMoreMessages,
+  } = useConnectionStore();
   const { sessionOnlineStatus } = useSessionStore();
   const isCliOnline = sessionId ? (sessionOnlineStatus[sessionId] ?? null) : null;
 
+  const hasInitiallyScrolled = useRef(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const prevLastSeqRef = useRef<number>(0);
+
+  // Pagination scroll fix: save scroll state BEFORE fetch, adjust AFTER render
+  const preFetchState = useRef<{ baseOffset: number; baseHeight: number } | null>(null);
+  const isLoadingMoreRef = useRef(false);
+
+  // Sync isLoadingMoreRef with store state
+  useEffect(() => {
+    isLoadingMoreRef.current = isLoadingMore;
+  }, [isLoadingMore]);
+
+  // Clear preFetchState after loading completes (give onContentSizeChange time to fire)
+  useEffect(() => {
+    if (!isLoadingMore && preFetchState.current) {
+      const timer = setTimeout(() => {
+        preFetchState.current = null;
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoadingMore]);
+
   // Scroll to bottom helper
   const scrollToBottom = useCallback(() => {
-    if (scrollViewRef.current) {
-      scrollViewRef.current.scrollToEnd({ animated: true });
-    }
+    scrollViewRef.current?.scrollToEnd({ animated: true });
   }, []);
 
   // Register scroll function with the store so InputBar can trigger it
@@ -86,16 +108,27 @@ export function Terminal({ maxLines = 1000 }: TerminalProps) {
     registerScrollToBottom(scrollToBottom);
   }, [registerScrollToBottom, scrollToBottom]);
 
-  // Auto-scroll to bottom when new messages arrive or typing state changes
+  // Reset on session change
   useEffect(() => {
-    if (scrollViewRef.current) {
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+    hasInitiallyScrolled.current = false;
+    setIsInitialLoading(true);
+    prevLastSeqRef.current = 0;
+  }, [sessionId]);
+
+  // Auto-scroll to bottom when NEW messages arrive
+  useEffect(() => {
+    if (messages.length > 0) {
+      const currentLastSeq = messages[messages.length - 1].seq;
+      if (currentLastSeq > prevLastSeqRef.current && hasInitiallyScrolled.current) {
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }
+      prevLastSeqRef.current = currentLastSeq;
     }
   }, [messages, isTyping]);
 
-  // Scroll to bottom when keyboard opens so latest messages stay visible
+  // Scroll to bottom when keyboard opens
   useEffect(() => {
     const sub = Keyboard.addListener('keyboardDidShow', () => {
       setTimeout(() => {
@@ -104,6 +137,49 @@ export function Terminal({ maxLines = 1000 }: TerminalProps) {
     });
     return () => sub.remove();
   }, []);
+
+  // Initial scroll: keep calling scrollToEnd on every content size change, reveal after stabilization
+  const revealDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleContentSizeChange = useCallback((_w: number, h: number) => {
+    // Handle pagination scroll position fix: adjust for prepended content
+    if (preFetchState.current && hasInitiallyScrolled.current) {
+      const delta = h - preFetchState.current.baseHeight;
+      if (delta > 0) {
+        scrollViewRef.current?.scrollTo({
+          y: preFetchState.current.baseOffset + delta,
+          animated: false,
+        });
+      }
+      return; // Don't run initial scroll logic during pagination
+    }
+
+    // Handle initial scroll to bottom
+    if (!hasInitiallyScrolled.current && messages.length > 0) {
+      scrollViewRef.current?.scrollToEnd({ animated: false });
+      if (revealDebounceRef.current) clearTimeout(revealDebounceRef.current);
+      revealDebounceRef.current = setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: false });
+        setTimeout(() => {
+          hasInitiallyScrolled.current = true;
+          setIsInitialLoading(false);
+        }, 50);
+      }, 300);
+    }
+  }, [messages.length]);
+
+  // Pagination: load older messages when scrolling near the top
+  const handleScroll = useCallback((event: any) => {
+    if (!hasInitiallyScrolled.current) return;
+    const { contentOffset, contentSize } = event.nativeEvent;
+    if (contentOffset.y < 200 && hasMoreMessages && !isLoadingMoreRef.current) {
+      // Save scroll state BEFORE triggering fetch
+      preFetchState.current = {
+        baseOffset: contentOffset.y,
+        baseHeight: contentSize.height,
+      };
+      fetchOlderMessages();
+    }
+  }, [hasMoreMessages, fetchOlderMessages]);
 
   // Group consecutive messages of the same type (except system messages)
   const groupedMessages = useMemo(() => {
@@ -130,6 +206,7 @@ export function Terminal({ maxLines = 1000 }: TerminalProps) {
           content: msg.content || '',
           timestamp: msg.timestamp,
           toolUseData: msg.toolUseData,
+          key: `${msgType}-${msg.seq}`,
         });
       } else if (currentGroup && currentGroup.type === msgType) {
         // Append to current group (only for input/output)
@@ -149,6 +226,7 @@ export function Terminal({ maxLines = 1000 }: TerminalProps) {
           type: msgType,
           content: msg.content || '',
           timestamp: msg.timestamp,
+          key: `${msgType}-${msg.seq}`,
         };
       }
     }
@@ -159,6 +237,43 @@ export function Terminal({ maxLines = 1000 }: TerminalProps) {
 
     return groups;
   }, [messages]);
+
+  // Top of list: loading indicator or "Beginning of conversation"
+  const ListHeaderComponent = useMemo(() => {
+    if (isLoadingMore) {
+      return (
+        <View style={styles.loadingMoreContainer}>
+          <ActivityIndicator size="small" color={isDark ? '#9ca3af' : '#6b7280'} />
+          <Text style={[styles.loadingMoreText, isDark && styles.loadingMoreTextDark]}>
+            Loading older messages...
+          </Text>
+        </View>
+      );
+    }
+    if (!hasMoreMessages && messages.length > 0) {
+      return (
+        <View style={styles.loadingMoreContainer}>
+          <Text style={[styles.loadingMoreText, isDark && styles.loadingMoreTextDark]}>
+            Beginning of conversation
+          </Text>
+        </View>
+      );
+    }
+    return null;
+  }, [isLoadingMore, hasMoreMessages, isDark, messages.length]);
+
+  // Bottom of list: typing indicator
+  const ListFooterComponent = useMemo(() => {
+    if (isTyping) {
+      return (
+        <AnimatedBubble>
+          <TypingIndicator isDark={isDark} isQueued={isMessageQueued} />
+        </AnimatedBubble>
+      );
+    }
+    return null;
+  }, [isTyping, isDark, isMessageQueued]);
+
 
   return (
     <View style={[styles.container, isDark && styles.containerDark]}>
@@ -178,12 +293,21 @@ export function Terminal({ maxLines = 1000 }: TerminalProps) {
           <Text style={styles.statusText}>CLI Offline (laptop may be sleeping)</Text>
         </View>
       )}
+      {isInitialLoading && messages.length > 0 && (
+        <View style={styles.initialLoadingOverlay}>
+          <ActivityIndicator size="small" color={isDark ? '#9ca3af' : '#6b7280'} />
+        </View>
+      )}
       <ScrollView
         ref={scrollViewRef}
-        style={styles.scrollView}
+        style={[styles.scrollView, isInitialLoading && messages.length > 0 && { opacity: 0 }]}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={true}
+        onScroll={handleScroll}
+        scrollEventThrottle={100}
+        onContentSizeChange={handleContentSizeChange}
       >
+        {ListHeaderComponent}
         {groupedMessages.length === 0 && !isTyping ? (
           <View style={styles.emptyState}>
             <Text style={[styles.emptyText, isDark && styles.emptyTextDark]}>
@@ -191,30 +315,24 @@ export function Terminal({ maxLines = 1000 }: TerminalProps) {
             </Text>
           </View>
         ) : (
-          <>
-            {groupedMessages.map((group, index) => (
-              <AnimatedBubble key={`${group.timestamp}-${index}`}>
-                {group.type === 'tool-use' && group.toolUseData ? (
-                  <CollapsibleToolUse
-                    toolUseData={group.toolUseData}
-                    isDark={isDark}
-                    timestamp={group.timestamp}
-                  />
-                ) : (
-                  <MessageBubble
-                    message={group}
-                    isDark={isDark}
-                  />
-                )}
-              </AnimatedBubble>
-            ))}
-            {isTyping && (
-              <AnimatedBubble>
-                <TypingIndicator isDark={isDark} isQueued={isMessageQueued} />
-              </AnimatedBubble>
-            )}
-          </>
+          groupedMessages.map((group) => (
+            <AnimatedBubble key={group.key}>
+              {group.type === 'tool-use' && group.toolUseData ? (
+                <CollapsibleToolUse
+                  toolUseData={group.toolUseData}
+                  isDark={isDark}
+                  timestamp={group.timestamp}
+                />
+              ) : (
+                <MessageBubble
+                  message={group}
+                  isDark={isDark}
+                />
+              )}
+            </AnimatedBubble>
+          ))
         )}
+        {ListFooterComponent}
       </ScrollView>
     </View>
   );
@@ -711,7 +829,7 @@ function CollapsibleToolUse({ toolUseData, isDark, timestamp }: CollapsibleToolU
 
 function EditDiffContent({ data, isDark }: { data: ToolUseEditData; isDark: boolean }) {
   return (
-    <ScrollView style={diffStyles.scrollContainer} nestedScrollEnabled>
+    <ScrollView style={diffStyles.scrollContainer} nestedScrollEnabled scrollsToTop={false}>
       <Text style={[diffStyles.filePath, isDark && diffStyles.filePathDark]}>
         {data.filePath}
       </Text>
@@ -743,7 +861,7 @@ function WriteContent({ data, isDark }: { data: ToolUseWriteData; isDark: boolea
     : data.content;
 
   return (
-    <ScrollView style={diffStyles.scrollContainer} nestedScrollEnabled>
+    <ScrollView style={diffStyles.scrollContainer} nestedScrollEnabled scrollsToTop={false}>
       <Text style={[diffStyles.filePath, isDark && diffStyles.filePathDark]}>
         {data.filePath}
       </Text>
@@ -763,7 +881,7 @@ function GenericToolContent({ data, isDark }: { data: ToolUseGenericData; isDark
     : inputStr;
 
   return (
-    <ScrollView style={diffStyles.scrollContainer} nestedScrollEnabled>
+    <ScrollView style={diffStyles.scrollContainer} nestedScrollEnabled scrollsToTop={false}>
       <View style={[diffStyles.codeBlock, isDark && diffStyles.codeBlockDark]}>
         <Text style={[diffStyles.codeText, isDark && diffStyles.codeTextDark]}>
           {displayContent}
@@ -935,6 +1053,26 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 12,
     paddingBottom: 20,
+  },
+  initialLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    zIndex: 1,
+  },
+  loadingMoreContainer: {
+    alignItems: 'center' as const,
+    paddingVertical: 16,
+    flexDirection: 'row' as const,
+    justifyContent: 'center' as const,
+    gap: 8,
+  },
+  loadingMoreText: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  loadingMoreTextDark: {
+    color: '#9ca3af',
   },
   emptyState: {
     flex: 1,
