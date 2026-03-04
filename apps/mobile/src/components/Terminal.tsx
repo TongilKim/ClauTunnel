@@ -21,6 +21,11 @@ import { useSessionStore } from '../stores/sessionStore';
 import type { RealtimeMessage, ToolUseData, ToolUseEditData, ToolUseWriteData, ToolUseGenericData } from 'clautunnel-shared';
 import { parseToolUsage, shortenPath } from '../utils/terminalUtils';
 
+/** Scroll offset threshold (px) from top to trigger loading older messages */
+const SCROLL_LOAD_THRESHOLD = 200;
+/** Delay (ms) before clearing pre-fetch state, allowing onContentSizeChange to fire first */
+const PREFETCH_CLEAR_DELAY = 500;
+
 interface GroupedMessage {
   type: 'input' | 'output' | 'system' | 'tool-use';
   content: string;
@@ -93,7 +98,7 @@ export function Terminal() {
     if (!isLoadingMore && preFetchState.current) {
       const timer = setTimeout(() => {
         preFetchState.current = null;
-      }, 500);
+      }, PREFETCH_CLEAR_DELAY);
       return () => clearTimeout(timer);
     }
   }, [isLoadingMore]);
@@ -171,7 +176,7 @@ export function Terminal() {
   const handleScroll = useCallback((event: any) => {
     if (!hasInitiallyScrolled.current) return;
     const { contentOffset, contentSize } = event.nativeEvent;
-    if (contentOffset.y < 200 && hasMoreMessages && !isLoadingMoreRef.current) {
+    if (contentOffset.y < SCROLL_LOAD_THRESHOLD && hasMoreMessages && !isLoadingMoreRef.current) {
       // Save scroll state BEFORE triggering fetch
       preFetchState.current = {
         baseOffset: contentOffset.y,

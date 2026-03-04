@@ -1507,3 +1507,175 @@ describe('InputBar Duplicate Send Prevention', () => {
     expect(computeIsDisabled(false, 'connected', false, true)).toBe(true);
   });
 });
+
+describe('Pagination - fetchOlderMessages logic', () => {
+  const PAGE_SIZE = 50;
+
+  interface PaginationState {
+    messages: RealtimeMessage[];
+    isLoadingMore: boolean;
+    hasMoreMessages: boolean;
+    oldestLoadedSeq: number | null;
+    sessionId: string | null;
+  }
+
+  /** Mimics the fetchOlderMessages guard logic */
+  function shouldFetch(state: PaginationState): boolean {
+    return !state.isLoadingMore && state.hasMoreMessages && !!state.sessionId && !!state.oldestLoadedSeq;
+  }
+
+  /** Mimics the state update after fetching older messages */
+  function applyOlderMessages(
+    state: PaginationState,
+    olderMessages: RealtimeMessage[],
+  ): PaginationState {
+    if (olderMessages.length === 0) {
+      return { ...state, isLoadingMore: false, hasMoreMessages: false };
+    }
+    const sorted = [...olderMessages].sort((a, b) => a.seq - b.seq);
+    return {
+      ...state,
+      messages: [...sorted, ...state.messages],
+      isLoadingMore: false,
+      oldestLoadedSeq: sorted[0].seq,
+      hasMoreMessages: olderMessages.length === PAGE_SIZE,
+    };
+  }
+
+  it('should not fetch when already loading', () => {
+    const state: PaginationState = {
+      messages: [],
+      isLoadingMore: true,
+      hasMoreMessages: true,
+      oldestLoadedSeq: 50,
+      sessionId: 'session-1',
+    };
+    expect(shouldFetch(state)).toBe(false);
+  });
+
+  it('should not fetch when no more messages', () => {
+    const state: PaginationState = {
+      messages: [],
+      isLoadingMore: false,
+      hasMoreMessages: false,
+      oldestLoadedSeq: 1,
+      sessionId: 'session-1',
+    };
+    expect(shouldFetch(state)).toBe(false);
+  });
+
+  it('should not fetch when no sessionId', () => {
+    const state: PaginationState = {
+      messages: [],
+      isLoadingMore: false,
+      hasMoreMessages: true,
+      oldestLoadedSeq: 50,
+      sessionId: null,
+    };
+    expect(shouldFetch(state)).toBe(false);
+  });
+
+  it('should not fetch when oldestLoadedSeq is null', () => {
+    const state: PaginationState = {
+      messages: [],
+      isLoadingMore: false,
+      hasMoreMessages: true,
+      oldestLoadedSeq: null,
+      sessionId: 'session-1',
+    };
+    expect(shouldFetch(state)).toBe(false);
+  });
+
+  it('should fetch when all conditions are met', () => {
+    const state: PaginationState = {
+      messages: [],
+      isLoadingMore: false,
+      hasMoreMessages: true,
+      oldestLoadedSeq: 50,
+      sessionId: 'session-1',
+    };
+    expect(shouldFetch(state)).toBe(true);
+  });
+
+  it('should prepend older messages and update oldestLoadedSeq', () => {
+    const existing: RealtimeMessage[] = [
+      { type: 'output', content: 'C', timestamp: 3000, seq: 51 },
+      { type: 'output', content: 'D', timestamp: 4000, seq: 52 },
+    ];
+    const state: PaginationState = {
+      messages: existing,
+      isLoadingMore: true,
+      hasMoreMessages: true,
+      oldestLoadedSeq: 51,
+      sessionId: 'session-1',
+    };
+
+    const olderMessages: RealtimeMessage[] = [
+      { type: 'input', content: 'A', timestamp: 1000, seq: 1 },
+      { type: 'output', content: 'B', timestamp: 2000, seq: 2 },
+    ];
+
+    const newState = applyOlderMessages(state, olderMessages);
+
+    expect(newState.messages.length).toBe(4);
+    expect(newState.messages[0].content).toBe('A');
+    expect(newState.messages[1].content).toBe('B');
+    expect(newState.messages[2].content).toBe('C');
+    expect(newState.messages[3].content).toBe('D');
+    expect(newState.oldestLoadedSeq).toBe(1);
+    expect(newState.isLoadingMore).toBe(false);
+  });
+
+  it('should set hasMoreMessages false when fewer than PAGE_SIZE returned', () => {
+    const state: PaginationState = {
+      messages: [{ type: 'output', content: 'Z', timestamp: 5000, seq: 100 }],
+      isLoadingMore: true,
+      hasMoreMessages: true,
+      oldestLoadedSeq: 100,
+      sessionId: 'session-1',
+    };
+
+    // Return fewer than PAGE_SIZE
+    const olderMessages: RealtimeMessage[] = [
+      { type: 'input', content: 'First', timestamp: 1000, seq: 1 },
+    ];
+
+    const newState = applyOlderMessages(state, olderMessages);
+    expect(newState.hasMoreMessages).toBe(false);
+  });
+
+  it('should set hasMoreMessages true when exactly PAGE_SIZE returned', () => {
+    const state: PaginationState = {
+      messages: [{ type: 'output', content: 'Z', timestamp: 5000, seq: 100 }],
+      isLoadingMore: true,
+      hasMoreMessages: true,
+      oldestLoadedSeq: 100,
+      sessionId: 'session-1',
+    };
+
+    // Return exactly PAGE_SIZE messages
+    const olderMessages: RealtimeMessage[] = Array.from({ length: PAGE_SIZE }, (_, i) => ({
+      type: 'output' as const,
+      content: `msg-${i}`,
+      timestamp: 1000 + i,
+      seq: i + 1,
+    }));
+
+    const newState = applyOlderMessages(state, olderMessages);
+    expect(newState.hasMoreMessages).toBe(true);
+  });
+
+  it('should set hasMoreMessages false when zero messages returned', () => {
+    const state: PaginationState = {
+      messages: [{ type: 'output', content: 'Z', timestamp: 5000, seq: 1 }],
+      isLoadingMore: true,
+      hasMoreMessages: true,
+      oldestLoadedSeq: 1,
+      sessionId: 'session-1',
+    };
+
+    const newState = applyOlderMessages(state, []);
+    expect(newState.hasMoreMessages).toBe(false);
+    expect(newState.messages.length).toBe(1); // unchanged
+  });
+});
