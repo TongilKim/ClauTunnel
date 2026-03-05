@@ -21,6 +21,7 @@ import {
   type FullDiskAccessStatus,
 } from '../utils/sleep-prevention.js';
 import { MobileServerManager } from '../mobile/mobile-server.js';
+import { acquirePidFile, removePidFile } from '../utils/pid.js';
 import type { MachineCommand } from 'clautunnel-shared';
 
 // Polyfill WebSocket for Node.js (Supabase Realtime needs this)
@@ -52,6 +53,14 @@ export function createStartCommand(): Command {
       let machineClient: MachineRealtimeClient | null = null;
 
       try {
+        // Enforce single process per machine (atomic check + acquire)
+        const existingPid = acquirePidFile();
+        if (existingPid !== null) {
+          logger.error(`Another clautunnel process is already running (PID: ${existingPid})`);
+          logger.error('Run "clautunnel stop" first, or kill the existing process.');
+          process.exit(1);
+        }
+
         config.requireConfiguration();
 
         spinner.start();
@@ -71,6 +80,7 @@ export function createStartCommand(): Command {
           logger.error(
             'Run "clautunnel login" or "clautunnel signup" first.'
           );
+          removePidFile();
           process.exit(1);
         }
 
@@ -203,6 +213,7 @@ export function createStartCommand(): Command {
             logger.info('');
           } else {
             logger.error(`Mobile server failed: ${result.error}`);
+            removePidFile();
             process.exit(1);
           }
 
@@ -211,6 +222,7 @@ export function createStartCommand(): Command {
 
         // Cleanup helper
         const cleanup = async () => {
+          removePidFile();
           if (mobileServer) {
             try {
               await mobileServer.stop();
@@ -224,7 +236,21 @@ export function createStartCommand(): Command {
           cleanupSleep(sleepState);
         };
 
-        // Handle process signals
+        spinner.update('Registering machine...');
+
+        // Register machine
+        const machineManager = new MachineManager({ supabase });
+        const machine = await machineManager.registerMachine(
+          user.id,
+          options.name,
+          config.getMachineId()
+        );
+
+        // Save machine ID for future use
+        config.setMachineId(machine.id);
+
+        // Handle process signals — registered after machine is available
+        // so gracefulShutdown can reliably set offline status
         let isShuttingDown = false;
 
         const gracefulShutdown = async (signal: string) => {
@@ -242,6 +268,12 @@ export function createStartCommand(): Command {
                 // Continue stopping other daemons
               }
               daemons.delete(sessionId);
+            }
+            // Set machine status to offline now that all sessions are stopped
+            try {
+              await machineManager.updateMachineStatus(machine.id, 'offline');
+            } catch {
+              // Best-effort - don't block shutdown
             }
             if (machineClient) {
               await machineClient.disconnect();
@@ -264,19 +296,6 @@ export function createStartCommand(): Command {
           gracefulShutdown('SIGTERM').catch(console.error);
         });
 
-        spinner.update('Registering machine...');
-
-        // Register machine
-        const machineManager = new MachineManager({ supabase });
-        const machine = await machineManager.registerMachine(
-          user.id,
-          options.name,
-          config.getMachineId()
-        );
-
-        // Save machine ID for future use
-        config.setMachineId(machine.id);
-
         spinner.update('Connecting to realtime...');
 
         // Create machine-level realtime client
@@ -296,6 +315,7 @@ export function createStartCommand(): Command {
           logger.error('  1. Open a new terminal and run "clautunnel start" again');
           logger.error('  2. Check your network connection');
           logger.error('  3. Try "clautunnel login" to refresh your session');
+          removePidFile();
           process.exit(1);
         }
 
@@ -415,6 +435,7 @@ export function createStartCommand(): Command {
           }
         });
       } catch (error) {
+        removePidFile();
         if (error instanceof ConfigurationError) {
           spinner.stop();
           logger.error(error.message);
