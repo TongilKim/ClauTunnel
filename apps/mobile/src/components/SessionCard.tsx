@@ -185,6 +185,8 @@ export function SessionCard({ session }: SessionCardProps) {
           >
             {session.title || machine?.name || 'Unknown Machine'}
           </Text>
+        </View>
+        <View style={styles.statusRow}>
           <View
             style={[
               styles.statusDot,
@@ -195,10 +197,10 @@ export function SessionCard({ session }: SessionCardProps) {
                   : styles.statusInactive,
             ]}
           />
+          <Text style={[styles.statusText, isDark && styles.statusTextDark]}>
+            {statusLabel}
+          </Text>
         </View>
-        <Text style={[styles.statusText, isDark && styles.statusTextDark]}>
-          {statusLabel}
-        </Text>
       </View>
 
       {session.working_directory && (
@@ -303,6 +305,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6b7280',
     fontWeight: '500',
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 0,
   },
   statusTextDark: {
     color: '#9ca3af',
