@@ -97,33 +97,30 @@ export default function SessionScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       {/* Custom Header */}
       <View style={[styles.header, isDark && styles.headerDark, { paddingTop: insets.top }]}>
-        <View style={styles.headerSide}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Text style={[styles.backText, isDark && styles.backTextDark]}>‹ Back</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Text style={[styles.backText, isDark && styles.backTextDark]}>‹ Back</Text>
+        </TouchableOpacity>
         <TouchableOpacity onPress={handleEditTitle} style={styles.titleButton}>
           <Text
             style={[styles.headerTitle, isDark && styles.headerTitleDark]}
             numberOfLines={1}
+            ellipsizeMode="tail"
           >
             {session?.title || 'Session'}
           </Text>
           <Text style={[styles.editIcon, isDark && styles.editIconDark]}>✎</Text>
         </TouchableOpacity>
-        <View style={[styles.headerSide, styles.headerSideRight]}>
-          <View style={[styles.statusBadge, styles[`statusBadge_${effectiveStatus}`]]}>
-            <View style={[styles.statusDot, styles[`statusDot_${effectiveStatus}`]]} />
-            <Text style={[styles.statusText, styles[`statusText_${effectiveStatus}`]]}>
-              {effectiveStatus === 'online'
-                ? 'Online'
-                : effectiveStatus === 'cliOffline'
-                  ? 'CLI Offline'
-                  : effectiveStatus === 'connecting'
-                    ? 'Connecting'
-                    : 'Disconnected'}
-            </Text>
-          </View>
+        <View style={[styles.statusBadge, styles[`statusBadge_${effectiveStatus}`]]}>
+          <View style={[styles.statusDot, styles[`statusDot_${effectiveStatus}`]]} />
+          <Text style={[styles.statusText, styles[`statusText_${effectiveStatus}`]]}>
+            {effectiveStatus === 'online'
+              ? 'Online'
+              : effectiveStatus === 'cliOffline'
+                ? 'CLI Offline'
+                : effectiveStatus === 'connecting'
+                  ? 'Connecting'
+                  : 'Disconnected'}
+          </Text>
         </View>
       </View>
       <Terminal />
@@ -173,16 +170,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#0a0a0a',
     borderBottomColor: '#374151',
   },
-  headerSide: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerSideRight: {
-    justifyContent: 'flex-end',
-  },
   backButton: {
+    flexShrink: 0,
     paddingVertical: 8,
+    marginRight: 10,
   },
   backText: {
     fontSize: 17,
@@ -192,11 +183,13 @@ const styles = StyleSheet.create({
     color: '#60a5fa',
   },
   titleButton: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    maxWidth: '50%',
+    marginHorizontal: 8,
     gap: 6,
   },
   headerTitle: {
@@ -204,6 +197,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000000',
     flexShrink: 1,
+    textAlign: 'center',
   },
   headerTitleDark: {
     color: '#ffffff',
@@ -217,6 +211,7 @@ const styles = StyleSheet.create({
   },
   // Status badge
   statusBadge: {
+    flexShrink: 0,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 10,
