@@ -33,6 +33,7 @@ interface PendingPermissionRequest {
   resolve: (result: PermissionResult) => void;
   reject: (error: Error) => void;
   signal: AbortSignal;
+  toolInput: Record<string, unknown>;
 }
 
 export class SdkSession extends EventEmitter {
@@ -84,7 +85,10 @@ export class SdkSession extends EventEmitter {
     if (response.behavior === 'allow') {
       const result: PermissionResult = {
         behavior: 'allow',
-        updatedInput: response.updatedInput,
+        // updatedInput is required by the SDK's Zod schema — if omitted,
+        // JSON.stringify drops the key and subprocess validation fails.
+        // Fall back to the original tool input to keep it valid.
+        updatedInput: response.updatedInput ?? pending.toolInput,
         updatedPermissions: response.updatedPermissions as SDKPermissionUpdate[] | undefined,
       };
       pending.resolve(result);
@@ -231,6 +235,7 @@ export class SdkSession extends EventEmitter {
           resolve,
           reject,
           signal: options.signal,
+          toolInput: input,
         });
 
         // Handle abort
