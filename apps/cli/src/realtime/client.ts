@@ -481,7 +481,11 @@ export class RealtimeClient extends EventEmitter {
     this.emit('broadcast', message);
   }
 
-  async broadcastStatusResponse(isProcessing: boolean, isMessageQueued: boolean): Promise<void> {
+  async broadcastStatusResponse(
+    isProcessing: boolean,
+    isMessageQueued: boolean,
+    permissionMode?: PermissionMode,
+  ): Promise<void> {
     if (!this.outputChannel) {
       throw new Error('Not connected');
     }
@@ -494,6 +498,7 @@ export class RealtimeClient extends EventEmitter {
       type: 'status-response',
       isProcessing,
       isMessageQueued,
+      permissionMode,
       timestamp: Date.now(),
       seq: ++this.seq,
     };

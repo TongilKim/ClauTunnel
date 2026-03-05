@@ -17,6 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useConnectionStore } from '../stores/connectionStore';
 import { convertImageToBase64 } from '../utils/imageUtils';
 import { getModelBadgeState } from '../utils/modelBadgeState';
+import { getPermissionModeBadgeState } from '../utils/permissionModeBadgeState';
 import { CommandPicker } from './CommandPicker';
 import { ModelPicker } from './ModelPicker';
 import { InteractivePicker } from './InteractivePicker';
@@ -63,6 +64,7 @@ export function InputBar({ disabled }: InputBarProps) {
     model,
     availableModels,
     isModelChanging,
+    permissionMode,
     interactiveData,
     isInteractiveLoading,
     interactiveError,
@@ -80,6 +82,24 @@ export function InputBar({ disabled }: InputBarProps) {
     availableModels,
     isModelChanging,
   });
+  const permissionModeBadge = getPermissionModeBadgeState(permissionMode);
+
+  const permissionModeBadgeToneStyle =
+    permissionModeBadge.tone === 'warning'
+      ? styles.modeBadge_warning
+      : permissionModeBadge.tone === 'info'
+        ? styles.modeBadge_info
+        : permissionModeBadge.tone === 'danger'
+          ? styles.modeBadge_danger
+          : styles.modeBadge_neutral;
+  const permissionModeTextToneStyle =
+    permissionModeBadge.tone === 'warning'
+      ? styles.modeText_warning
+      : permissionModeBadge.tone === 'info'
+        ? styles.modeText_info
+        : permissionModeBadge.tone === 'danger'
+          ? styles.modeText_danger
+          : styles.modeText_neutral;
 
   // Placeholder text based on connection state (not typing/sending state)
   const placeholderText =
@@ -353,6 +373,13 @@ export function InputBar({ disabled }: InputBarProps) {
                 )}
               </View>
             )}
+            {permissionModeBadge.visible && (
+              <View style={[styles.modeBadge, permissionModeBadgeToneStyle]}>
+                <Text style={[styles.modeText, permissionModeTextToneStyle]} numberOfLines={1}>
+                  {permissionModeBadge.label}
+                </Text>
+              </View>
+            )}
           </View>
           {isTyping ? (
             <TouchableOpacity
@@ -600,6 +627,44 @@ const styles = StyleSheet.create({
   },
   modelBadgeTextDark: {
     color: '#9ca3af',
+  },
+  // Permission mode badge
+  modeBadge: {
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginLeft: 8,
+    maxWidth: 130,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modeBadge_neutral: {
+    backgroundColor: '#f3f4f6',
+  },
+  modeBadge_warning: {
+    backgroundColor: '#fef3c7',
+  },
+  modeBadge_info: {
+    backgroundColor: '#dbeafe',
+  },
+  modeBadge_danger: {
+    backgroundColor: '#fee2e2',
+  },
+  modeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  modeText_neutral: {
+    color: '#4b5563',
+  },
+  modeText_warning: {
+    color: '#92400e',
+  },
+  modeText_info: {
+    color: '#1e40af',
+  },
+  modeText_danger: {
+    color: '#b91c1c',
   },
   imageIcon: {
     width: 20,

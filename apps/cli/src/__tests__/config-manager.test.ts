@@ -376,4 +376,32 @@ describe('ConfigManager', () => {
       expect(configManager2.getThinkingMode()).toBe(false);
     });
   });
+
+  describe('getPermissionMode', () => {
+    it('should return default when no settings exist', () => {
+      expect(configManager.getPermissionMode()).toBe('default');
+    });
+
+    it('should return configured mode when settings contain a valid mode', () => {
+      const settingsPath = join(CLAUDE_DIR, 'settings.json');
+      writeFileSync(
+        settingsPath,
+        JSON.stringify({ permissions: { mode: 'plan' } })
+      );
+
+      const configManager2 = new ConfigManager({ cwd: TEST_DIR, homeDir: TEST_DIR });
+      expect(configManager2.getPermissionMode()).toBe('plan');
+    });
+
+    it('should fall back to default when settings contain an invalid mode', () => {
+      const settingsPath = join(CLAUDE_DIR, 'settings.json');
+      writeFileSync(
+        settingsPath,
+        JSON.stringify({ permissions: { mode: 'invalid-mode' } })
+      );
+
+      const configManager2 = new ConfigManager({ cwd: TEST_DIR, homeDir: TEST_DIR });
+      expect(configManager2.getPermissionMode()).toBe('default');
+    });
+  });
 });

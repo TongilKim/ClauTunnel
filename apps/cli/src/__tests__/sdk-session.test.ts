@@ -106,6 +106,78 @@ describe('SdkSession', () => {
 
       expect(permissionModeHandler).toHaveBeenCalledWith('default');
     });
+
+    it('should create a new session with updated mode after setPermissionMode', async () => {
+      const session1 = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'session-1' },
+        { type: 'result', subtype: 'success', result: 'done' },
+      ]);
+      mockedCreateSession.mockReturnValue(session1 as any);
+
+      await sdkSession.sendPrompt('Hello');
+      await tick();
+
+      sdkSession.setPermissionMode('plan');
+
+      expect(session1._closeMock).toHaveBeenCalled();
+      expect(sdkSession.getSessionId()).toBeNull();
+
+      const session2 = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'session-2' },
+        { type: 'result', subtype: 'success', result: 'done' },
+      ]);
+      mockedCreateSession.mockReturnValue(session2 as any);
+
+      await sdkSession.sendPrompt('Hello again');
+
+      expect(mockedCreateSession).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          permissionMode: 'plan',
+        })
+      );
+    });
+
+    it('should reject and clear pending interaction state when permission mode changes', () => {
+      const rejectPendingPermission = vi.fn();
+      const rejectPendingAnswer = vi.fn();
+      const internal = sdkSession as any;
+
+      internal.pendingQuestionData = {
+        toolUseId: 'toolu_123',
+        questions: [
+          {
+            question: 'Pick one',
+            header: 'Test',
+            options: [{ label: 'A', description: 'Option A' }],
+          },
+        ],
+      };
+      internal.pendingPermissionData = {
+        requestId: 'req_123',
+        toolName: 'Edit',
+        toolInput: {},
+        toolUseId: 'toolu_456',
+      };
+      internal.pendingPermissionRequests.set('req_123', {
+        resolve: vi.fn(),
+        reject: rejectPendingPermission,
+        signal: new AbortController().signal,
+        toolInput: {},
+      });
+      internal.pendingAnswerRequest = {
+        resolve: vi.fn(),
+        reject: rejectPendingAnswer,
+      };
+
+      sdkSession.setPermissionMode('plan');
+
+      expect(rejectPendingPermission).toHaveBeenCalledWith(expect.any(Error));
+      expect(rejectPendingAnswer).toHaveBeenCalledWith(expect.any(Error));
+      expect(sdkSession.getPendingQuestionData()).toBeNull();
+      expect(sdkSession.getPendingPermissionData()).toBeNull();
+      expect(internal.pendingPermissionRequests.size).toBe(0);
+      expect(internal.pendingAnswerRequest).toBeNull();
+    });
   });
 
   describe('sendPrompt with attachments', () => {
@@ -374,6 +446,48 @@ describe('SdkSession', () => {
 
       await sdkSession.setModel('sonnet');
       expect(sdkSession.getSessionId()).toBeNull();
+    });
+
+    it('should reject and clear pending interaction state when model changes', async () => {
+      const rejectPendingPermission = vi.fn();
+      const rejectPendingAnswer = vi.fn();
+      const internal = sdkSession as any;
+
+      internal.pendingQuestionData = {
+        toolUseId: 'toolu_789',
+        questions: [
+          {
+            question: 'Select',
+            header: 'Test',
+            options: [{ label: 'B', description: 'Option B' }],
+          },
+        ],
+      };
+      internal.pendingPermissionData = {
+        requestId: 'req_456',
+        toolName: 'Write',
+        toolInput: {},
+        toolUseId: 'toolu_999',
+      };
+      internal.pendingPermissionRequests.set('req_456', {
+        resolve: vi.fn(),
+        reject: rejectPendingPermission,
+        signal: new AbortController().signal,
+        toolInput: {},
+      });
+      internal.pendingAnswerRequest = {
+        resolve: vi.fn(),
+        reject: rejectPendingAnswer,
+      };
+
+      await sdkSession.setModel('sonnet');
+
+      expect(rejectPendingPermission).toHaveBeenCalledWith(expect.any(Error));
+      expect(rejectPendingAnswer).toHaveBeenCalledWith(expect.any(Error));
+      expect(sdkSession.getPendingQuestionData()).toBeNull();
+      expect(sdkSession.getPendingPermissionData()).toBeNull();
+      expect(internal.pendingPermissionRequests.size).toBe(0);
+      expect(internal.pendingAnswerRequest).toBeNull();
     });
 
     it('should prepend conversation context to next prompt after model change clears session', async () => {
@@ -787,9 +901,9 @@ describe('SdkSession', () => {
       await tick();
 
       // Simulate a pending question via canUseTool
-      capturedCanUseTool('AskUserQuestion', {
+      const pendingQuestionPromise = capturedCanUseTool('AskUserQuestion', {
         questions: [{ question: 'Pick one', header: 'Choice', options: [{ label: 'A', description: 'Option A' }], multiSelect: false }],
-      }, { signal: new AbortController().signal });
+      }, { signal: new AbortController().signal }).catch((error: Error) => error);
       await tick();
 
       // Verify pending question is set
@@ -801,6 +915,7 @@ describe('SdkSession', () => {
       expect(sdkSession.getPendingQuestionData()).toBeNull();
       expect(sdkSession.getPendingPermissionData()).toBeNull();
       expect(sdkSession.isActive()).toBe(false);
+      await expect(pendingQuestionPromise).resolves.toBeInstanceOf(Error);
     });
 
     it('should clear pending prompt when clearHistory is called', async () => {

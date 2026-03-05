@@ -1,12 +1,14 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
+import { isPermissionMode } from 'clautunnel-shared';
 import type {
   InteractiveCommandType,
   InteractiveCommandData,
   InteractiveApplyPayload,
   InteractiveResult,
   InteractiveOption,
+  PermissionMode,
 } from 'clautunnel-shared';
 
 interface ClaudeSettings {
@@ -105,6 +107,15 @@ export class ConfigManager {
   getThinkingMode(): boolean {
     const settings = this.getMergedSettings();
     return settings.alwaysThinkingEnabled ?? false;
+  }
+
+  /**
+   * Get the current permission mode setting from merged settings
+   */
+  getPermissionMode(): PermissionMode {
+    const settings = this.getMergedSettings();
+    const mode = settings.permissions?.mode;
+    return isPermissionMode(mode) ? mode : 'default';
   }
 
   getInteractiveData(command: InteractiveCommandType): InteractiveCommandData {

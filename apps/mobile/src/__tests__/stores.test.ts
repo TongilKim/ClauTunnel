@@ -559,6 +559,40 @@ describe('Store Logic', () => {
       expect(permissionMode).toBe('bypassPermissions');
     });
 
+    it('should update permissionMode from status-response when provided', () => {
+      let state: {
+        isTyping: boolean;
+        isMessageQueued: boolean;
+        permissionMode: PermissionMode | null;
+      } = {
+        isTyping: false,
+        isMessageQueued: false,
+        permissionMode: null,
+      };
+
+      const handleMessage = (message: RealtimeMessage) => {
+        if (message.type === 'status-response') {
+          state = {
+            ...state,
+            isTyping: message.isProcessing ?? false,
+            isMessageQueued: message.isMessageQueued ?? false,
+            permissionMode: message.permissionMode ?? state.permissionMode,
+          };
+        }
+      };
+
+      handleMessage({
+        type: 'status-response',
+        isProcessing: false,
+        isMessageQueued: false,
+        permissionMode: 'plan',
+        timestamp: Date.now(),
+        seq: 1,
+      });
+
+      expect(state.permissionMode).toBe('plan');
+    });
+
     it('should set isTyping true when sending input', () => {
       let isTyping = false;
 

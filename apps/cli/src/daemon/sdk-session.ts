@@ -36,6 +36,11 @@ interface PendingPermissionRequest {
   toolInput: Record<string, unknown>;
 }
 
+interface PendingAnswerRequest {
+  resolve: (answers: Record<string, string>) => void;
+  reject: (error: Error) => void;
+}
+
 export class SdkSession extends EventEmitter {
   private options: SdkSessionOptions;
   private sessionId: string | null = null;
@@ -50,8 +55,8 @@ export class SdkSession extends EventEmitter {
   private pendingContextTransfer: boolean = false;
   private thinkingEnabled: boolean = false;
   private pendingPermissionRequests: Map<string, PendingPermissionRequest> = new Map();
-  // Pending AskUserQuestion answer resolver - resolved by provideAnswer()
-  private pendingAnswerResolve: ((answers: Record<string, string>) => void) | null = null;
+  // Pending AskUserQuestion answer promise
+  private pendingAnswerRequest: PendingAnswerRequest | null = null;
   // Track pending question/permission data for re-broadcast on status-request
   private pendingQuestionData: UserQuestionData | null = null;
   private pendingPermissionData: PermissionRequestData | null = null;
@@ -159,18 +164,21 @@ export class SdkSession extends EventEmitter {
           // Wait for provideAnswer() to supply the answers
           const answers = await new Promise<Record<string, string>>(
             (resolve, reject) => {
-              this.pendingAnswerResolve = resolve;
+              const pendingRequest: PendingAnswerRequest = { resolve, reject };
+              this.pendingAnswerRequest = pendingRequest;
 
               // Clean up if the request is aborted (e.g. session cancelled)
               options.signal.addEventListener('abort', () => {
-                this.pendingAnswerResolve = null;
-                this.pendingQuestionData = null;
+                if (this.pendingAnswerRequest === pendingRequest) {
+                  this.pendingAnswerRequest = null;
+                  this.pendingQuestionData = null;
+                }
                 reject(new Error('Question aborted'));
               });
             }
           );
 
-          this.pendingAnswerResolve = null;
+          this.pendingAnswerRequest = null;
           this.pendingQuestionData = null;
 
           // Return updatedInput so the subprocess can build the tool_result
@@ -249,7 +257,27 @@ export class SdkSession extends EventEmitter {
   }
 
   setPermissionMode(mode: PermissionMode): void {
+    const modeChanged = this.currentPermissionMode !== mode;
     this.currentPermissionMode = mode;
+
+    // Permission mode is set at session creation time in V2.
+    // Recreate session so the next prompt uses the new mode.
+    if (modeChanged) {
+      this.clearPendingInteractionState('Session reconfigured');
+      if (this.v2Session) {
+        this.v2Session.close();
+        this.v2Session = null;
+        this.streamLoopRunning = false;
+        this.sessionId = null;
+        this.isProcessing = false;
+        this.pendingPrompt = null;
+        this.pendingContextTransfer = true;
+      } else if (this.sessionId) {
+        this.sessionId = null;
+        this.pendingContextTransfer = true;
+      }
+    }
+
     this.emit('permission-mode', mode);
   }
 
@@ -591,11 +619,12 @@ export class SdkSession extends EventEmitter {
       this.conversationHistory.push({ role: 'user', content: answerText });
     }
 
-    if (this.pendingAnswerResolve) {
+    if (this.pendingAnswerRequest) {
       // Resolve the pending canUseTool callback with the answers
       const resolvedAnswers = answers || { result: answerText };
-      this.pendingAnswerResolve(resolvedAnswers);
-      this.pendingAnswerResolve = null;
+      const pendingRequest = this.pendingAnswerRequest;
+      this.pendingAnswerRequest = null;
+      pendingRequest.resolve(resolvedAnswers);
       return;
     }
 
@@ -604,10 +633,7 @@ export class SdkSession extends EventEmitter {
   }
 
   cancel(): void {
-    this.pendingAnswerResolve = null;
-    this.pendingQuestionData = null;
-    this.pendingPermissionData = null;
-    this.pendingPermissionRequests.clear();
+    this.clearPendingInteractionState('Session cancelled');
     if (this.v2Session) {
       this.v2Session.close();
       this.v2Session = null;
@@ -659,6 +685,7 @@ export class SdkSession extends EventEmitter {
     if (model === this.currentModel) return;
 
     this.currentModel = model;
+    this.clearPendingInteractionState('Session reconfigured');
 
     // Close existing session - a new one will be created with the new model on next sendPrompt()
     if (this.v2Session) {
@@ -696,6 +723,20 @@ export class SdkSession extends EventEmitter {
     this.sessionId = null;
     this.isProcessing = false;
     this.pendingPrompt = null;
+  }
+
+  private clearPendingInteractionState(reason: string): void {
+    if (this.pendingAnswerRequest) {
+      this.pendingAnswerRequest.reject(new Error(reason));
+      this.pendingAnswerRequest = null;
+    }
+    this.pendingQuestionData = null;
+    this.pendingPermissionData = null;
+
+    for (const pending of this.pendingPermissionRequests.values()) {
+      pending.reject(new Error(reason));
+    }
+    this.pendingPermissionRequests.clear();
   }
 
   async getSupportedModels(): Promise<ModelInfo[]> {

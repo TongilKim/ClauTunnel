@@ -281,6 +281,11 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
             set({ interactiveError: message.interactiveResult.message || 'Failed to apply change' });
           } else {
             set({ interactiveData: null, interactiveError: null });
+            // Re-sync mode after permissions changes in case a realtime mode
+            // broadcast was missed while interactive updates were in flight.
+            if (message.interactiveCommand === 'permissions') {
+              void get().requestPendingState();
+            }
           }
           return;
         }
@@ -315,10 +320,11 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
 
         // Handle status-response - restore processing state on reconnect
         if (message.type === 'status-response') {
-          set({
+          set((state) => ({
             isTyping: message.isProcessing ?? false,
             isMessageQueued: message.isMessageQueued ?? false,
-          });
+            permissionMode: message.permissionMode ?? state.permissionMode,
+          }));
           return;
         }
 

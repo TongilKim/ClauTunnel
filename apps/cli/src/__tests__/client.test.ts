@@ -657,6 +657,27 @@ describe('RealtimeClient', () => {
         })
       );
     });
+
+    it('should include permission mode when provided', async () => {
+      const client = new RealtimeClient({
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      await client.connect();
+      await client.broadcastStatusResponse(false, false, 'plan');
+
+      expect(mockOutputChannel.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payload: expect.objectContaining({
+            type: 'status-response',
+            isProcessing: false,
+            isMessageQueued: false,
+            permissionMode: 'plan',
+          }),
+        })
+      );
+    });
   });
 
   describe('broadcastSystem', () => {

@@ -13,6 +13,7 @@ vi.mock('@anthropic-ai/claude-agent-sdk', () => ({
 }));
 
 import { Daemon } from '../daemon/daemon.js';
+import { ConfigManager } from '../daemon/config-manager.js';
 import type { SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
 
 describe('Daemon', () => {
@@ -300,6 +301,22 @@ describe('Daemon', () => {
   });
 
   describe('permission mode handling', () => {
+    it('should initialize sdkSession permission mode from config', () => {
+      const modeSpy = vi.spyOn(ConfigManager.prototype, 'getPermissionMode').mockReturnValue('plan');
+      try {
+        daemon = new Daemon({
+          supabase: mockSupabase as SupabaseClient,
+          userId: 'user-456',
+          cwd: '/home/user',
+        });
+
+        const sdkSession = (daemon as any).sdkSession;
+        expect(sdkSession.getPermissionMode()).toBe('plan');
+      } finally {
+        modeSpy.mockRestore();
+      }
+    });
+
     it('should listen for permission-mode event from SDK session', async () => {
       daemon = new Daemon({
         supabase: mockSupabase as SupabaseClient,
@@ -595,6 +612,49 @@ describe('Daemon', () => {
           }),
         })
       );
+    });
+
+    it('should apply permissions changes to runtime sdk session mode', async () => {
+      let inputHandler: ((payload: any) => void) | null = null;
+
+      mockInputChannel.on = vi.fn((event, filter, handler) => {
+        if (event === 'broadcast' && filter.event === 'input') {
+          inputHandler = handler;
+        }
+        return mockInputChannel as RealtimeChannel;
+      });
+
+      daemon = new Daemon({
+        supabase: mockSupabase as SupabaseClient,
+        userId: 'user-456',
+        cwd: '/home/user',
+      });
+
+      await daemon.start();
+
+      const sdkSession = (daemon as any).sdkSession;
+      const setPermissionModeSpy = vi.spyOn(sdkSession, 'setPermissionMode');
+
+      // Simulate receiving interactive-apply from mobile
+      if (inputHandler) {
+        inputHandler({
+          payload: {
+            type: 'interactive-apply',
+            interactivePayload: {
+              command: 'permissions' as InteractiveCommandType,
+              action: 'set',
+              value: 'plan',
+            },
+            timestamp: Date.now(),
+            seq: 1,
+          },
+        });
+      }
+
+      // Wait for async operations
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(setPermissionModeSpy).toHaveBeenCalledWith('plan');
     });
   });
 
@@ -1431,6 +1491,55 @@ describe('Daemon', () => {
           type: 'status-response',
           isProcessing: true,
           isMessageQueued: false,
+        }),
+      });
+    });
+
+    it('should include current permission mode in status-response', async () => {
+      let inputHandler: ((payload: any) => void) | null = null;
+
+      mockInputChannel.on = vi.fn((event, filter, handler) => {
+        if (event === 'broadcast' && filter.event === 'input') {
+          inputHandler = handler;
+        }
+        return mockInputChannel as RealtimeChannel;
+      });
+
+      daemon = new Daemon({
+        cwd: '/test',
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'session-789',
+      });
+
+      await daemon.start();
+
+      const sdkSession = (daemon as any).sdkSession;
+      vi.spyOn(sdkSession, 'isActive').mockReturnValue(false);
+      vi.spyOn(sdkSession, 'getPendingQuestionData').mockReturnValue(null);
+      vi.spyOn(sdkSession, 'getPendingPermissionData').mockReturnValue(null);
+      vi.spyOn(sdkSession, 'hasPendingPrompt').mockReturnValue(false);
+      vi.spyOn(sdkSession, 'getPermissionMode').mockReturnValue('plan');
+
+      const sendSpy = mockOutputChannel.send;
+
+      if (inputHandler) {
+        inputHandler({
+          payload: {
+            type: 'status-request',
+            timestamp: Date.now(),
+            seq: 1,
+          },
+        });
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      expect(sendSpy).toHaveBeenCalledWith({
+        type: 'broadcast',
+        event: 'output',
+        payload: expect.objectContaining({
+          type: 'status-response',
+          permissionMode: 'plan',
         }),
       });
     });

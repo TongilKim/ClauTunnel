@@ -5,6 +5,7 @@ import { SessionManager } from './session.js';
 import { MachineManager } from './machine.js';
 import { ConfigManager } from './config-manager.js';
 import { RealtimeClient } from '../realtime/client.js';
+import { isPermissionMode } from 'clautunnel-shared';
 import type { Session, Machine, RealtimeMessage, ImageAttachment, PermissionMode, UserQuestionData, PermissionRequestData, ToolUseData } from 'clautunnel-shared';
 
 export interface DaemonOptions {
@@ -34,8 +35,13 @@ export class Daemon extends EventEmitter {
     super();
     this.options = options;
 
+    this.configManager = new ConfigManager({
+      cwd: options.cwd,
+    });
+
     this.sdkSession = new SdkSession({
       cwd: options.cwd,
+      permissionMode: this.configManager.getPermissionMode(),
     });
 
     this.sessionManager = new SessionManager({
@@ -44,10 +50,6 @@ export class Daemon extends EventEmitter {
 
     this.machineManager = new MachineManager({
       supabase: options.supabase,
-    });
-
-    this.configManager = new ConfigManager({
-      cwd: options.cwd,
     });
 
     // Initialize thinking mode from settings
@@ -333,7 +335,11 @@ export class Daemon extends EventEmitter {
             const isProcessing = this.sdkSession.isActive();
             const isActivelyWorking = isProcessing && !pendingQuestion && !pendingPermission;
             const isMessageQueued = this.sdkSession.hasPendingPrompt();
-            await this.realtimeClient.broadcastStatusResponse(isActivelyWorking, isMessageQueued);
+            await this.realtimeClient.broadcastStatusResponse(
+              isActivelyWorking,
+              isMessageQueued,
+              this.sdkSession.getPermissionMode(),
+            );
           } catch {
             // Silently handle broadcast errors
           }
@@ -366,6 +372,15 @@ export class Daemon extends EventEmitter {
       // Handle interactive apply
       if (message.type === 'interactive-apply' && message.interactivePayload) {
         const result = this.configManager.applyChange(message.interactivePayload);
+
+        // If permission mode was changed, update runtime SDK mode too
+        if (
+          result.success &&
+          message.interactivePayload.command === 'permissions' &&
+          isPermissionMode(message.interactivePayload.value)
+        ) {
+          this.sdkSession.setPermissionMode(message.interactivePayload.value);
+        }
 
         // If thinking mode was changed, also update the running SDK session
         if (
