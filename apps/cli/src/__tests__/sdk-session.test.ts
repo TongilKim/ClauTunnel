@@ -1375,6 +1375,146 @@ describe('SdkSession', () => {
     });
   });
 
+  describe('handlePermissionResponse', () => {
+    it('should use original toolInput as updatedInput fallback when mobile omits it', async () => {
+      let capturedCanUseTool: any = null;
+
+      mockedCreateSession.mockImplementation((opts: any) => {
+        capturedCanUseTool = opts.canUseTool;
+        return createMockSession([
+          { type: 'system', subtype: 'init', session_id: 'test-session-id' },
+        ]) as any;
+      });
+
+      const permissionHandler = vi.fn();
+      sdkSession.on('permission-request', permissionHandler);
+
+      sdkSession.sendPrompt('Do something');
+      await tick();
+
+      // Simulate SDK calling canUseTool for a regular tool (e.g. ExitPlanMode)
+      const canUseToolPromise = capturedCanUseTool('ExitPlanMode', {
+        allowedPrompts: [{ tool: 'Bash', prompt: 'run tests' }],
+      }, {
+        signal: new AbortController().signal,
+        toolUseID: 'toolu_exit_plan',
+      });
+
+      await tick();
+
+      // permission-request should have been emitted
+      expect(permissionHandler).toHaveBeenCalled();
+      const requestData = permissionHandler.mock.calls[0][0];
+
+      // Simulate mobile approving WITHOUT updatedInput (the bug scenario)
+      sdkSession.handlePermissionResponse({
+        requestId: requestData.requestId,
+        behavior: 'allow',
+        // updatedInput is intentionally omitted
+      });
+
+      const result = await canUseToolPromise;
+      expect(result.behavior).toBe('allow');
+      // Should fall back to the original tool input
+      expect(result.updatedInput).toEqual({
+        allowedPrompts: [{ tool: 'Bash', prompt: 'run tests' }],
+      });
+    });
+
+    it('should use provided updatedInput when mobile sends it', async () => {
+      let capturedCanUseTool: any = null;
+
+      mockedCreateSession.mockImplementation((opts: any) => {
+        capturedCanUseTool = opts.canUseTool;
+        return createMockSession([
+          { type: 'system', subtype: 'init', session_id: 'test-session-id' },
+        ]) as any;
+      });
+
+      const permissionHandler = vi.fn();
+      sdkSession.on('permission-request', permissionHandler);
+
+      sdkSession.sendPrompt('Do something');
+      await tick();
+
+      const canUseToolPromise = capturedCanUseTool('Bash', {
+        command: 'ls -la',
+      }, {
+        signal: new AbortController().signal,
+        toolUseID: 'toolu_bash_perm',
+      });
+
+      await tick();
+
+      const requestData = permissionHandler.mock.calls[0][0];
+
+      // Mobile sends with explicit updatedInput (e.g. modified command)
+      sdkSession.handlePermissionResponse({
+        requestId: requestData.requestId,
+        behavior: 'allow',
+        updatedInput: { command: 'ls -la --color' },
+      });
+
+      const result = await canUseToolPromise;
+      expect(result.behavior).toBe('allow');
+      // Should use the explicitly provided updatedInput
+      expect(result.updatedInput).toEqual({ command: 'ls -la --color' });
+    });
+
+    it('should resolve with deny when permission is denied', async () => {
+      let capturedCanUseTool: any = null;
+
+      mockedCreateSession.mockImplementation((opts: any) => {
+        capturedCanUseTool = opts.canUseTool;
+        return createMockSession([
+          { type: 'system', subtype: 'init', session_id: 'test-session-id' },
+        ]) as any;
+      });
+
+      const permissionHandler = vi.fn();
+      sdkSession.on('permission-request', permissionHandler);
+
+      sdkSession.sendPrompt('Do something');
+      await tick();
+
+      const canUseToolPromise = capturedCanUseTool('Bash', {
+        command: 'rm -rf /',
+      }, {
+        signal: new AbortController().signal,
+        toolUseID: 'toolu_bash_deny',
+      });
+
+      await tick();
+
+      const requestData = permissionHandler.mock.calls[0][0];
+
+      sdkSession.handlePermissionResponse({
+        requestId: requestData.requestId,
+        behavior: 'deny',
+        message: 'Too dangerous',
+      });
+
+      const result = await canUseToolPromise;
+      expect(result.behavior).toBe('deny');
+      expect(result.message).toBe('Too dangerous');
+    });
+
+    it('should warn when no pending request matches the response requestId', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      sdkSession.handlePermissionResponse({
+        requestId: 'non-existent-id',
+        behavior: 'allow',
+      });
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('No pending permission request found')
+      );
+
+      warnSpy.mockRestore();
+    });
+  });
+
   describe('resume fallback', () => {
     it('should fall back to createSession when resumeSession stream fails', async () => {
       // Simulate a resumed session that fails in the stream
