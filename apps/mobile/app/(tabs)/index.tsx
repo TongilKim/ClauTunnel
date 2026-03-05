@@ -16,6 +16,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useSessionStore } from '../../src/stores/sessionStore';
 import { SessionCard } from '../../src/components/SessionCard';
 import { EmptyState } from '../../src/components/EmptyState';
+import { isSessionOnlineForUI } from '../../src/utils/sessionStatus';
 
 interface MachineSection {
   id: string;
@@ -121,8 +122,8 @@ export default function SessionsScreen() {
 
       const section = machineMap.get(machineId)!;
       section.data.push(session);
-      // Count as online only if active AND CLI is online via presence
-      if (session.status === 'active' && sessionOnlineStatus[session.id]) {
+      // Match chat room semantics: explicit false means offline, unknown stays optimistic.
+      if (isSessionOnlineForUI(session.status, sessionOnlineStatus[session.id])) {
         section.onlineCount++;
       } else {
         section.offlineCount++;
@@ -140,7 +141,7 @@ export default function SessionsScreen() {
     const total = sessions.length;
     // Count sessions where CLI is actually online (active + presence confirmed)
     const online = sessions.filter((s: any) =>
-      s.status === 'active' && sessionOnlineStatus[s.id]
+      isSessionOnlineForUI(s.status, sessionOnlineStatus[s.id])
     ).length;
     const offline = total - online;
     return { total, online, offline };

@@ -13,6 +13,7 @@ import { Swipeable } from 'react-native-gesture-handler';
 import { useRouter } from 'expo-router';
 import type { Session } from 'clautunnel-shared';
 import { useSessionStore } from '../stores/sessionStore';
+import { getSessionActivityLabel, isSessionOnlineForUI } from '../utils/sessionStatus';
 
 interface SessionCardProps {
   session: Session & {
@@ -32,7 +33,7 @@ export function SessionCard({ session }: SessionCardProps) {
   const swipeableRef = useRef<Swipeable>(null);
   const { endSession, deleteSession, pendingSessionId, openSwipeableId, setOpenSwipeableId, sessionOnlineStatus } = useSessionStore();
   const isPending = pendingSessionId === session.id;
-  const isCliOnline = sessionOnlineStatus[session.id] ?? false;
+  const cliOnline = sessionOnlineStatus[session.id];
 
   // Close this swipeable if another one is opened or if cleared
   useEffect(() => {
@@ -55,6 +56,8 @@ export function SessionCard({ session }: SessionCardProps) {
 
   const machine = session.machines;
   const isActive = session.status === 'active';
+  const isOnlineForUI = isSessionOnlineForUI(session.status, cliOnline);
+  const statusLabel = getSessionActivityLabel(session.status, cliOnline);
   const machineOnline = machine?.status === 'online';
 
   const handleDisconnect = () => {
@@ -185,7 +188,7 @@ export function SessionCard({ session }: SessionCardProps) {
           <View
             style={[
               styles.statusDot,
-              isActive && isCliOnline
+              isActive && isOnlineForUI
                 ? styles.statusActive
                 : isActive
                   ? styles.statusOffline
@@ -194,7 +197,7 @@ export function SessionCard({ session }: SessionCardProps) {
           />
         </View>
         <Text style={[styles.statusText, isDark && styles.statusTextDark]}>
-          {isActive ? (isCliOnline ? 'Active' : 'Offline') : 'Ended'}
+          {statusLabel}
         </Text>
       </View>
 
