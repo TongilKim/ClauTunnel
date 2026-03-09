@@ -1,0 +1,135 @@
+# Codex PR Review (Step 1: Codex Reviews the code)
+# Set ENABLE_CODEX_REVIEW=true in repository variables to activate.
+# When disabled, the existing Claude-only review runs as before.
+
+name: Codex PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: codex-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  codex-review:
+    if: vars.ENABLE_CODEX_REVIEW == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+          fetch-depth: 0
+
+      - name: Pre-fetch base and head refs
+        run: |
+          git fetch --no-tags origin \
+            ${{ github.event.pull_request.base.ref }} \
+            +refs/pull/${{ github.event.pull_request.number }}/head
+
+      - name: Check if already approved
+        id: check_approved
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+            });
+            const approved = comments.some(c => c.body.includes('Ready to merge'));
+            const maxReached = comments.some(c => c.body.includes('Max iteration limit reached'));
+            const codexCount = comments.filter(c => c.body.includes('[CODEX-REVIEW]')).length;
+            core.setOutput('skip', String(approved || maxReached || codexCount >= 5));
+
+      - name: Run Codex Review
+        if: steps.check_approved.outputs.skip != 'true'
+        id: codex_review
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt: |
+            You are a code reviewer for the ClauTunnel project.
+            Review PR #${{ github.event.pull_request.number }}.
+            This project follows Kent Beck TDD and Tidy First principles.
+
+            ## Review Checklist
+            ### TDD Compliance
+            - Are tests present for new or changed behavior?
+            - Do test names describe behavior clearly?
+            - Is there a failing test written before the implementation?
+            ### Tidy First Principles
+            - Are structural changes separated from behavioral changes?
+            - Are structural and behavioral changes NOT mixed in the same commit?
+            ### Code Quality
+            - Is duplication eliminated?
+            - Are names clear and intent-revealing?
+            - Are dependencies explicit?
+            - Are methods small and focused on a single responsibility?
+            - Is state and side effects minimized?
+            - Is the simplest solution used?
+            ### Security
+            - No secrets, API keys, or credentials in the diff
+            - No command injection, XSS, or SQL injection vulnerabilities
+            - No unsafe patterns with user input
+            ### General
+            - Does the code build without warnings?
+            - Are imports clean (no unused imports)?
+
+            ## Output Format
+            1. **Summary** - One sentence describing what the PR does
+            2. **Issues** - Bullet list of problems (with file:line references)
+            3. **Suggestions** - Optional improvements (non-blocking)
+
+            If no issues found, include 'Ready to merge' at the end.
+            IMPORTANT: Prefix your review with [CODEX-REVIEW].
+          sandbox: read-only
+          safety-strategy: drop-sudo
+
+      - name: Post Codex review comment
+        if: steps.check_approved.outputs.skip != 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const message = process.env.CODEX_MESSAGE;
+            if (!message) return;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+            });
+            const MAX_ITERATIONS = 5;
+            const reviewComments = comments.filter(c =>
+              c.body.includes('[CODEX-REVIEW]') || c.body.includes('[CLAUDE-FIX]')
+            );
+            const currentIteration = Math.floor(reviewComments.length / 2) + 1;
+            let body = message;
+            if (!body.startsWith('[CODEX-REVIEW]')) {
+              body = '[CODEX-REVIEW]
+
+' + body;
+            }
+            body += '
+
+---
+_Review iteration: ' + currentIteration + '/' + MAX_ITERATIONS + '_';
+            if (currentIteration >= MAX_ITERATIONS) {
+              body += '
+
+**Max iteration limit reached.** Please review manually.';
+            }
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: body,
+            });
+        env:
+          CODEX_MESSAGE: ${{ steps.codex_review.outputs.final-message }}
