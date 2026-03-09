@@ -112,18 +112,11 @@ jobs:
             const currentIteration = Math.floor(reviewComments.length / 2) + 1;
             let body = message;
             if (!body.startsWith('[CODEX-REVIEW]')) {
-              body = '[CODEX-REVIEW]
-
-' + body;
+              body = '[CODEX-REVIEW]\n\n' + body;
             }
-            body += '
-
----
-_Review iteration: ' + currentIteration + '/' + MAX_ITERATIONS + '_';
+            body += '\n\n---\n_Review iteration: ' + currentIteration + '/' + MAX_ITERATIONS + '_';
             if (currentIteration >= MAX_ITERATIONS) {
-              body += '
-
-**Max iteration limit reached.** Please review manually.';
+              body += '\n\n**Max iteration limit reached.** Please review manually.';
             }
             await github.rest.issues.createComment({
               owner: context.repo.owner,
