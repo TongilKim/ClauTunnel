@@ -3,6 +3,7 @@ import type { ImageAttachment, ModelInfo, SlashCommand } from 'clautunnel-shared
 
 // Helper to let the background stream loop process messages
 const tick = () => new Promise(resolve => setTimeout(resolve, 10));
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Helper to create a mock V2 session
 function createMockSession(messages: any[]) {
@@ -445,6 +446,19 @@ describe('SdkSession', () => {
       expect(sdkSession.getSessionId()).toBe('test-session-123');
 
       await sdkSession.setModel('sonnet');
+      expect(sdkSession.getSessionId()).toBeNull();
+    });
+
+    it('should reset compact fallback flags when model changes with sessionId only', async () => {
+      sdkSession.resumeSession('test-session-123');
+      const internal = sdkSession as any;
+      internal.awaitingCompactCompletionFallback = true;
+      internal.compactLateResultSuppressedGeneration = 7;
+
+      await sdkSession.setModel('sonnet');
+
+      expect(internal.awaitingCompactCompletionFallback).toBe(false);
+      expect(internal.compactLateResultSuppressedGeneration).toBeNull();
       expect(sdkSession.getSessionId()).toBeNull();
     });
 
@@ -1142,6 +1156,165 @@ describe('SdkSession', () => {
       // Should NOT be queued (previous request already recovered)
       expect(queuedHandler).not.toHaveBeenCalled();
       expect(normalSession._sendMock).toHaveBeenCalled();
+    });
+  });
+
+  describe('compact command completion fallback', () => {
+    it('should complete when /compact receives compact_boundary without result', async () => {
+      const compactOnlySession = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'compact-session' },
+        {
+          type: 'system',
+          subtype: 'compact_boundary',
+          compact_metadata: { trigger: 'manual', pre_tokens: 1234 },
+        },
+      ]);
+      mockedCreateSession.mockReturnValue(compactOnlySession as any);
+
+      const completeHandler = vi.fn();
+      sdkSession.on('complete', completeHandler);
+
+      await sdkSession.sendPrompt('/compact');
+      await tick();
+
+      // fallback is intentionally delayed to avoid racing late result events
+      expect(sdkSession.isActive()).toBe(true);
+      expect(completeHandler).not.toHaveBeenCalled();
+
+      await wait(90);
+      expect(sdkSession.isActive()).toBe(false);
+      expect(completeHandler).toHaveBeenCalledTimes(1);
+    });
+
+    it('should complete when /compact receives status:null without result', async () => {
+      const compactStatusOnlySession = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'compact-session' },
+        { type: 'system', subtype: 'status', status: 'compacting' },
+        { type: 'system', subtype: 'status', status: null },
+      ]);
+      mockedCreateSession.mockReturnValue(compactStatusOnlySession as any);
+
+      const completeHandler = vi.fn();
+      sdkSession.on('complete', completeHandler);
+
+      await sdkSession.sendPrompt('/compact');
+      await tick();
+
+      expect(sdkSession.isActive()).toBe(true);
+      expect(completeHandler).not.toHaveBeenCalled();
+
+      await wait(90);
+      expect(sdkSession.isActive()).toBe(false);
+      expect(completeHandler).toHaveBeenCalledTimes(1);
+    });
+
+    it('should prefer result over fallback when result arrives after compact_boundary', async () => {
+      const compactWithResultSession = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'compact-session' },
+        {
+          type: 'system',
+          subtype: 'compact_boundary',
+          compact_metadata: { trigger: 'manual', pre_tokens: 1234 },
+        },
+        { type: 'result', subtype: 'success', result: 'compacted' },
+      ]);
+      mockedCreateSession.mockReturnValue(compactWithResultSession as any);
+
+      const completeHandler = vi.fn();
+      sdkSession.on('complete', completeHandler);
+
+      await sdkSession.sendPrompt('/compact');
+      await tick();
+
+      expect(sdkSession.isActive()).toBe(false);
+      expect(completeHandler).toHaveBeenCalledTimes(1);
+
+      // delayed fallback timer should not emit a second completion
+      await wait(90);
+      expect(completeHandler).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not complete early for non-compact prompt on compact_boundary', async () => {
+      const compactBoundarySession = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'normal-session' },
+        {
+          type: 'system',
+          subtype: 'compact_boundary',
+          compact_metadata: { trigger: 'auto', pre_tokens: 2048 },
+        },
+      ]);
+      mockedCreateSession.mockReturnValue(compactBoundarySession as any);
+
+      const completeHandler = vi.fn();
+      sdkSession.on('complete', completeHandler);
+
+      await sdkSession.sendPrompt('hello');
+      await tick();
+
+      expect(sdkSession.isActive()).toBe(true);
+      expect(completeHandler).not.toHaveBeenCalled();
+    });
+
+    it('should defer queued prompt dispatch briefly after compact fallback', async () => {
+      const compactOnlySession = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'compact-session' },
+        {
+          type: 'system',
+          subtype: 'compact_boundary',
+          compact_metadata: { trigger: 'manual', pre_tokens: 900 },
+        },
+      ]);
+      mockedCreateSession.mockReturnValue(compactOnlySession as any);
+
+      await sdkSession.sendPrompt('/compact');
+      await tick();
+
+      // Queue a second message while compact is still processing
+      await sdkSession.sendPrompt('next message');
+
+      // The queued message should not be dispatched immediately.
+      expect(compactOnlySession._sendMock).toHaveBeenCalledTimes(1);
+
+      await wait(90);
+      expect(compactOnlySession._sendMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('should ignore a late compact result after queued prompt dispatch begins', async () => {
+      const sendMock = vi.fn().mockResolvedValue(undefined);
+      const lateResultSession = {
+        closed: false,
+        get sessionId() { return 'compact-session'; },
+        send: sendMock,
+        stream: async function* () {
+          yield { type: 'system', subtype: 'init', session_id: 'compact-session' };
+          yield {
+            type: 'system',
+            subtype: 'compact_boundary',
+            compact_metadata: { trigger: 'manual', pre_tokens: 1000 },
+          };
+          // Arrives after fallback has auto-dispatched the queued prompt
+          await wait(120);
+          yield { type: 'result', subtype: 'success', result: 'compacted' };
+        },
+        close: vi.fn(),
+        [Symbol.asyncDispose]: async () => {},
+      };
+      mockedCreateSession.mockReturnValue(lateResultSession as any);
+
+      const completeHandler = vi.fn();
+      sdkSession.on('complete', completeHandler);
+
+      await sdkSession.sendPrompt('/compact');
+      await tick();
+      await sdkSession.sendPrompt('next message');
+
+      await wait(105);
+      expect(sendMock).toHaveBeenCalledTimes(2);
+
+      // Late compact result must not complete the already-started next turn.
+      await wait(80);
+      expect(sdkSession.isActive()).toBe(true);
+      expect(completeHandler).not.toHaveBeenCalled();
     });
   });
 
