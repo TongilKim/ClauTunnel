@@ -111,9 +111,7 @@ jobs:
               body = fs.readFileSync('/tmp/claude-response.md', 'utf8');
             } catch(e) {}
             if (!body.startsWith('[CLAUDE-FIX]')) {
-              body = '[CLAUDE-FIX]
-
-' + body;
+              body = '[CLAUDE-FIX]\n\n' + body;
             }
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
@@ -125,10 +123,7 @@ jobs:
               c.body.includes('[CODEX-REVIEW]') || c.body.includes('[CLAUDE-FIX]')
             );
             const currentIteration = Math.ceil(reviewComments.length / 2);
-            body += '
-
----
-_Fix iteration: ' + currentIteration + '/' + MAX_ITERATIONS + '_';
+            body += '\n\n---\n_Fix iteration: ' + currentIteration + '/' + MAX_ITERATIONS + '_';
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
