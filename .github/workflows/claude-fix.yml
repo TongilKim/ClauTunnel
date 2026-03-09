@@ -1,0 +1,137 @@
+# Claude Fix (Step 2: Claude validates Codex review and applies fixes)
+# Triggers when a [CODEX-REVIEW] comment is posted on a PR.
+# Claude reads the review, validates it, and applies code changes if valid.
+# Requires ENABLE_CODEX_REVIEW=true in repository variables.
+
+name: Claude Fix on Codex Review
+
+on:
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: claude-fix-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  claude-fix:
+    if: |
+      vars.ENABLE_CODEX_REVIEW == 'true' &&
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '[CODEX-REVIEW]') &&
+      !contains(github.event.comment.body, 'Ready to merge') &&
+      !contains(github.event.comment.body, 'Max iteration limit reached')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Get PR details
+        id: pr_details
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.issue.number,
+            });
+            core.setOutput('head_ref', pr.head.ref);
+            core.setOutput('head_sha', pr.head.sha);
+
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ steps.pr_details.outputs.head_ref }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Read Codex review and apply fixes
+        id: claude_fix
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CODEX_REVIEW: ${{ github.event.comment.body }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          claude -p 'You are a senior developer for the ClauTunnel project.
+          You received the following code review from another AI reviewer (Codex):
+
+          --- CODEX REVIEW START ---
+          $CODEX_REVIEW
+          --- CODEX REVIEW END ---
+
+          Your task:
+          1. VALIDATE the review: Evaluate each issue Codex raised. Are they legitimate?
+          2. For VALID issues: Apply the minimal code fix needed.
+          3. For INVALID issues: Note why you disagree.
+          4. Do NOT make changes beyond what the review suggests.
+          5. Run any available tests to verify your changes.
+
+          After making changes, output a summary in this exact format:
+          [CLAUDE-FIX]
+          ## Validation of Codex Review
+          - For each issue: state whether you AGREE or DISAGREE and why
+          ## Changes Made
+          - List each file modified and what was changed
+          ## Status
+          - If all issues are resolved: Ready to merge
+          - If issues remain: list what still needs attention' --output-file /tmp/claude-response.md
+
+          cat /tmp/claude-response.md > $GITHUB_OUTPUT
+
+      - name: Commit and push fixes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          if [ -n '$(git status --porcelain)' ]; then
+            git add -A
+            git commit -m 'fix: Apply changes from Codex review (PR #${{ github.event.issue.number }})'
+            git push
+          else
+            echo 'No changes to commit'
+          fi
+
+      - name: Post Claude response
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const fs = require('fs');
+            let body = '[CLAUDE-FIX] No response generated';
+            try {
+              body = fs.readFileSync('/tmp/claude-response.md', 'utf8');
+            } catch(e) {}
+            if (!body.startsWith('[CLAUDE-FIX]')) {
+              body = '[CLAUDE-FIX]
+
+' + body;
+            }
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+            });
+            const MAX_ITERATIONS = 5;
+            const reviewComments = comments.filter(c =>
+              c.body.includes('[CODEX-REVIEW]') || c.body.includes('[CLAUDE-FIX]')
+            );
+            const currentIteration = Math.ceil(reviewComments.length / 2);
+            body += '
+
+---
+_Fix iteration: ' + currentIteration + '/' + MAX_ITERATIONS + '_';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              body: body,
+            });
