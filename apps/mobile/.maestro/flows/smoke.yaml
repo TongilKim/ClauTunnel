@@ -35,7 +35,7 @@ appId: com.clautunnel.app
 
 # Dismiss keyboard before interacting with test mode panel
 - hideKeyboard
-- pressKey: back
+- takeScreenshot: before-test-panel
 
 # Test AskUserQuestion flow — wait for toggle to be visible
 - extendedWaitUntil:

@@ -63,6 +63,8 @@ jobs:
 
       - name: Run Maestro E2E tests
         working-directory: apps/mobile
+        env:
+          MAESTRO_DRIVER_STARTUP_TIMEOUT: 120000
         run: |
           maestro test .maestro/flows/smoke.yaml --format junit --output test-results.xml
 
@@ -73,6 +75,7 @@ jobs:
           name: e2e-ios-results
           path: |
             apps/mobile/test-results.xml
+            apps/mobile/**/*.png
             ~/.maestro/tests/**/*.png
 
   e2e-android:
@@ -132,6 +135,7 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: |
             adb install apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+            export MAESTRO_DRIVER_STARTUP_TIMEOUT=120000
             cd apps/mobile && maestro test .maestro/flows/smoke.yaml --format junit --output test-results.xml
 
       - name: Upload test results
@@ -139,4 +143,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: e2e-android-results
-          path: apps/mobile/test-results.xml
+          path: |
+            apps/mobile/test-results.xml
+            apps/mobile/**/*.png
