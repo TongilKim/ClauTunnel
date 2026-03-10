@@ -91,6 +91,8 @@ export function ModelPicker({
                 return (
                   <TouchableOpacity
                     key={model.value}
+                    accessible={true}
+                    accessibilityLabel={`model-${model.value}`}
                     testID={`model-option-${model.value}`}
                     style={[
                       styles.option,

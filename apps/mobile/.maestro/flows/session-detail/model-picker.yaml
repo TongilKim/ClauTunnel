@@ -20,16 +20,16 @@ appId: com.clautunnel.app
 - tapOn:
     id: "input-commands-button"
 - extendedWaitUntil:
-    visible: "Commands"
+    visible: "command-model"
     timeout: 3000
-- extendedWaitUntil:
-    visible: "Change the Claude model for this session"
-    timeout: 3000
-- tapOn: "Change the Claude model for this session"
+- tapOn: "command-model"
 - extendedWaitUntil:
     visible: "Select Model"
     timeout: 3000
-- tapOn: "Haiku 3.5"
+- extendedWaitUntil:
+    visible: "model-haiku"
+    timeout: 3000
+- tapOn: "model-haiku"
 - assertNotVisible: "Select Model"
 - assertVisible:
     id: "input-model-badge"
