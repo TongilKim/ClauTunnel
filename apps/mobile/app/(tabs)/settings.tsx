@@ -48,7 +48,7 @@ export default function SettingsScreen() {
         <View style={[styles.card, isDark && styles.cardDark]}>
           <View style={styles.row}>
             <Text style={[styles.label, isDark && styles.labelDark]}>Email</Text>
-            <Text style={[styles.value, isDark && styles.valueDark]}>
+            <Text testID="settings-email" style={[styles.value, isDark && styles.valueDark]}>
               {user?.email || 'Not signed in'}
             </Text>
           </View>
@@ -65,7 +65,7 @@ export default function SettingsScreen() {
             <Text style={[styles.label, isDark && styles.labelDark]}>
               Version
             </Text>
-            <Text style={[styles.value, isDark && styles.valueDark]}>
+            <Text testID="settings-version" style={[styles.value, isDark && styles.valueDark]}>
               {appVersion}
             </Text>
           </View>
@@ -74,6 +74,7 @@ export default function SettingsScreen() {
 
       {/* Sign Out Button */}
       <TouchableOpacity
+        testID="settings-logout-button"
         style={[styles.logoutButton, isLoading && styles.logoutButtonDisabled]}
         onPress={handleLogout}
         disabled={isLoading}

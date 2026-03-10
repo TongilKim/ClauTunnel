@@ -76,6 +76,7 @@ export default function RegisterScreen() {
 
         <View style={styles.form}>
           <TextInput
+            testID="register-email-input"
             style={[styles.input, isDark && styles.inputDark]}
             placeholder="Email"
             placeholderTextColor={isDark ? '#6b7280' : '#9ca3af'}
@@ -87,6 +88,7 @@ export default function RegisterScreen() {
             editable={!isLoading}
           />
           <TextInput
+            testID="register-password-input"
             style={[styles.input, isDark && styles.inputDark]}
             placeholder="Password"
             placeholderTextColor={isDark ? '#6b7280' : '#9ca3af'}
@@ -96,6 +98,7 @@ export default function RegisterScreen() {
             editable={!isLoading}
           />
           <TextInput
+            testID="register-confirm-password-input"
             style={[styles.input, isDark && styles.inputDark]}
             placeholder="Confirm Password"
             placeholderTextColor={isDark ? '#6b7280' : '#9ca3af'}
@@ -106,6 +109,7 @@ export default function RegisterScreen() {
           />
 
           <Pressable
+            testID="register-button"
             style={[styles.button, isLoading && styles.buttonDisabled]}
             onPress={handleRegister}
             disabled={isLoading}
@@ -123,7 +127,7 @@ export default function RegisterScreen() {
             Already have an account?{' '}
           </Text>
           <Link href="/(auth)/login" asChild>
-            <Pressable>
+            <Pressable testID="register-login-link">
               <Text style={styles.linkText}>Sign In</Text>
             </Pressable>
           </Link>

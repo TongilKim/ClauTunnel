@@ -172,6 +172,7 @@ export function SessionCard({ session }: SessionCardProps) {
 
   const cardContent = (
     <TouchableOpacity
+      testID={`session-card-${session.id}`}
       style={[styles.container, isDark && styles.containerDark]}
       onPress={handleCardPress}
       activeOpacity={0.7}

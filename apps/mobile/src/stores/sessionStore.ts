@@ -4,6 +4,7 @@ import type { Session, Machine, MachineCommand } from 'clautunnel-shared';
 import { REALTIME_CHANNELS } from 'clautunnel-shared';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { setupPresenceHandlers } from '../utils/presenceUtils';
+import { isTestMode, MOCK_SESSIONS, MOCK_MACHINES } from '../utils/testMode';
 
 interface SessionStoreState {
   sessions: Session[];
@@ -39,15 +40,17 @@ interface SessionStoreState {
 const presenceChannels: Map<string, RealtimeChannel> = new Map();
 const machinePresenceChannels: Map<string, RealtimeChannel> = new Map();
 
+const _testMode = isTestMode();
+
 export const useSessionStore = create<SessionStoreState>((set, get) => ({
-  sessions: [],
-  machines: [],
+  sessions: _testMode ? (MOCK_SESSIONS as any) : [],
+  machines: _testMode ? (MOCK_MACHINES as any) : [],
   isLoading: false,
   error: null,
   pendingSessionId: null,
   openSwipeableId: null,
-  sessionOnlineStatus: {},
-  machineOnlineStatus: {},
+  sessionOnlineStatus: _testMode ? { 'test-session-1': true } : {},
+  machineOnlineStatus: _testMode ? { 'test-machine-1': true } : {},
   isStartingSession: null,
   startSessionError: null,
 

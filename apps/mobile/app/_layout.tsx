@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useColorScheme, View, ActivityIndicator } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuthStore } from '../src/stores/authStore';
+import { isTestMode } from '../src/utils/testMode';
 
 function useProtectedRoute(user: any, isLoading: boolean) {
   const segments = useSegments();
@@ -34,9 +35,11 @@ export default function RootLayout() {
 
   const { user, isLoading, initialize } = useAuthStore();
 
-  // Initialize auth on app load
+  // Initialize auth on app load (skip in test mode — stores have mock data from init)
   useEffect(() => {
-    initialize();
+    if (!isTestMode()) {
+      initialize();
+    }
   }, []);
 
   const redirectTo = useProtectedRoute(user, isLoading);

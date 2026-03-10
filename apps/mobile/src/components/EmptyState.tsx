@@ -5,14 +5,15 @@ interface EmptyStateProps {
   title: string;
   message: string;
   icon?: string;
+  testID?: string;
 }
 
-export function EmptyState({ title, message, icon = '📱' }: EmptyStateProps) {
+export function EmptyState({ title, message, icon = '📱', testID }: EmptyStateProps) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} testID={testID}>
       <Text style={styles.icon}>{icon}</Text>
       <Text style={[styles.title, isDark && styles.titleDark]}>{title}</Text>
       <Text style={[styles.message, isDark && styles.messageDark]}>

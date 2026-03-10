@@ -42,7 +42,7 @@ export default function LoginScreen() {
 
         {error && (
           <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{error}</Text>
+            <Text testID="login-error-text" style={styles.errorText}>{error}</Text>
             <Pressable onPress={clearError}>
               <Text style={styles.errorDismiss}>Dismiss</Text>
             </Pressable>
@@ -51,6 +51,7 @@ export default function LoginScreen() {
 
         <View style={styles.form}>
           <TextInput
+            testID="login-email-input"
             style={[styles.input, isDark && styles.inputDark]}
             placeholder="Email"
             placeholderTextColor={isDark ? '#6b7280' : '#9ca3af'}
@@ -62,6 +63,7 @@ export default function LoginScreen() {
             editable={!isLoading}
           />
           <TextInput
+            testID="login-password-input"
             style={[styles.input, isDark && styles.inputDark]}
             placeholder="Password"
             placeholderTextColor={isDark ? '#6b7280' : '#9ca3af'}
@@ -95,6 +97,7 @@ export default function LoginScreen() {
             </button>
           ) : (
             <Pressable
+              testID="login-button"
               style={[styles.button, isLoading && styles.buttonDisabled]}
               onPress={handleLogin}
               disabled={isLoading}
@@ -113,7 +116,7 @@ export default function LoginScreen() {
             Don't have an account?{' '}
           </Text>
           <Link href="/(auth)/register" asChild>
-            <Pressable>
+            <Pressable testID="login-signup-link">
               <Text style={styles.linkText}>Sign Up</Text>
             </Pressable>
           </Link>

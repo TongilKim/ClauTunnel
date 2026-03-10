@@ -304,6 +304,7 @@ export function Terminal() {
         </View>
       )}
       <ScrollView
+        testID="terminal-scrollview"
         ref={scrollViewRef}
         style={[styles.scrollView, isInitialLoading && messages.length > 0 && { opacity: 0 }]}
         contentContainerStyle={styles.scrollContent}

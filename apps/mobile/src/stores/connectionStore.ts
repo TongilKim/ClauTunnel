@@ -1,6 +1,16 @@
 import { create } from 'zustand';
 import { supabase } from '../services/supabase';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import {
+  buildMockAnswerSummary,
+  buildMockClaudeResponse,
+  buildMockPermissionSummary,
+  isTestMode,
+  MOCK_COMMANDS,
+  MOCK_MESSAGES,
+  MOCK_MODELS,
+  MOCK_PERMISSION_MODE,
+} from '../utils/testMode';
 import type {
   RealtimeMessage,
   ImageAttachment,
@@ -110,6 +120,22 @@ let outputChannel: RealtimeChannel | null = null;
 let inputChannel: RealtimeChannel | null = null;
 let seq = 0;
 let scrollToBottomCallback: (() => void) | null = null;
+const mockTimers = new Set<ReturnType<typeof setTimeout>>();
+
+function scheduleMockAction(action: () => void, delayMs = 150) {
+  const timer = setTimeout(() => {
+    mockTimers.delete(timer);
+    action();
+  }, delayMs);
+  mockTimers.add(timer);
+}
+
+function clearMockActions() {
+  for (const timer of mockTimers) {
+    clearTimeout(timer);
+  }
+  mockTimers.clear();
+}
 
 export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
   state: 'disconnected',
@@ -136,6 +162,8 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
 
   connect: async (sessionId: string) => {
     try {
+      clearMockActions();
+
       // Clear all previous session state - each session has its own messages, typing state, model, commands, etc.
       set({
         state: 'connecting',
@@ -160,6 +188,36 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
         isLoadingMore: false,
         oldestLoadedSeq: null,
       });
+
+      if (isTestMode()) {
+        const mockMessages = [...MOCK_MESSAGES];
+        const mockLastSeq = mockMessages[mockMessages.length - 1]?.seq ?? 0;
+        seq = mockLastSeq;
+        set({
+          state: 'connected',
+          sessionId,
+          error: null,
+          messages: mockMessages,
+          lastSeq: mockLastSeq,
+          isTyping: false,
+          isMessageQueued: false,
+          isCliOnline: true,
+          permissionMode: MOCK_PERMISSION_MODE,
+          commands: MOCK_COMMANDS,
+          model: MOCK_MODELS[0]?.value ?? null,
+          availableModels: MOCK_MODELS,
+          isModelChanging: false,
+          interactiveData: null,
+          isInteractiveLoading: false,
+          interactiveError: null,
+          pendingQuestion: null,
+          pendingPermissionRequest: null,
+          hasMoreMessages: false,
+          isLoadingMore: false,
+          oldestLoadedSeq: mockMessages[0]?.seq ?? null,
+        });
+        return;
+      }
 
       // First check if the session is still active
       const { data: session, error: sessionError } = await supabase
@@ -406,6 +464,8 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
   },
 
   disconnect: async () => {
+    clearMockActions();
+
     if (outputChannel) {
       await supabase.removeChannel(outputChannel);
       outputChannel = null;
@@ -418,11 +478,56 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
     set({
       state: 'disconnected',
       sessionId: null,
+      messages: [],
+      lastSeq: 0,
+      isTyping: false,
+      isMessageQueued: false,
       isCliOnline: false,
+      pendingQuestion: null,
+      pendingPermissionRequest: null,
     });
   },
 
   sendInput: async (content: string, attachments?: ImageAttachment[]) => {
+    if (isTestMode() && get().state === 'connected') {
+      const message: RealtimeMessage = {
+        type: 'input',
+        content,
+        attachments,
+        timestamp: Date.now(),
+        seq: ++seq,
+      };
+
+      set((state) => ({
+        messages: [...state.messages, message],
+        lastSeq: message.seq,
+        isTyping: true,
+        error: null,
+      }));
+
+      setTimeout(() => {
+        get().scrollToBottom();
+      }, 50);
+
+      scheduleMockAction(() => {
+        const response: RealtimeMessage = {
+          type: 'output',
+          content: buildMockClaudeResponse(content),
+          timestamp: Date.now(),
+          seq: ++seq,
+        };
+
+        set((state) => ({
+          messages: [...state.messages, response],
+          lastSeq: response.seq,
+          isTyping: false,
+          isMessageQueued: false,
+        }));
+      });
+
+      return;
+    }
+
     if (!inputChannel || get().state !== 'connected') {
       set({ error: 'Not connected' });
       return;
@@ -524,6 +629,12 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
   },
 
   sendCancelRequest: async () => {
+    if (isTestMode() && get().state === 'connected') {
+      clearMockActions();
+      set({ isTyping: false, isMessageQueued: false, error: null });
+      return;
+    }
+
     if (!inputChannel || get().state !== 'connected') {
       set({ error: 'Not connected' });
       return;
@@ -543,6 +654,12 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
   },
 
   sendClearRequest: async () => {
+    if (isTestMode() && get().state === 'connected') {
+      clearMockActions();
+      set({ messages: [], lastSeq: 0, isTyping: false, isMessageQueued: false });
+      return;
+    }
+
     if (!inputChannel || get().state !== 'connected') {
       set({ error: 'Not connected' });
       return;
@@ -562,6 +679,23 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
   },
 
   sendResumeRequest: async (sdkSessionId: string) => {
+    if (isTestMode() && get().state === 'connected') {
+      const message: RealtimeMessage = {
+        type: 'system',
+        content: `Resumed mock session ${sdkSessionId}`,
+        timestamp: Date.now(),
+        seq: ++seq,
+      };
+
+      set((state) => ({
+        messages: [...state.messages, message],
+        lastSeq: message.seq,
+        isTyping: false,
+        error: null,
+      }));
+      return;
+    }
+
     if (!inputChannel || get().state !== 'connected') {
       set({ error: 'Not connected' });
       return;
@@ -589,6 +723,11 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
   },
 
   sendModeChange: async (mode: PermissionMode) => {
+    if (isTestMode() && get().state === 'connected') {
+      set({ permissionMode: mode, error: null });
+      return;
+    }
+
     if (!inputChannel || get().state !== 'connected') {
       set({ error: 'Not connected' });
       return;
@@ -609,6 +748,11 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
   },
 
   requestCommands: async () => {
+    if (isTestMode() && get().state === 'connected') {
+      set({ commands: MOCK_COMMANDS, error: null });
+      return;
+    }
+
     if (!inputChannel || get().state !== 'connected') {
       set({ error: 'Not connected' });
       return;
@@ -628,6 +772,17 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
   },
 
   sendModelChange: async (model: string) => {
+    if (isTestMode() && get().state === 'connected') {
+      set({ isModelChanging: true, error: null });
+      scheduleMockAction(() => {
+        set({
+          model,
+          isModelChanging: false,
+        });
+      });
+      return;
+    }
+
     if (!inputChannel || get().state !== 'connected') {
       set({ error: 'Not connected' });
       return;
@@ -651,6 +806,15 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
   },
 
   requestModels: async () => {
+    if (isTestMode() && get().state === 'connected') {
+      set({
+        availableModels: MOCK_MODELS,
+        model: get().model ?? MOCK_MODELS[0]?.value ?? null,
+        error: null,
+      });
+      return;
+    }
+
     if (!inputChannel || get().state !== 'connected') {
       set({ error: 'Not connected' });
       return;
@@ -670,6 +834,11 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
   },
 
   requestPendingState: async () => {
+    if (isTestMode() && get().state === 'connected') {
+      set({ permissionMode: MOCK_PERMISSION_MODE });
+      return;
+    }
+
     if (!inputChannel || get().state !== 'connected') {
       return;
     }
@@ -746,6 +915,25 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
   }),
 
   sendUserAnswer: async (answers: Record<string, string>) => {
+    if (isTestMode() && get().state === 'connected') {
+      const summary = buildMockAnswerSummary(answers);
+      const response: RealtimeMessage = {
+        type: 'system',
+        content: `Question answered: ${summary}`,
+        timestamp: Date.now(),
+        seq: ++seq,
+      };
+
+      set((state) => ({
+        pendingQuestion: null,
+        messages: [...state.messages, response],
+        lastSeq: response.seq,
+        isTyping: false,
+        error: null,
+      }));
+      return;
+    }
+
     if (!inputChannel || get().state !== 'connected') {
       set({ error: 'Not connected' });
       return;
@@ -785,6 +973,28 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
   clearPendingQuestion: () => set({ pendingQuestion: null }),
 
   sendPermissionResponse: async (behavior: 'allow' | 'deny', message?: string) => {
+    if (isTestMode() && get().state === 'connected') {
+      const pendingRequest = get().pendingPermissionRequest;
+      const response: RealtimeMessage = {
+        type: 'system',
+        content: buildMockPermissionSummary(
+          pendingRequest?.toolName || 'tool',
+          behavior
+        ),
+        timestamp: Date.now(),
+        seq: ++seq,
+      };
+
+      set((state) => ({
+        pendingPermissionRequest: null,
+        messages: [...state.messages, response],
+        lastSeq: response.seq,
+        isTyping: false,
+        error: null,
+      }));
+      return;
+    }
+
     if (!inputChannel || get().state !== 'connected') {
       set({ error: 'Not connected' });
       return;

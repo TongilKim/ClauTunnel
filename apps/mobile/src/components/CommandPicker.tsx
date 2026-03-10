@@ -12,6 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import type { SlashCommand } from 'clautunnel-shared';
+import { isTestMode } from '../utils/testMode';
 
 interface CommandPickerProps {
   visible: boolean;
@@ -32,7 +33,7 @@ export function CommandPicker({
   const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
-    if (visible) {
+    if (visible && !isTestMode()) {
       // Delay to let the modal animation finish before focusing
       const timer = setTimeout(() => {
         inputRef.current?.focus();
@@ -104,7 +105,10 @@ export function CommandPicker({
           activeOpacity={1}
           onPress={handleClose}
         />
-        <View style={[styles.content, isDark && styles.contentDark]}>
+        <View
+          testID="command-picker-modal"
+          style={[styles.content, isDark && styles.contentDark]}
+        >
           <View style={styles.handle} />
           <Text style={[styles.title, isDark && styles.titleDark]}>
             Commands
@@ -138,6 +142,9 @@ export function CommandPicker({
               filteredCommands.map((item) => (
                 <TouchableOpacity
                   key={item.name}
+                  accessible={true}
+                  accessibilityLabel={`command-${item.name}`}
+                  testID={`command-option-${item.name}`}
                   style={[styles.commandItem, isDark && styles.commandItemDark]}
                   onPress={() => handleSelect(item)}
                   activeOpacity={0.7}
