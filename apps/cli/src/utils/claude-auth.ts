@@ -1,14 +1,21 @@
 import { execSync } from 'child_process';
 
+export type AuthCheckFailure =
+  | 'cli_not_found'
+  | 'subcommand_not_supported'
+  | 'not_logged_in'
+  | 'unknown';
+
 export interface ClaudeAuthStatus {
   loggedIn: boolean;
   authMethod?: string;
   apiProvider?: string;
+  failure?: AuthCheckFailure;
 }
 
 /**
  * Check if the Claude CLI is authenticated by running `claude auth status --json`.
- * Returns { loggedIn: false } if the command fails or reports not logged in.
+ * Distinguishes between CLI not found, subcommand not supported, and not logged in.
  */
 export function checkClaudeCliAuth(): ClaudeAuthStatus {
   try {
@@ -19,13 +26,37 @@ export function checkClaudeCliAuth(): ClaudeAuthStatus {
     });
 
     const status = JSON.parse(output.trim());
-    return {
-      loggedIn: status.loggedIn === true,
-      authMethod: status.authMethod,
-      apiProvider: status.apiProvider,
-    };
-  } catch {
-    // Command failed or not found — treat as not logged in
-    return { loggedIn: false };
+    if (status.loggedIn === true) {
+      return {
+        loggedIn: true,
+        authMethod: status.authMethod,
+        apiProvider: status.apiProvider,
+      };
+    }
+    return { loggedIn: false, failure: 'not_logged_in' };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : String(error);
+
+    // CLI binary not found
+    if (
+      message.includes('command not found') ||
+      message.includes('ENOENT') ||
+      message.includes('not recognized')
+    ) {
+      return { loggedIn: false, failure: 'cli_not_found' };
+    }
+
+    // Subcommand not supported (older CLI version)
+    if (
+      message.includes('Unknown command') ||
+      message.includes('unknown command') ||
+      message.includes('Invalid subcommand') ||
+      message.includes('invalid subcommand')
+    ) {
+      return { loggedIn: false, failure: 'subcommand_not_supported' };
+    }
+
+    return { loggedIn: false, failure: 'unknown' };
   }
 }
