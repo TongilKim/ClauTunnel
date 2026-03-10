@@ -35,10 +35,19 @@ appId: com.clautunnel.app
 
 # Dismiss keyboard before interacting with test mode panel
 - hideKeyboard
+- pressKey: back
 
-# Test AskUserQuestion flow
+# Test AskUserQuestion flow — wait for toggle to be visible
+- extendedWaitUntil:
+    visible:
+      id: "test-mode-toggle"
+    timeout: 5000
 - tapOn:
     id: "test-mode-toggle"
+- extendedWaitUntil:
+    visible:
+      id: "test-mode-trigger-question"
+    timeout: 3000
 - tapOn:
     id: "test-mode-trigger-question"
 - extendedWaitUntil:

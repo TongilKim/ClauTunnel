@@ -50,7 +50,7 @@ export function TestModePanel() {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: 120,
+    top: 120,
     right: 16,
     zIndex: 9999,
     alignItems: 'flex-end',
