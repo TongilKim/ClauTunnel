@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { useColorScheme, Text } from 'react-native';
+import { useColorScheme, Text, Pressable } from 'react-native';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -34,9 +34,11 @@ export default function TabLayout() {
         name="settings"
         options={{
           title: 'Settings',
-          tabBarTestID: 'tab-settings',
           tabBarIcon: ({ color }) => (
             <Text style={{ fontSize: 20, color }}>⚙️</Text>
+          ),
+          tabBarButton: (props) => (
+            <Pressable testID="tab-settings" {...props} />
           ),
         }}
       />
