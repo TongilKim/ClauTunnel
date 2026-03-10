@@ -88,7 +88,9 @@ appId: com.clautunnel.app
 # (Expo Router v6 tabs don't expose testID or text to Maestro)
 - tapOn:
     point: "75%,97%"
-- assertVisible:
-    id: "settings-email"
+- extendedWaitUntil:
+    visible:
+      id: "settings-email"
+    timeout: 5000
 - assertVisible:
     id: "settings-version"

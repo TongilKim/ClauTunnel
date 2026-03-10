@@ -74,9 +74,8 @@ jobs:
 
       - name: Run Maestro E2E tests
         working-directory: apps/mobile
-        env:
-          MAESTRO_DRIVER_STARTUP_TIMEOUT: 120000
         run: |
+          export MAESTRO_DRIVER_STARTUP_TIMEOUT=120000
           maestro test .maestro/flows/smoke.yaml --format junit --output test-results.xml
 
       - name: Upload test results
