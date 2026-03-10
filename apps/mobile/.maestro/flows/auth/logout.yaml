@@ -1,0 +1,9 @@
+appId: com.clautunnel.app
+---
+- tapOn: "Settings"
+- assertVisible:
+    id: "settings-logout-button"
+- tapOn:
+    id: "settings-logout-button"
+- tapOn: "Sign Out"
+- assertVisible: "ClauTunnel"

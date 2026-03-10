@@ -90,6 +90,7 @@ export function CommandPicker({
 
   return (
     <Modal
+      testID="command-picker-modal"
       visible={visible}
       animationType="slide"
       transparent
@@ -138,6 +139,7 @@ export function CommandPicker({
               filteredCommands.map((item) => (
                 <TouchableOpacity
                   key={item.name}
+                  testID={`command-option-${item.name}`}
                   style={[styles.commandItem, isDark && styles.commandItemDark]}
                   onPress={() => handleSelect(item)}
                   activeOpacity={0.7}

@@ -88,6 +88,7 @@ export function UserQuestionPicker({
 
   return (
     <Modal
+      testID="user-question-modal"
       visible={visible}
       animationType="slide"
       transparent
@@ -107,7 +108,7 @@ export function UserQuestionPicker({
         >
           <View style={styles.handle} />
 
-          <Text style={[styles.title, isDark && styles.titleDark]}>
+          <Text testID="user-question-title" style={[styles.title, isDark && styles.titleDark]}>
             Claude is asking...
           </Text>
 
@@ -135,6 +136,7 @@ export function UserQuestionPicker({
                     return (
                       <TouchableOpacity
                         key={oIndex}
+                        testID={`user-question-option-${qIndex}-${oIndex}`}
                         style={[
                           styles.option,
                           isDark && styles.optionDark,
@@ -176,6 +178,7 @@ export function UserQuestionPicker({
 
                   {/* Other option */}
                   <TouchableOpacity
+                    testID={`user-question-other-${qIndex}`}
                     style={[
                       styles.option,
                       isDark && styles.optionDark,
@@ -214,6 +217,7 @@ export function UserQuestionPicker({
                   {/* Text input for Other option */}
                   {usingOther[qIndex] && (
                     <TextInput
+                      testID={`user-question-other-input-${qIndex}`}
                       style={[styles.otherInput, isDark && styles.otherInputDark]}
                       placeholder="Type your answer..."
                       placeholderTextColor={isDark ? '#6b7280' : '#9ca3af'}
@@ -235,6 +239,7 @@ export function UserQuestionPicker({
 
           {/* Submit button */}
           <TouchableOpacity
+            testID="user-question-submit"
             style={[
               styles.submitButton,
               isDark && styles.submitButtonDark,
@@ -250,6 +255,7 @@ export function UserQuestionPicker({
 
           {/* Cancel button */}
           <TouchableOpacity
+            testID="user-question-cancel"
             style={[styles.cancelButton, isDark && styles.cancelButtonDark]}
             onPress={onClose}
           >

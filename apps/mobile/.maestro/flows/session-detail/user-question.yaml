@@ -1,0 +1,24 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+    arguments:
+      EXPO_PUBLIC_E2E_TEST_MODE: "true"
+- tapOn:
+    id: "session-card-test-session-1"
+- tapOn:
+    id: "test-mode-toggle"
+- tapOn:
+    id: "test-mode-trigger-question"
+- assertVisible:
+    id: "user-question-modal"
+- assertVisible: "Claude is asking..."
+- assertVisible: "Which testing framework should we use?"
+- tapOn:
+    id: "user-question-option-0-0"
+- tapOn:
+    id: "user-question-submit"
+- assertNotVisible:
+    id: "user-question-modal"
+- tapOn:
+    id: "session-back-button"

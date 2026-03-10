@@ -69,6 +69,7 @@ export function PermissionRequestPicker({
 
   return (
     <Modal
+      testID="permission-request-modal"
       visible={visible}
       animationType="slide"
       transparent
@@ -99,7 +100,7 @@ export function PermissionRequestPicker({
             <View style={styles.requestBlock}>
               {/* Tool name badge */}
               <View style={[styles.headerBadge, isDark && styles.headerBadgeDark]}>
-                <Text style={[styles.headerText, isDark && styles.headerTextDark]}>
+                <Text testID="permission-tool-name" style={[styles.headerText, isDark && styles.headerTextDark]}>
                   {requestData.toolName}
                 </Text>
               </View>
@@ -154,6 +155,7 @@ export function PermissionRequestPicker({
           {/* Action buttons */}
           <View style={styles.buttonContainer}>
             <TouchableOpacity
+              testID="permission-allow-button"
               style={[styles.allowButton, isDark && styles.allowButtonDark]}
               onPress={handleAllow}
             >
@@ -161,6 +163,7 @@ export function PermissionRequestPicker({
             </TouchableOpacity>
 
             <TouchableOpacity
+              testID="permission-deny-button"
               style={[styles.denyButton, isDark && styles.denyButtonDark]}
               onPress={handleDeny}
             >

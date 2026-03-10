@@ -17,6 +17,7 @@ import { useSessionStore } from '../../src/stores/sessionStore';
 import { SessionCard } from '../../src/components/SessionCard';
 import { EmptyState } from '../../src/components/EmptyState';
 import { isSessionOnlineForUI } from '../../src/utils/sessionStatus';
+import { isTestMode, MOCK_SESSIONS, MOCK_MACHINES } from '../../src/utils/testMode';
 
 interface MachineSection {
   id: string;
@@ -52,9 +53,23 @@ export default function SessionsScreen() {
     startSessionOnMachine,
   } = useSessionStore();
 
+  // In test mode, inject mock data instead of fetching from Supabase
+  useEffect(() => {
+    if (isTestMode()) {
+      useSessionStore.setState({
+        sessions: MOCK_SESSIONS as any,
+        machines: MOCK_MACHINES as any,
+        isLoading: false,
+        sessionOnlineStatus: { 'test-session-1': true },
+        machineOnlineStatus: { 'test-machine-1': true },
+      });
+    }
+  }, []);
+
   // Refresh sessions silently and subscribe to presence whenever the screen gains focus
   useFocusEffect(
     useCallback(() => {
+      if (isTestMode()) return;
       fetchMachines();
       fetchSessions(true).then(() => {
         subscribeToPresence();
@@ -65,6 +80,7 @@ export default function SessionsScreen() {
 
   // Also subscribe when sessions or machines change
   useEffect(() => {
+    if (isTestMode()) return;
     if (sessions.length > 0 || machines.length > 0) {
       subscribeToPresence();
       subscribeMachinePresence();
@@ -205,6 +221,7 @@ export default function SessionsScreen() {
           title="No Sessions"
           message="Start a Claude Code session using 'clautunnel start' or run 'clautunnel listen' to start sessions from this app. Pull down to refresh."
           icon="💻"
+          testID="sessions-empty-state"
         />
       </ScrollView>
     );
@@ -219,7 +236,7 @@ export default function SessionsScreen() {
           onPress={() => setOpenSwipeableId(null)}
         >
           <View style={styles.statItem}>
-            <Text style={[styles.statNumber, isDark && styles.statNumberDark]}>
+            <Text testID="sessions-stats-total" style={[styles.statNumber, isDark && styles.statNumberDark]}>
               {sessionCounts.total}
             </Text>
             <Text style={[styles.statLabel, isDark && styles.statLabelDark]}>Total</Text>
@@ -228,7 +245,7 @@ export default function SessionsScreen() {
           <View style={styles.statItem}>
             <View style={styles.statRow}>
               <View style={[styles.statusDot, styles.statusDotOnline]} />
-              <Text style={[styles.statNumber, styles.statNumberOnline]}>
+              <Text testID="sessions-stats-online" style={[styles.statNumber, styles.statNumberOnline]}>
                 {sessionCounts.online}
               </Text>
             </View>
@@ -238,7 +255,7 @@ export default function SessionsScreen() {
           <View style={styles.statItem}>
             <View style={styles.statRow}>
               <View style={[styles.statusDot, styles.statusDotOffline]} />
-              <Text style={[styles.statNumber, isDark && styles.statNumberDark]}>
+              <Text testID="sessions-stats-offline" style={[styles.statNumber, isDark && styles.statNumberDark]}>
                 {sessionCounts.offline}
               </Text>
             </View>
@@ -247,6 +264,7 @@ export default function SessionsScreen() {
         </Pressable>
         <View style={styles.statDivider} />
         <TouchableOpacity
+          testID="sessions-refresh-button"
           style={styles.refreshButton}
           onPress={onRefresh}
           disabled={isLoading}
@@ -259,6 +277,7 @@ export default function SessionsScreen() {
         </TouchableOpacity>
       </View>
       <SectionList
+        testID="sessions-section-list"
         sections={sections}
         keyExtractor={(item) => item.id}
         renderItem={({ item, section }) =>
@@ -271,6 +290,7 @@ export default function SessionsScreen() {
           return (
             <View>
               <TouchableOpacity
+                testID={`machine-section-${section.id}`}
                 style={[styles.sectionHeader, isDark && styles.sectionHeaderDark]}
                 onPress={() => toggleSection(section.id)}
                 activeOpacity={0.7}
@@ -321,6 +341,7 @@ export default function SessionsScreen() {
               </TouchableOpacity>
               {(showAdd || isStarting) && (
                 <TouchableOpacity
+                  testID={`machine-add-session-${section.id}`}
                   style={[styles.addSessionButton, isDark && styles.addSessionButtonDark]}
                   onPress={() => onStartSession(section.id)}
                   disabled={isStarting}

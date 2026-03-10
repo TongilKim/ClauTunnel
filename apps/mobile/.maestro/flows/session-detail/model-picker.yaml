@@ -1,0 +1,15 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+    arguments:
+      EXPO_PUBLIC_E2E_TEST_MODE: "true"
+- tapOn:
+    id: "session-card-test-session-1"
+- tapOn:
+    id: "input-commands-button"
+- assertVisible:
+    id: "command-picker-modal"
+- assertVisible: "Commands"
+- tapOn:
+    id: "session-back-button"

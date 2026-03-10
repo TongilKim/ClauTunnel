@@ -302,6 +302,7 @@ export function InputBar({ disabled }: InputBarProps) {
       <View style={[styles.inputCard, isDark && styles.inputCardDark]}>
         {/* Input area */}
         <TextInput
+          testID="input-text"
           style={[
             styles.input,
             isDark && styles.inputDark,
@@ -346,6 +347,7 @@ export function InputBar({ disabled }: InputBarProps) {
         <View style={[styles.toolbar, isDark && styles.toolbarDark]}>
           <View style={styles.toolbarLeft}>
             <TouchableOpacity
+              testID="input-attach-button"
               style={[styles.attachButton, isDisabled && styles.attachButtonDisabled]}
               onPress={handleAttachment}
               disabled={isDisabled}
@@ -356,6 +358,7 @@ export function InputBar({ disabled }: InputBarProps) {
               </View>
             </TouchableOpacity>
             <TouchableOpacity
+              testID="input-commands-button"
               style={[styles.commandsButton, isDisabled && styles.commandsButtonDisabled]}
               onPress={handleCommandsPress}
               disabled={isDisabled}
@@ -363,7 +366,7 @@ export function InputBar({ disabled }: InputBarProps) {
               <Text style={[styles.commandsButtonText, isDark && styles.commandsButtonTextDark]}>/</Text>
             </TouchableOpacity>
             {modelBadge.visible && (
-              <View style={[styles.modelBadge, isDark && styles.modelBadgeDark]}>
+              <View testID="input-model-badge" style={[styles.modelBadge, isDark && styles.modelBadgeDark]}>
                 {modelBadge.showSpinner ? (
                   <ActivityIndicator size="small" color={isDark ? '#9ca3af' : '#6b7280'} />
                 ) : (
@@ -374,7 +377,7 @@ export function InputBar({ disabled }: InputBarProps) {
               </View>
             )}
             {permissionModeBadge.visible && (
-              <View style={[styles.modeBadge, permissionModeBadgeToneStyle]}>
+              <View testID="input-mode-badge" style={[styles.modeBadge, permissionModeBadgeToneStyle]}>
                 <Text style={[styles.modeText, permissionModeTextToneStyle]} numberOfLines={1}>
                   {permissionModeBadge.label}
                 </Text>
@@ -383,6 +386,7 @@ export function InputBar({ disabled }: InputBarProps) {
           </View>
           {isTyping ? (
             <TouchableOpacity
+              testID="input-stop-button"
               style={[styles.sendButton, styles.stopButtonActive]}
               onPress={handleCancel}
             >
@@ -390,6 +394,7 @@ export function InputBar({ disabled }: InputBarProps) {
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
+              testID="input-send-button"
               style={[
                 styles.sendButton,
                 isDark && styles.sendButtonDark,

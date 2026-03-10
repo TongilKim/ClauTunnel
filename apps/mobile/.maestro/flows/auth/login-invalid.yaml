@@ -1,0 +1,14 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "login-email-input"
+- inputText: "bad@example.com"
+- tapOn:
+    id: "login-password-input"
+- inputText: "wrongpassword"
+- tapOn:
+    id: "login-button"
+- assertVisible:
+    id: "login-error-text"

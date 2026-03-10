@@ -1,0 +1,15 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+    arguments:
+      EXPO_PUBLIC_E2E_TEST_MODE: "true"
+- tapOn: "Settings"
+- assertVisible: "Account"
+- assertVisible:
+    id: "settings-email"
+- assertVisible: "About"
+- assertVisible:
+    id: "settings-version"
+- assertVisible:
+    id: "settings-logout-button"

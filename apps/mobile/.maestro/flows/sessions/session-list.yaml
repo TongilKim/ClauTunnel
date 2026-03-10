@@ -1,0 +1,14 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+    arguments:
+      EXPO_PUBLIC_E2E_TEST_MODE: "true"
+- assertVisible:
+    id: "sessions-stats-total"
+- assertVisible:
+    id: "sessions-stats-online"
+- assertVisible:
+    id: "sessions-stats-offline"
+- assertVisible: "Test MacBook"
+- assertVisible: "Test Session"

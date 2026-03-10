@@ -1,0 +1,134 @@
+name: Mobile E2E Tests
+
+on:
+  pull_request:
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/shared/**'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/shared/**'
+  workflow_dispatch:
+
+jobs:
+  e2e-ios:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build shared package
+        run: pnpm --filter clautunnel-shared build
+
+      - name: Install Maestro
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+
+      - name: Create iOS dev build
+        working-directory: apps/mobile
+        env:
+          EXPO_PUBLIC_E2E_TEST_MODE: "true"
+          EXPO_PUBLIC_SUPABASE_URL: "https://mock.supabase.co"
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: "mock-anon-key"
+        run: |
+          npx expo prebuild --platform ios --clean
+          xcodebuild -workspace ios/ClauTunnel.xcworkspace \
+            -scheme ClauTunnel \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "platform=iOS Simulator,name=iPhone 16" \
+            -derivedDataPath build \
+            build
+
+      - name: Boot iOS Simulator
+        run: xcrun simctl boot "iPhone 16" || true
+
+      - name: Install app on simulator
+        run: |
+          xcrun simctl install booted apps/mobile/build/Build/Products/Debug-iphonesimulator/ClauTunnel.app
+
+      - name: Run Maestro E2E tests
+        working-directory: apps/mobile
+        run: |
+          maestro test .maestro/flows/smoke.yaml --format junit --output test-results.xml
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-ios-results
+          path: apps/mobile/test-results.xml
+
+  e2e-android:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build shared package
+        run: pnpm --filter clautunnel-shared build
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Install Maestro
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+
+      - name: Create Android dev build
+        working-directory: apps/mobile
+        env:
+          EXPO_PUBLIC_E2E_TEST_MODE: "true"
+          EXPO_PUBLIC_SUPABASE_URL: "https://mock.supabase.co"
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: "mock-anon-key"
+        run: |
+          npx expo prebuild --platform android --clean
+          cd android && ./gradlew assembleDebug
+
+      - name: Run Android emulator and tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_6
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          script: |
+            adb install apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+            cd apps/mobile && maestro test .maestro/flows/smoke.yaml --format junit --output test-results.xml
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-android-results
+          path: apps/mobile/test-results.xml

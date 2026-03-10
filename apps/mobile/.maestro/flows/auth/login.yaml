@@ -1,0 +1,14 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+- assertVisible: "ClauTunnel"
+- assertVisible: "Remote control for Claude Code"
+- assertVisible:
+    id: "login-email-input"
+- assertVisible:
+    id: "login-password-input"
+- assertVisible:
+    id: "login-button"
+- assertVisible:
+    id: "login-signup-link"

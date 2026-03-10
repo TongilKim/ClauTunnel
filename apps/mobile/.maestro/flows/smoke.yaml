@@ -1,0 +1,70 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+    arguments:
+      EXPO_PUBLIC_E2E_TEST_MODE: "true"
+
+# Session list
+- assertVisible:
+    id: "sessions-stats-total"
+- assertVisible: "Test MacBook"
+- assertVisible: "Test Session"
+
+# Navigate to session detail
+- tapOn:
+    id: "session-card-test-session-1"
+- assertVisible:
+    id: "session-title"
+- assertVisible:
+    id: "terminal-scrollview"
+- assertVisible:
+    id: "input-text"
+
+# Send a message
+- tapOn:
+    id: "input-text"
+- inputText: "Hello from smoke test"
+- tapOn:
+    id: "input-send-button"
+
+# Test AskUserQuestion flow
+- tapOn:
+    id: "test-mode-toggle"
+- tapOn:
+    id: "test-mode-trigger-question"
+- assertVisible:
+    id: "user-question-modal"
+- assertVisible: "Claude is asking..."
+- tapOn:
+    id: "user-question-option-0-0"
+- tapOn:
+    id: "user-question-submit"
+- assertNotVisible:
+    id: "user-question-modal"
+
+# Test Permission Request flow
+- tapOn:
+    id: "test-mode-trigger-permission"
+- assertVisible:
+    id: "permission-request-modal"
+- tapOn:
+    id: "permission-allow-button"
+- assertNotVisible:
+    id: "permission-request-modal"
+
+# Close test mode panel
+- tapOn:
+    id: "test-mode-toggle"
+
+# Go back to session list
+- tapOn:
+    id: "session-back-button"
+- assertVisible: "Test MacBook"
+
+# Navigate to settings
+- tapOn: "Settings"
+- assertVisible:
+    id: "settings-email"
+- assertVisible:
+    id: "settings-version"
