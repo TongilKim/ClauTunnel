@@ -85,7 +85,8 @@ appId: com.clautunnel.app
     id: "machine-section-test-machine-1"
 
 # Navigate to settings
-- tapOn: "Settings"
+- tapOn:
+    id: "tab-settings"
 - assertVisible:
     id: "settings-email"
 - assertVisible:

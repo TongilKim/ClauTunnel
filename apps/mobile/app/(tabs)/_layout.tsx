@@ -34,6 +34,7 @@ export default function TabLayout() {
         name="settings"
         options={{
           title: 'Settings',
+          tabBarTestID: 'tab-settings',
           tabBarIcon: ({ color }) => (
             <Text style={{ fontSize: 20, color }}>⚙️</Text>
           ),
