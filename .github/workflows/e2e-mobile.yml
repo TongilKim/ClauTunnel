@@ -38,7 +38,7 @@ jobs:
           curl -Ls "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
 
-      - name: Create iOS dev build
+      - name: Create iOS build
         working-directory: apps/mobile
         env:
           EXPO_PUBLIC_E2E_TEST_MODE: "true"
@@ -48,7 +48,7 @@ jobs:
           npx expo prebuild --platform ios --clean
           xcodebuild -workspace ios/ClauTunnel.xcworkspace \
             -scheme ClauTunnel \
-            -configuration Debug \
+            -configuration Release \
             -sdk iphonesimulator \
             -destination "platform=iOS Simulator,name=iPhone 16" \
             -derivedDataPath build \
@@ -59,7 +59,7 @@ jobs:
 
       - name: Install app on simulator
         run: |
-          xcrun simctl install booted apps/mobile/build/Build/Products/Debug-iphonesimulator/ClauTunnel.app
+          xcrun simctl install booted apps/mobile/build/Build/Products/Release-iphonesimulator/ClauTunnel.app
 
       - name: Run Maestro E2E tests
         working-directory: apps/mobile
@@ -71,7 +71,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: e2e-ios-results
-          path: apps/mobile/test-results.xml
+          path: |
+            apps/mobile/test-results.xml
+            ~/.maestro/tests/**/*.png
 
   e2e-android:
     runs-on: ubuntu-latest

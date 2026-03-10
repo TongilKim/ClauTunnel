@@ -6,10 +6,11 @@ import type {
 
 /**
  * Returns true when running in Maestro E2E test mode.
- * Requires both __DEV__ and the EXPO_PUBLIC_E2E_TEST_MODE env var.
+ * The EXPO_PUBLIC_E2E_TEST_MODE env var is baked in at build time and only
+ * set in CI / local E2E builds — production App Store builds never set it.
  */
 export function isTestMode(): boolean {
-  return __DEV__ && process.env.EXPO_PUBLIC_E2E_TEST_MODE === 'true';
+  return process.env.EXPO_PUBLIC_E2E_TEST_MODE === 'true';
 }
 
 // ---------------------------------------------------------------------------
