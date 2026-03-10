@@ -34,9 +34,33 @@ export function checkClaudeCliAuth(): ClaudeAuthStatus {
       };
     }
     return { loggedIn: false, failure: 'not_logged_in' };
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : String(error);
+  } catch (error: unknown) {
+    // execSync throws on non-zero exit codes. The CLI may still write
+    // valid JSON to stdout (e.g. exit 1 + {"loggedIn": false, ...}).
+    const execError = error as { stdout?: string | Buffer; message?: string };
+
+    // Try to parse stdout from the thrown error first
+    if (execError.stdout) {
+      try {
+        const stdout =
+          typeof execError.stdout === 'string'
+            ? execError.stdout
+            : execError.stdout.toString('utf-8');
+        const status = JSON.parse(stdout.trim());
+        if (status.loggedIn === true) {
+          return {
+            loggedIn: true,
+            authMethod: status.authMethod,
+            apiProvider: status.apiProvider,
+          };
+        }
+        return { loggedIn: false, failure: 'not_logged_in' };
+      } catch {
+        // stdout wasn't valid JSON — fall through to message-based detection
+      }
+    }
+
+    const message = execError.message ?? String(error);
 
     // CLI binary not found
     if (
