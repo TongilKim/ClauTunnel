@@ -33,8 +33,9 @@ appId: com.clautunnel.app
 - tapOn:
     id: "input-send-button"
 
-# Dismiss keyboard before interacting with test mode panel
-- hideKeyboard
+# Dismiss keyboard by tapping terminal area (hideKeyboard uses back button on Android)
+- tapOn:
+    id: "terminal-scrollview"
 - takeScreenshot: before-test-panel
 
 # Test AskUserQuestion flow — wait for toggle to be visible

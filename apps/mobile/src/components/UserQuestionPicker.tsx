@@ -88,13 +88,13 @@ export function UserQuestionPicker({
 
   return (
     <Modal
-      testID="user-question-modal"
       visible={visible}
       animationType="slide"
       transparent
       onRequestClose={onClose}
     >
       <KeyboardAvoidingView
+        testID="user-question-modal"
         style={styles.overlay}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
