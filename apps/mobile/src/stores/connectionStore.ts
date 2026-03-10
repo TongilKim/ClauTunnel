@@ -918,7 +918,7 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
     if (isTestMode() && get().state === 'connected') {
       const summary = buildMockAnswerSummary(answers);
       const response: RealtimeMessage = {
-        type: 'output',
+        type: 'system',
         content: `Question answered: ${summary}`,
         timestamp: Date.now(),
         seq: ++seq,
@@ -976,7 +976,7 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
     if (isTestMode() && get().state === 'connected') {
       const pendingRequest = get().pendingPermissionRequest;
       const response: RealtimeMessage = {
-        type: 'output',
+        type: 'system',
         content: buildMockPermissionSummary(
           pendingRequest?.toolName || 'tool',
           behavior
