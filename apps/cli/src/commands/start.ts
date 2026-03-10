@@ -22,6 +22,7 @@ import {
 } from '../utils/sleep-prevention.js';
 import { MobileServerManager } from '../mobile/mobile-server.js';
 import { acquirePidFile, removePidFile } from '../utils/pid.js';
+import { checkClaudeCliAuth } from '../utils/claude-auth.js';
 import type { MachineCommand } from 'clautunnel-shared';
 
 // Polyfill WebSocket for Node.js (Supabase Realtime needs this)
@@ -99,6 +100,40 @@ export function createStartCommand(): Command {
         });
 
         spinner.update(`Authenticated as ${user.email}...`);
+
+        // Check Claude CLI authentication (Anthropic API)
+        spinner.update('Checking Claude CLI auth...');
+        const claudeAuth = checkClaudeCliAuth();
+        if (!claudeAuth.loggedIn) {
+          switch (claudeAuth.failure) {
+            case 'cli_not_found':
+              spinner.fail('Claude CLI not found');
+              logger.error('Claude Code CLI is not installed or not in PATH.');
+              logger.error('Install it first: https://docs.anthropic.com/en/docs/claude-code');
+              removePidFile();
+              process.exit(1);
+              break;
+            case 'subcommand_not_supported':
+              // Older CLI version that doesn't have `auth status` — skip the check
+              spinner.update('Claude CLI auth check skipped (CLI version does not support "auth status")');
+              logger.warn('Could not verify Claude CLI auth — your CLI version may not support "claude auth status".');
+              logger.warn('If sessions fail to start, try updating Claude Code and running "claude login".');
+              break;
+            case 'not_logged_in':
+              spinner.fail('Claude CLI is not logged in');
+              logger.error('Claude Code requires authentication to use the Anthropic API.');
+              logger.error('Run "claude login" first, then try "clautunnel start" again.');
+              removePidFile();
+              process.exit(1);
+              break;
+            default:
+              // Unknown error — warn but don't block
+              spinner.update('Claude CLI auth check inconclusive');
+              logger.warn('Could not verify Claude CLI authentication (unexpected error).');
+              logger.warn('If sessions fail to start, run "claude login" and try again.');
+              break;
+          }
+        }
 
         // Check Full Disk Access (macOS only)
         let fdaStatus: FullDiskAccessStatus | null = null;

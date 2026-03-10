@@ -1806,4 +1806,144 @@ describe('SdkSession', () => {
       expect(sdkSession.getSessionId()).toBe('resumed-ok');
     });
   });
+
+  describe('auth and API error handling', () => {
+    it('should emit auth-error when assistant message has authentication_failed error', async () => {
+      const session = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'test-session-id' },
+        {
+          type: 'assistant',
+          error: 'authentication_failed',
+          message: { content: [{ type: 'text', text: '' }] },
+        },
+        { type: 'result', subtype: 'success', result: '' },
+      ]);
+      mockedCreateSession.mockReturnValue(session as any);
+
+      const authErrorHandler = vi.fn();
+      sdkSession.on('auth-error', authErrorHandler);
+
+      await sdkSession.sendPrompt('Hello');
+      await tick();
+
+      expect(authErrorHandler).toHaveBeenCalledWith({
+        errorCode: 'authentication_failed',
+        message: 'authentication_failed',
+      });
+    });
+
+    it('should emit auth-error when assistant message has billing_error', async () => {
+      const session = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'test-session-id' },
+        {
+          type: 'assistant',
+          error: 'billing_error',
+          message: { content: [{ type: 'text', text: '' }] },
+        },
+        { type: 'result', subtype: 'success', result: '' },
+      ]);
+      mockedCreateSession.mockReturnValue(session as any);
+
+      const authErrorHandler = vi.fn();
+      sdkSession.on('auth-error', authErrorHandler);
+
+      await sdkSession.sendPrompt('Hello');
+      await tick();
+
+      expect(authErrorHandler).toHaveBeenCalledWith({
+        errorCode: 'billing_error',
+        message: 'billing_error',
+      });
+    });
+
+    it('should emit auth-error when assistant message has rate_limit error', async () => {
+      const session = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'test-session-id' },
+        {
+          type: 'assistant',
+          error: 'rate_limit',
+          message: { content: [{ type: 'text', text: '' }] },
+        },
+        { type: 'result', subtype: 'success', result: '' },
+      ]);
+      mockedCreateSession.mockReturnValue(session as any);
+
+      const authErrorHandler = vi.fn();
+      sdkSession.on('auth-error', authErrorHandler);
+
+      await sdkSession.sendPrompt('Hello');
+      await tick();
+
+      expect(authErrorHandler).toHaveBeenCalledWith({
+        errorCode: 'rate_limit',
+        message: 'rate_limit',
+      });
+    });
+
+    it('should emit auth-error when auth_status message has error', async () => {
+      const session = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'test-session-id' },
+        {
+          type: 'auth_status',
+          isAuthenticating: false,
+          error: 'Token expired',
+          output: [],
+        },
+        { type: 'result', subtype: 'success', result: '' },
+      ]);
+      mockedCreateSession.mockReturnValue(session as any);
+
+      const authErrorHandler = vi.fn();
+      sdkSession.on('auth-error', authErrorHandler);
+
+      await sdkSession.sendPrompt('Hello');
+      await tick();
+
+      expect(authErrorHandler).toHaveBeenCalledWith({
+        errorCode: 'authentication_failed',
+        message: 'Token expired',
+      });
+    });
+
+    it('should not emit auth-error when auth_status has no error', async () => {
+      const session = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'test-session-id' },
+        {
+          type: 'auth_status',
+          isAuthenticating: true,
+          output: ['Authenticating...'],
+        },
+        { type: 'result', subtype: 'success', result: '' },
+      ]);
+      mockedCreateSession.mockReturnValue(session as any);
+
+      const authErrorHandler = vi.fn();
+      sdkSession.on('auth-error', authErrorHandler);
+
+      await sdkSession.sendPrompt('Hello');
+      await tick();
+
+      expect(authErrorHandler).not.toHaveBeenCalled();
+    });
+
+    it('should not emit auth-error for normal assistant messages without error', async () => {
+      const session = createMockSession([
+        { type: 'system', subtype: 'init', session_id: 'test-session-id' },
+        {
+          type: 'assistant',
+          message: { content: [{ type: 'text', text: 'Hello!' }] },
+        },
+        { type: 'result', subtype: 'success', result: 'done' },
+      ]);
+      mockedCreateSession.mockReturnValue(session as any);
+
+      const authErrorHandler = vi.fn();
+      sdkSession.on('auth-error', authErrorHandler);
+
+      await sdkSession.sendPrompt('Hello');
+      await tick();
+
+      expect(authErrorHandler).not.toHaveBeenCalled();
+    });
+  });
 });
