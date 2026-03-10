@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '../services/supabase';
 import type { User, Session } from '@supabase/supabase-js';
+import { isTestMode, MOCK_USER, MOCK_SESSION } from '../utils/testMode';
 
 interface AuthState {
   user: User | null;
@@ -16,9 +17,11 @@ interface AuthState {
   clearError: () => void;
 }
 
+const _testMode = isTestMode();
+
 export const useAuthStore = create<AuthState>((set, get) => ({
-  user: null,
-  session: null,
+  user: _testMode ? (MOCK_USER as any) : null,
+  session: _testMode ? (MOCK_SESSION as any) : null,
   isLoading: false,
   error: null,
 

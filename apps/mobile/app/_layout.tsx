@@ -4,8 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useColorScheme, View, ActivityIndicator } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuthStore } from '../src/stores/authStore';
-import { useSessionStore } from '../src/stores/sessionStore';
-import { isTestMode, MOCK_USER, MOCK_SESSION, MOCK_SESSIONS, MOCK_MACHINES } from '../src/utils/testMode';
+import { isTestMode } from '../src/utils/testMode';
 
 function useProtectedRoute(user: any, isLoading: boolean) {
   const segments = useSegments();
@@ -36,23 +35,9 @@ export default function RootLayout() {
 
   const { user, isLoading, initialize } = useAuthStore();
 
-  // Initialize auth on app load (or inject mock auth in test mode)
+  // Initialize auth on app load (skip in test mode — stores have mock data from init)
   useEffect(() => {
-    if (isTestMode()) {
-      useAuthStore.setState({
-        user: MOCK_USER as any,
-        session: MOCK_SESSION as any,
-        isLoading: false,
-        error: null,
-      });
-      useSessionStore.setState({
-        sessions: MOCK_SESSIONS as any,
-        machines: MOCK_MACHINES as any,
-        isLoading: false,
-        sessionOnlineStatus: { 'test-session-1': true },
-        machineOnlineStatus: { 'test-machine-1': true },
-      });
-    } else {
+    if (!isTestMode()) {
       initialize();
     }
   }, []);
