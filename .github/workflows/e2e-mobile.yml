@@ -114,7 +114,7 @@ jobs:
           EXPO_PUBLIC_SUPABASE_ANON_KEY: "mock-anon-key"
         run: |
           npx expo prebuild --platform android --clean
-          cd android && ./gradlew assembleDebug
+          cd android && ./gradlew assembleRelease
 
       - name: Enable KVM
         run: |
@@ -131,7 +131,7 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: |
-            adb install apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+            adb install apps/mobile/android/app/build/outputs/apk/release/app-release.apk
             cd apps/mobile && maestro test .maestro/flows/smoke.yaml --format junit --output test-results.xml
 
       - name: Upload test results
