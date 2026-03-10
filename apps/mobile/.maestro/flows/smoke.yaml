@@ -5,9 +5,11 @@ appId: com.clautunnel.app
     arguments:
       EXPO_PUBLIC_E2E_TEST_MODE: "true"
 
-# Session list
-- assertVisible:
-    id: "sessions-stats-total"
+# Session list — wait for mock data to render
+- extendedWaitUntil:
+    visible:
+      id: "sessions-stats-total"
+    timeout: 10000
 - assertVisible: "Test MacBook"
 - assertVisible: "Test Session"
 

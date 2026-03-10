@@ -17,7 +17,7 @@ import { useSessionStore } from '../../src/stores/sessionStore';
 import { SessionCard } from '../../src/components/SessionCard';
 import { EmptyState } from '../../src/components/EmptyState';
 import { isSessionOnlineForUI } from '../../src/utils/sessionStatus';
-import { isTestMode, MOCK_SESSIONS, MOCK_MACHINES } from '../../src/utils/testMode';
+import { isTestMode } from '../../src/utils/testMode';
 
 interface MachineSection {
   id: string;
@@ -52,19 +52,6 @@ export default function SessionsScreen() {
     startSessionError,
     startSessionOnMachine,
   } = useSessionStore();
-
-  // In test mode, inject mock data instead of fetching from Supabase
-  useEffect(() => {
-    if (isTestMode()) {
-      useSessionStore.setState({
-        sessions: MOCK_SESSIONS as any,
-        machines: MOCK_MACHINES as any,
-        isLoading: false,
-        sessionOnlineStatus: { 'test-session-1': true },
-        machineOnlineStatus: { 'test-machine-1': true },
-      });
-    }
-  }, []);
 
   // Refresh sessions silently and subscribe to presence whenever the screen gains focus
   useFocusEffect(
