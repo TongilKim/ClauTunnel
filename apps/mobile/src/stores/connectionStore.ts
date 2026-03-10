@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '../services/supabase';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import { isTestMode } from '../utils/testMode';
 import type {
   RealtimeMessage,
   ImageAttachment,
@@ -747,6 +748,10 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
 
   sendUserAnswer: async (answers: Record<string, string>) => {
     if (!inputChannel || get().state !== 'connected') {
+      if (isTestMode()) {
+        set({ pendingQuestion: null });
+        return;
+      }
       set({ error: 'Not connected' });
       return;
     }
@@ -786,6 +791,10 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
 
   sendPermissionResponse: async (behavior: 'allow' | 'deny', message?: string) => {
     if (!inputChannel || get().state !== 'connected') {
+      if (isTestMode()) {
+        set({ pendingPermissionRequest: null });
+        return;
+      }
       set({ error: 'Not connected' });
       return;
     }

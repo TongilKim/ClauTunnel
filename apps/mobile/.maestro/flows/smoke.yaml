@@ -33,13 +33,18 @@ appId: com.clautunnel.app
 - tapOn:
     id: "input-send-button"
 
+# Dismiss keyboard before interacting with test mode panel
+- hideKeyboard
+
 # Test AskUserQuestion flow
 - tapOn:
     id: "test-mode-toggle"
 - tapOn:
     id: "test-mode-trigger-question"
-- assertVisible:
-    id: "user-question-modal"
+- extendedWaitUntil:
+    visible:
+      id: "user-question-modal"
+    timeout: 5000
 - assertVisible:
     id: "user-question-title"
 - tapOn:
