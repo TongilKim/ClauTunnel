@@ -75,12 +75,12 @@ export function PermissionRequestPicker({
       onRequestClose={onClose}
     >
       <KeyboardAvoidingView
-        testID="permission-request-modal"
         style={styles.overlay}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View style={styles.backdrop} />
         <View
+          testID="permission-request-modal"
           style={[
             styles.sheet,
             isDark && styles.sheetDark,

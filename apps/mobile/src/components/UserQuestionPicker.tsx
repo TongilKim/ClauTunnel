@@ -94,12 +94,12 @@ export function UserQuestionPicker({
       onRequestClose={onClose}
     >
       <KeyboardAvoidingView
-        testID="user-question-modal"
         style={styles.overlay}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View style={styles.backdrop} />
         <View
+          testID="user-question-modal"
           style={[
             styles.sheet,
             isDark && styles.sheetDark,
