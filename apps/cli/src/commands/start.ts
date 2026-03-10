@@ -22,6 +22,7 @@ import {
 } from '../utils/sleep-prevention.js';
 import { MobileServerManager } from '../mobile/mobile-server.js';
 import { acquirePidFile, removePidFile } from '../utils/pid.js';
+import { checkClaudeCliAuth } from '../utils/claude-auth.js';
 import type { MachineCommand } from 'clautunnel-shared';
 
 // Polyfill WebSocket for Node.js (Supabase Realtime needs this)
@@ -99,6 +100,19 @@ export function createStartCommand(): Command {
         });
 
         spinner.update(`Authenticated as ${user.email}...`);
+
+        // Check Claude CLI authentication (Anthropic API)
+        spinner.update('Checking Claude CLI auth...');
+        const claudeAuth = checkClaudeCliAuth();
+        if (!claudeAuth.loggedIn) {
+          spinner.fail('Claude CLI is not logged in');
+          logger.error(
+            'Claude Code requires authentication to use the Anthropic API.'
+          );
+          logger.error('Run "claude login" first, then try "clautunnel start" again.');
+          removePidFile();
+          process.exit(1);
+        }
 
         // Check Full Disk Access (macOS only)
         let fdaStatus: FullDiskAccessStatus | null = null;
