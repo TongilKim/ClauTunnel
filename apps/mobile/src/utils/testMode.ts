@@ -1,4 +1,7 @@
 import type {
+  ModelInfo,
+  PermissionMode,
+  SlashCommand,
   UserQuestionData,
   PermissionRequestData,
   RealtimeMessage,
@@ -20,6 +23,11 @@ export function isTestMode(): boolean {
 export const MOCK_USER = {
   id: 'test-user-id',
   email: 'test@clautunnel.com',
+} as const;
+
+export const MOCK_TEST_CREDENTIALS = {
+  email: MOCK_USER.email,
+  password: 'password123',
 } as const;
 
 export const MOCK_SESSION = {
@@ -75,6 +83,44 @@ export const MOCK_SESSIONS = [
   },
 ];
 
+export const MOCK_MODELS: ModelInfo[] = [
+  {
+    value: 'opus',
+    displayName: 'Opus 4.6',
+    description: 'Best quality for complex reasoning',
+  },
+  {
+    value: 'sonnet',
+    displayName: 'Sonnet 4',
+    description: 'Fast, balanced default model',
+  },
+  {
+    value: 'haiku',
+    displayName: 'Haiku 3.5',
+    description: 'Fastest model for lightweight work',
+  },
+];
+
+export const MOCK_COMMANDS: SlashCommand[] = [
+  {
+    name: 'model',
+    description: 'Change the Claude model for this session',
+    argumentHint: '[model]',
+  },
+  {
+    name: 'clear',
+    description: 'Clear the current conversation context',
+    argumentHint: '',
+  },
+  {
+    name: 'resume',
+    description: 'Resume a previous SDK session',
+    argumentHint: '[session-id]',
+  },
+];
+
+export const MOCK_PERMISSION_MODE: PermissionMode = 'default';
+
 // ---------------------------------------------------------------------------
 // Mock interactive data
 // ---------------------------------------------------------------------------
@@ -126,3 +172,20 @@ export const MOCK_MESSAGES: RealtimeMessage[] = [
     seq: 3,
   },
 ];
+
+export function buildMockClaudeResponse(input: string): string {
+  return `Mock response to: ${input.trim()}`;
+}
+
+export function buildMockAnswerSummary(answers: Record<string, string>): string {
+  const values = Object.values(answers).filter(Boolean);
+  return values.length > 0 ? values.join(', ') : 'No answer provided';
+}
+
+export function buildMockPermissionSummary(
+  toolName: string,
+  behavior: 'allow' | 'deny',
+): string {
+  const decision = behavior === 'allow' ? 'allowed' : 'denied';
+  return `Permission ${decision} for ${toolName}`;
+}

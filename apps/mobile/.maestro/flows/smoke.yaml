@@ -6,6 +6,17 @@ appId: com.clautunnel.app
 # Take debug screenshot to see initial state
 - takeScreenshot: app-launched
 
+# Sign in with mock credentials
+- assertVisible: "ClauTunnel"
+- tapOn:
+    id: "login-email-input"
+- inputText: "test@clautunnel.com"
+- tapOn:
+    id: "login-password-input"
+- inputText: "password123"
+- tapOn:
+    id: "login-button"
+
 # Session list — wait for mock data to render
 - extendedWaitUntil:
     visible:
@@ -32,11 +43,39 @@ appId: com.clautunnel.app
 - inputText: "Hello from smoke test"
 - tapOn:
     id: "input-send-button"
+- extendedWaitUntil:
+    visible: "Mock response to: Hello from smoke test"
+    timeout: 3000
 
 # Dismiss keyboard by tapping terminal area (hideKeyboard uses back button on Android)
 - tapOn:
     id: "terminal-scrollview"
 - takeScreenshot: before-test-panel
+
+# Test model picker via command palette
+- assertVisible: "Opus 4.6"
+- tapOn:
+    id: "input-commands-button"
+- extendedWaitUntil:
+    visible:
+      id: "command-picker-modal"
+    timeout: 3000
+- tapOn:
+    id: "command-option-model"
+- extendedWaitUntil:
+    visible:
+      id: "model-picker-modal"
+    timeout: 3000
+- tapOn:
+    id: "model-option-haiku"
+- assertNotVisible:
+    id: "model-picker-modal"
+- assertVisible:
+    id: "input-model-badge"
+- extendedWaitUntil:
+    visible: "Haiku 3.5"
+    timeout: 3000
+- assertNotVisible: "Opus 4.6"
 
 # Test AskUserQuestion flow — wait for toggle to be visible
 - extendedWaitUntil:
@@ -63,6 +102,7 @@ appId: com.clautunnel.app
     id: "user-question-submit"
 - assertNotVisible:
     id: "user-question-modal"
+- assertVisible: "Question answered: Maestro"
 
 # Test Permission Request flow
 - tapOn:
@@ -73,6 +113,7 @@ appId: com.clautunnel.app
     id: "permission-allow-button"
 - assertNotVisible:
     id: "permission-request-modal"
+- assertVisible: "Permission allowed for Bash"
 
 # Close test mode panel
 - tapOn:
@@ -94,3 +135,4 @@ appId: com.clautunnel.app
     timeout: 5000
 - assertVisible:
     id: "settings-version"
+- assertVisible: "test@clautunnel.com"

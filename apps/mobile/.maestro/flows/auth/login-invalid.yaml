@@ -10,5 +10,8 @@ appId: com.clautunnel.app
 - inputText: "wrongpassword"
 - tapOn:
     id: "login-button"
-- assertVisible:
-    id: "login-error-text"
+- extendedWaitUntil:
+    visible:
+      id: "login-error-text"
+    timeout: 3000
+- assertVisible: "Invalid email or password"

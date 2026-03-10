@@ -2,8 +2,18 @@ appId: com.clautunnel.app
 ---
 - launchApp:
     clearState: true
-    arguments:
-      EXPO_PUBLIC_E2E_TEST_MODE: "true"
+- tapOn:
+    id: "login-email-input"
+- inputText: "test@clautunnel.com"
+- tapOn:
+    id: "login-password-input"
+- inputText: "password123"
+- tapOn:
+    id: "login-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-card-test-session-1"
+    timeout: 5000
 - tapOn:
     id: "session-card-test-session-1"
 - tapOn:
@@ -13,5 +23,8 @@ appId: com.clautunnel.app
     id: "input-send-button"
 - tapOn:
     id: "input-send-button"
+- extendedWaitUntil:
+    visible: "Mock response to: Hello from Maestro test"
+    timeout: 3000
 - tapOn:
     id: "session-back-button"

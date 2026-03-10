@@ -51,7 +51,6 @@ export function ModelPicker({
 
   return (
     <Modal
-      testID="model-picker-modal"
       visible={visible}
       animationType="slide"
       transparent
@@ -64,6 +63,7 @@ export function ModelPicker({
           onPress={onClose}
         />
         <View
+          testID="model-picker-modal"
           style={[
             styles.sheet,
             isDark && styles.sheetDark,

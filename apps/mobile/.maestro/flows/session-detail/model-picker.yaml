@@ -2,14 +2,42 @@ appId: com.clautunnel.app
 ---
 - launchApp:
     clearState: true
-    arguments:
-      EXPO_PUBLIC_E2E_TEST_MODE: "true"
+- tapOn:
+    id: "login-email-input"
+- inputText: "test@clautunnel.com"
+- tapOn:
+    id: "login-password-input"
+- inputText: "password123"
+- tapOn:
+    id: "login-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-card-test-session-1"
+    timeout: 5000
 - tapOn:
     id: "session-card-test-session-1"
+- assertVisible: "Opus 4.6"
 - tapOn:
     id: "input-commands-button"
+- extendedWaitUntil:
+    visible:
+      id: "command-picker-modal"
+    timeout: 3000
+- tapOn:
+    id: "command-option-model"
+- extendedWaitUntil:
+    visible:
+      id: "model-picker-modal"
+    timeout: 3000
+- tapOn:
+    id: "model-option-haiku"
+- assertNotVisible:
+    id: "model-picker-modal"
 - assertVisible:
-    id: "command-picker-modal"
-- assertVisible: "Commands"
+    id: "input-model-badge"
+- extendedWaitUntil:
+    visible: "Haiku 3.5"
+    timeout: 3000
+- assertNotVisible: "Opus 4.6"
 - tapOn:
     id: "session-back-button"

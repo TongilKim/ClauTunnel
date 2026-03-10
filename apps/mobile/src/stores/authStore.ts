@@ -1,7 +1,12 @@
 import { create } from 'zustand';
 import { supabase } from '../services/supabase';
 import type { User, Session } from '@supabase/supabase-js';
-import { isTestMode, MOCK_USER, MOCK_SESSION } from '../utils/testMode';
+import {
+  isTestMode,
+  MOCK_TEST_CREDENTIALS,
+  MOCK_USER,
+  MOCK_SESSION,
+} from '../utils/testMode';
 
 interface AuthState {
   user: User | null;
@@ -19,13 +24,34 @@ interface AuthState {
 
 const _testMode = isTestMode();
 
+function buildMockAuthState(email = MOCK_USER.email) {
+  return {
+    user: {
+      ...MOCK_USER,
+      email,
+    } as User,
+    session: {
+      ...MOCK_SESSION,
+      user: {
+        ...MOCK_USER,
+        email,
+      },
+    } as Session,
+  };
+}
+
 export const useAuthStore = create<AuthState>((set, get) => ({
-  user: _testMode ? (MOCK_USER as any) : null,
-  session: _testMode ? (MOCK_SESSION as any) : null,
+  user: null,
+  session: null,
   isLoading: false,
   error: null,
 
   initialize: async () => {
+    if (_testMode) {
+      set({ isLoading: false, error: null, user: null, session: null });
+      return;
+    }
+
     try {
       set({ isLoading: true, error: null });
 
@@ -59,6 +85,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   signIn: async (email: string, password: string) => {
+    if (_testMode) {
+      set({ isLoading: true, error: null });
+
+      if (
+        email.trim().toLowerCase() !== MOCK_TEST_CREDENTIALS.email ||
+        password !== MOCK_TEST_CREDENTIALS.password
+      ) {
+        set({
+          error: 'Invalid email or password',
+          isLoading: false,
+        });
+        return;
+      }
+
+      set({
+        ...buildMockAuthState(email.trim().toLowerCase()),
+        isLoading: false,
+      });
+      return;
+    }
+
     try {
       set({ isLoading: true, error: null });
 
@@ -83,6 +130,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   signUp: async (email: string, password: string) => {
+    if (_testMode) {
+      set({ isLoading: true, error: null });
+      set({
+        ...buildMockAuthState(email.trim().toLowerCase() || MOCK_USER.email),
+        isLoading: false,
+      });
+      return;
+    }
+
     try {
       set({ isLoading: true, error: null });
 
@@ -107,6 +163,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   signOut: async () => {
+    if (_testMode) {
+      set({
+        session: null,
+        user: null,
+        isLoading: false,
+        error: null,
+      });
+      return;
+    }
+
     try {
       set({ isLoading: true, error: null });
 

@@ -2,13 +2,27 @@ appId: com.clautunnel.app
 ---
 - launchApp:
     clearState: true
-    arguments:
-      EXPO_PUBLIC_E2E_TEST_MODE: "true"
+- tapOn:
+    id: "login-email-input"
+- inputText: "test@clautunnel.com"
+- tapOn:
+    id: "login-password-input"
+- inputText: "password123"
+- tapOn:
+    id: "login-button"
+- extendedWaitUntil:
+    visible:
+      id: "sessions-stats-total"
+    timeout: 5000
 - assertVisible:
     id: "sessions-stats-total"
 - assertVisible:
     id: "sessions-stats-online"
 - assertVisible:
     id: "sessions-stats-offline"
+- assertVisible:
+    id: "machine-section-test-machine-1"
+- assertVisible:
+    id: "session-card-test-session-1"
 - assertVisible: "Test MacBook"
 - assertVisible: "Test Session"

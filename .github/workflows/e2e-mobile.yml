@@ -76,7 +76,7 @@ jobs:
         working-directory: apps/mobile
         run: |
           export MAESTRO_DRIVER_STARTUP_TIMEOUT=120000
-          maestro test .maestro/flows/smoke.yaml --format junit --output test-results.xml
+          maestro test .maestro/flows --format junit --output test-results.xml
 
       - name: Upload test results
         if: always()
@@ -146,7 +146,7 @@ jobs:
           script: |
             adb install apps/mobile/android/app/build/outputs/apk/release/app-release.apk
             export MAESTRO_DRIVER_STARTUP_TIMEOUT=120000
-            cd apps/mobile && maestro test .maestro/flows/smoke.yaml --format junit --output test-results.xml
+            cd apps/mobile && maestro test .maestro/flows --format junit --output test-results.xml
 
       - name: Upload test results
         if: always()

@@ -3,12 +3,17 @@ appId: com.clautunnel.app
 - launchApp:
     clearState: true
 - assertVisible: "ClauTunnel"
-- assertVisible: "Remote control for Claude Code"
-- assertVisible:
+- tapOn:
     id: "login-email-input"
-- assertVisible:
+- inputText: "test@clautunnel.com"
+- tapOn:
     id: "login-password-input"
-- assertVisible:
+- inputText: "password123"
+- tapOn:
     id: "login-button"
-- assertVisible:
-    id: "login-signup-link"
+- extendedWaitUntil:
+    visible:
+      id: "sessions-stats-total"
+    timeout: 5000
+- assertVisible: "Test MacBook"
+- assertVisible: "Test Session"

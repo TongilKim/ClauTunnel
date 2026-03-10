@@ -18,7 +18,7 @@ import { InputBar } from '../../src/components/InputBar';
 import { UserQuestionPicker } from '../../src/components/UserQuestionPicker';
 import { PermissionRequestPicker } from '../../src/components/PermissionRequestPicker';
 import { TestModePanel } from '../../src/components/TestModePanel';
-import { isTestMode, MOCK_MESSAGES } from '../../src/utils/testMode';
+import { isTestMode } from '../../src/utils/testMode';
 
 export default function SessionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -74,29 +74,14 @@ export default function SessionScreen() {
           : 'disconnected';
 
   useEffect(() => {
-    if (isTestMode()) {
-      // In test mode, inject mock connection state instead of connecting to Supabase
-      useConnectionStore.setState({
-        state: 'connected',
-        sessionId: id || null,
-        messages: MOCK_MESSAGES,
-        lastSeq: 3,
-        isTyping: false,
-        isCliOnline: true,
-      });
-      return;
-    }
-
     if (id) {
       connect(id);
     }
 
     return () => {
-      if (!isTestMode()) {
-        disconnect();
-      }
+      disconnect();
     };
-  }, [id]);
+  }, [connect, disconnect, id]);
 
   // Request available models when connected
   useEffect(() => {

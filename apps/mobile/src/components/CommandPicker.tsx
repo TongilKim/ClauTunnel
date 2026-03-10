@@ -90,7 +90,6 @@ export function CommandPicker({
 
   return (
     <Modal
-      testID="command-picker-modal"
       visible={visible}
       animationType="slide"
       transparent
@@ -105,7 +104,10 @@ export function CommandPicker({
           activeOpacity={1}
           onPress={handleClose}
         />
-        <View style={[styles.content, isDark && styles.contentDark]}>
+        <View
+          testID="command-picker-modal"
+          style={[styles.content, isDark && styles.contentDark]}
+        >
           <View style={styles.handle} />
           <Text style={[styles.title, isDark && styles.titleDark]}>
             Commands
