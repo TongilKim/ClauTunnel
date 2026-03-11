@@ -26,6 +26,7 @@ interface MachineSection {
   data: any[];
   onlineCount: number;
   offlineCount: number;
+  endedCount: number;
   hasListener: boolean;
 }
 
@@ -100,6 +101,7 @@ export default function SessionsScreen() {
           data: [],
           onlineCount: 0,
           offlineCount: 0,
+          endedCount: 0,
           hasListener: !!machineOnlineStatus[machine.id],
         });
       }
@@ -119,6 +121,7 @@ export default function SessionsScreen() {
           data: [],
           onlineCount: 0,
           offlineCount: 0,
+          endedCount: 0,
           hasListener: !!machineOnlineStatus[machineId],
         });
       }
@@ -130,6 +133,9 @@ export default function SessionsScreen() {
         section.onlineCount++;
       } else {
         section.offlineCount++;
+      }
+      if (session.status === 'ended') {
+        section.endedCount++;
       }
     });
 
@@ -304,21 +310,21 @@ export default function SessionsScreen() {
                         <Text style={[styles.sectionBadgeText, isDark && styles.sectionBadgeTextDark]}>{section.onlineCount}</Text>
                       </View>
                     )}
-                    {section.offlineCount > 0 && (
+                    {section.endedCount > 0 && (
                       <View style={[styles.sectionBadge, styles.sectionBadgeOffline, isDark && styles.sectionBadgeOfflineDark]}>
                         <Text style={[styles.sectionBadgeText, styles.sectionBadgeTextOffline, isDark && styles.sectionBadgeTextOfflineDark]}>
-                          {section.offlineCount}
+                          {section.endedCount}
                         </Text>
                       </View>
                     )}
                   </View>
-                  {section.offlineCount > 0 && (
+                  {section.endedCount > 0 && (
                     <TouchableOpacity
                       testID={`machine-clear-ended-${section.id}`}
                       style={styles.sectionClearButton}
                       onPress={(e) => {
                         e.stopPropagation();
-                        onClearEndedForMachine(section.id, section.title, section.offlineCount);
+                        onClearEndedForMachine(section.id, section.title, section.endedCount);
                       }}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
