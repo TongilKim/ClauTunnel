@@ -1,0 +1,72 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+# Navigate to register screen
+- tapOn:
+    id: "login-signup-link"
+- extendedWaitUntil:
+    visible:
+      id: "register-button"
+    timeout: 3000
+
+# Test validation: empty fields
+- tapOn:
+    id: "register-button"
+- assertVisible: "All fields are required"
+
+# Test validation: password mismatch
+- tapOn:
+    id: "register-email-input"
+- inputText: "newuser@test.com"
+- tapOn:
+    id: "register-password-input"
+- inputText: "password123"
+- tapOn:
+    id: "register-confirm-password-input"
+- inputText: "differentpassword"
+- tapOn:
+    id: "register-button"
+- assertVisible: "Passwords do not match"
+
+# Test validation: short password
+- tapOn:
+    id: "register-email-input"
+- clearText
+- inputText: "newuser@test.com"
+- tapOn:
+    id: "register-password-input"
+- clearText
+- inputText: "12345"
+- tapOn:
+    id: "register-confirm-password-input"
+- clearText
+- inputText: "12345"
+- tapOn:
+    id: "register-button"
+- assertVisible: "Password must be at least 6 characters"
+
+# Successful registration
+- tapOn:
+    id: "register-email-input"
+- clearText
+- inputText: "newuser@test.com"
+- tapOn:
+    id: "register-password-input"
+- clearText
+- inputText: "password123"
+- tapOn:
+    id: "register-confirm-password-input"
+- clearText
+- inputText: "password123"
+- tapOn:
+    id: "register-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-card-test-session-1"
+    timeout: 5000
+
+# Navigate back to login link
+- tapOn:
+    id: "register-login-link"
+  optional: true

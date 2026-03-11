@@ -123,6 +123,7 @@ export function SessionCard({ session }: SessionCardProps) {
         <View style={styles.swipeActions}>
           <Animated.View style={[styles.actionButton, styles.disconnectButton, { transform: [{ translateX }] }]}>
             <TouchableOpacity
+              testID={`session-disconnect-${session.id}`}
               style={styles.actionButtonInner}
               onPress={handleDisconnect}
             >
@@ -137,6 +138,7 @@ export function SessionCard({ session }: SessionCardProps) {
       <View style={styles.swipeActions}>
         <Animated.View style={[styles.actionButton, styles.deleteButton, { transform: [{ translateX }] }]}>
           <TouchableOpacity
+            testID={`session-delete-${session.id}`}
             style={styles.actionButtonInner}
             onPress={handleDelete}
           >
