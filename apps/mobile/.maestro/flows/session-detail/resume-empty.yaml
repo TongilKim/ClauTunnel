@@ -1,0 +1,51 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "login-email-input"
+- inputText: "test@clautunnel.com"
+- tapOn:
+    id: "login-password-input"
+- inputText: "password123"
+- tapOn:
+    id: "login-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-card-test-session-1"
+    timeout: 5000
+
+# First, clear all ended sessions so no resumable sessions exist
+- tapOn:
+    id: "machine-clear-ended-test-machine-1"
+- assertVisible: "Clear Ended Sessions"
+- tapOn: "Delete"
+- extendedWaitUntil:
+    notVisible: "Ended Session"
+    timeout: 3000
+
+# Navigate to active session
+- tapOn:
+    id: "session-card-test-session-1"
+- extendedWaitUntil:
+    visible:
+      id: "input-commands-button"
+    timeout: 3000
+
+# Open command picker and select resume
+- tapOn:
+    id: "input-commands-button"
+- extendedWaitUntil:
+    visible: "command-resume"
+    timeout: 3000
+- tapOn: "command-resume"
+
+# Verify empty state in resume picker
+- extendedWaitUntil:
+    visible:
+      id: "resume-session-empty"
+    timeout: 3000
+- assertVisible: "No previous sessions found"
+
+- tapOn:
+    id: "session-back-button"
