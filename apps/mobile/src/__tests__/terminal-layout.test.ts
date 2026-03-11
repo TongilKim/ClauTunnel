@@ -1,11 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { parseToolUsage } from '../utils/terminalUtils';
+import { CLAUDE_MARKDOWN_LAYOUT_FIXES } from '../utils/terminalMarkdownStyles';
 
 /**
  * Terminal message bubble layout and utility tests.
- *
- * Validates that bubble containers use correct flex properties so
- * Claude messages fill available width instead of collapsing.
  */
 
 describe('parseToolUsage', () => {
@@ -46,24 +44,22 @@ describe('parseToolUsage', () => {
   });
 });
 
-describe('bubbleContainer styles', () => {
-  // These values mirror the StyleSheet in Terminal.tsx
-  const bubbleContainer = {
-    maxWidth: '75%',
-    flexShrink: 1,
-    flexGrow: 1,
-  };
-
-  it('should have flexGrow: 1 so Claude messages fill available width', () => {
-    expect(bubbleContainer.flexGrow).toBe(1);
+describe('Claude markdown layout fixes', () => {
+  it('should let the markdown body shrink inside a capped bubble', () => {
+    expect(CLAUDE_MARKDOWN_LAYOUT_FIXES.body.flexShrink).toBe(1);
+    expect(CLAUDE_MARKDOWN_LAYOUT_FIXES.body.minWidth).toBe(0);
   });
 
-  it('should have flexShrink: 1 so content can shrink when needed', () => {
-    expect(bubbleContainer.flexShrink).toBe(1);
+  it('should override paragraph width so wrapped text does not keep the library default', () => {
+    expect(CLAUDE_MARKDOWN_LAYOUT_FIXES.paragraph.width).toBe('auto');
+    expect(CLAUDE_MARKDOWN_LAYOUT_FIXES.paragraph.flexDirection).toBe('row');
+    expect(CLAUDE_MARKDOWN_LAYOUT_FIXES.paragraph.flexWrap).toBe('wrap');
+    expect(CLAUDE_MARKDOWN_LAYOUT_FIXES.paragraph.minWidth).toBe(0);
   });
 
-  it('should cap width at 75%', () => {
-    expect(bubbleContainer.maxWidth).toBe('75%');
+  it('should allow markdown text groups to shrink instead of clipping', () => {
+    expect(CLAUDE_MARKDOWN_LAYOUT_FIXES.textgroup.flexShrink).toBe(1);
+    expect(CLAUDE_MARKDOWN_LAYOUT_FIXES.textgroup.minWidth).toBe(0);
   });
 });
 

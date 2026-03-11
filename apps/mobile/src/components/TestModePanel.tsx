@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { isTestMode, MOCK_QUESTION_DATA, MOCK_PERMISSION_REQUEST } from '../utils/testMode';
+import {
+  buildMockMarkdownOverflowRiskMessage,
+  isTestMode,
+  MOCK_QUESTION_DATA,
+  MOCK_PERMISSION_REQUEST,
+} from '../utils/testMode';
 import { useConnectionStore } from '../stores/connectionStore';
 
 export function TestModePanel() {
@@ -14,6 +19,20 @@ export function TestModePanel() {
 
   const injectPermission = () => {
     useConnectionStore.setState({ pendingPermissionRequest: MOCK_PERMISSION_REQUEST });
+  };
+
+  const injectMarkdownOverflowRisk = () => {
+    const { messages, lastSeq, scrollToBottom } = useConnectionStore.getState();
+    const nextMessage = buildMockMarkdownOverflowRiskMessage(lastSeq + 1);
+
+    useConnectionStore.setState({
+      messages: [...messages, nextMessage],
+      lastSeq: nextMessage.seq,
+    });
+
+    setTimeout(() => {
+      scrollToBottom();
+    }, 50);
   };
 
   return (
@@ -40,6 +59,13 @@ export function TestModePanel() {
             onPress={injectPermission}
           >
             <Text style={styles.buttonText}>Inject Permission</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            testID="test-mode-trigger-markdown-overflow"
+            style={styles.button}
+            onPress={injectMarkdownOverflowRisk}
+          >
+            <Text style={styles.buttonText}>Inject Markdown Wrap</Text>
           </TouchableOpacity>
         </View>
       )}

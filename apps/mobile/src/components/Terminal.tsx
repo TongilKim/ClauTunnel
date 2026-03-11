@@ -20,6 +20,7 @@ import { useConnectionStore } from '../stores/connectionStore';
 import { useSessionStore } from '../stores/sessionStore';
 import type { RealtimeMessage, ToolUseData, ToolUseEditData, ToolUseWriteData, ToolUseGenericData } from 'clautunnel-shared';
 import { parseToolUsage, shortenPath } from '../utils/terminalUtils';
+import { CLAUDE_MARKDOWN_LAYOUT_FIXES } from '../utils/terminalMarkdownStyles';
 
 /** Scroll offset threshold (px) from top to trigger loading older messages */
 const SCROLL_LOAD_THRESHOLD = 200;
@@ -631,11 +632,15 @@ function ClaudeMessage({ content, isDark }: ClaudeMessageProps) {
       color: isDark ? '#e5e5e5' : '#1f2937',
       fontSize: 14,
       lineHeight: 20,
-      flexShrink: 1,
+      ...CLAUDE_MARKDOWN_LAYOUT_FIXES.body,
     },
     paragraph: {
       marginTop: 0,
       marginBottom: 8,
+      ...CLAUDE_MARKDOWN_LAYOUT_FIXES.paragraph,
+    },
+    textgroup: {
+      ...CLAUDE_MARKDOWN_LAYOUT_FIXES.textgroup,
     },
     heading1: {
       color: isDark ? '#ffffff' : '#111827',
@@ -1109,6 +1114,7 @@ const styles = StyleSheet.create({
   bubbleContainer: {
     maxWidth: '75%',
     flexShrink: 1,
+    minWidth: 0,
   },
   bubbleContainerUser: {
     alignItems: 'flex-end',
@@ -1128,6 +1134,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 10,
+    // Clamp the inner bubble to the container cap during markdown reflow.
+    maxWidth: '100%',
     overflow: 'hidden' as const,
   },
   bubbleUser: {

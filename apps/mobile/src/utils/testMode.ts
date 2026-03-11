@@ -102,6 +102,18 @@ export function buildMockMessages() {
   return MOCK_MESSAGES.map((message) => ({ ...message }));
 }
 
+export const MOCK_MARKDOWN_OVERFLOW_RISK_MESSAGE =
+  'After tracing the markdown layout, I think `renderClaudeMarkdownBubbleWithoutClipping` and `isSessionOnlineForUI` are the two inline code paths most likely to stress wrapping, but this reply must still show the final marker VISIBLE_END.';
+
+export function buildMockMarkdownOverflowRiskMessage(seq: number): RealtimeMessage {
+  return {
+    type: 'output',
+    content: MOCK_MARKDOWN_OVERFLOW_RISK_MESSAGE,
+    timestamp: Date.now(),
+    seq,
+  };
+}
+
 export function buildMockStartedSession(index: number) {
   return {
     id: `test-session-${index}`,

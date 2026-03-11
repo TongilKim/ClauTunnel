@@ -1,0 +1,46 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "login-email-input"
+- inputText: "test@clautunnel.com"
+- tapOn:
+    id: "login-password-input"
+- inputText: "password123"
+- tapOn:
+    id: "login-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-card-test-session-1"
+    timeout: 5000
+- tapOn:
+    id: "session-card-test-session-1"
+- extendedWaitUntil:
+    visible:
+      id: "test-mode-toggle"
+    timeout: 5000
+
+# Inject a markdown response that combines a long paragraph with long camelCase
+# inline-code tokens, which is the most likely shape to regress this clipping bug.
+- tapOn:
+    id: "test-mode-toggle"
+- extendedWaitUntil:
+    visible:
+      id: "test-mode-trigger-markdown-overflow"
+    timeout: 3000
+- tapOn:
+    id: "test-mode-trigger-markdown-overflow"
+- tapOn:
+    id: "test-mode-toggle"
+
+# The bubble should render the whole trailing marker, not clip the line mid-word.
+- extendedWaitUntil:
+    visible: "VISIBLE_END."
+    timeout: 3000
+- assertVisible: "isSessionOnlineForUI"
+- assertVisible: "VISIBLE_END."
+- takeScreenshot: markdown-overflow-visible
+
+- tapOn:
+    id: "session-back-button"
