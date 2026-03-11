@@ -32,6 +32,7 @@ import { isTestMode } from '../utils/testMode';
 const SCROLL_LOAD_THRESHOLD = 200;
 /** Delay (ms) before clearing pre-fetch state, allowing onContentSizeChange to fire first */
 const PREFETCH_CLEAR_DELAY = 500;
+const MESSAGE_ROW_GAP = 8;
 
 interface GroupedMessage {
   type: 'input' | 'output' | 'system' | 'tool-use';
@@ -786,6 +787,7 @@ interface CollapsibleToolUseProps {
 function CollapsibleToolUse({ toolUseData, isDark, timestamp }: CollapsibleToolUseProps) {
   const [expanded, setExpanded] = useState(false);
   const [rowWidth, setRowWidth] = useState(0);
+  const [avatarWidth, setAvatarWidth] = useState(0);
   const [headerWidth, setHeaderWidth] = useState(0);
   const formattedTime = formatTimestamp(timestamp);
   const shouldShowTestProbe = isTestMode();
@@ -806,18 +808,37 @@ function CollapsibleToolUse({ toolUseData, isDark, timestamp }: CollapsibleToolU
     setRowWidth((prevWidth) => (Math.abs(prevWidth - nextWidth) < 0.5 ? prevWidth : nextWidth));
   }, []);
 
+  const handleAvatarLayout = useCallback((event: LayoutChangeEvent) => {
+    const nextWidth = event.nativeEvent.layout.width;
+    setAvatarWidth((prevWidth) => (Math.abs(prevWidth - nextWidth) < 0.5 ? prevWidth : nextWidth));
+  }, []);
+
   const handleHeaderLayout = useCallback((event: LayoutChangeEvent) => {
     const nextWidth = event.nativeEvent.layout.width;
     setHeaderWidth((prevWidth) => (Math.abs(prevWidth - nextWidth) < 0.5 ? prevWidth : nextWidth));
   }, []);
 
-  const widthRatio = rowWidth > 0 ? headerWidth / rowWidth : 0;
-  const hasWidthMeasurement = rowWidth > 0 && headerWidth > 0;
-  const isWidthHealthy = hasWidthMeasurement && isToolUseWidthHealthy(widthRatio);
+  const hasWidthMeasurement = rowWidth > 0 && avatarWidth > 0 && headerWidth > 0;
+  const isWidthHealthy = hasWidthMeasurement && isToolUseWidthHealthy(
+    headerWidth,
+    rowWidth,
+    avatarWidth,
+    MESSAGE_ROW_GAP,
+  );
 
   return (
-    <View testID="tool-use-card" style={styles.messageRow} onLayout={handleRowLayout}>
-      <ClaudeAvatar />
+    <View
+      testID="tool-use-card"
+      style={styles.messageRow}
+      onLayout={shouldShowTestProbe ? handleRowLayout : undefined}
+    >
+      {shouldShowTestProbe ? (
+        <View onLayout={handleAvatarLayout}>
+          <ClaudeAvatar />
+        </View>
+      ) : (
+        <ClaudeAvatar />
+      )}
       <View
         style={[
           styles.bubbleContainer,
@@ -828,7 +849,7 @@ function CollapsibleToolUse({ toolUseData, isDark, timestamp }: CollapsibleToolU
         <TouchableOpacity
           testID="tool-use-card-header"
           onPress={() => setExpanded(!expanded)}
-          onLayout={handleHeaderLayout}
+          onLayout={shouldShowTestProbe ? handleHeaderLayout : undefined}
           style={[
             diffStyles.header,
             TOOL_USE_LAYOUT_FIXES.contentWidth,
@@ -1157,7 +1178,7 @@ const styles = StyleSheet.create({
   messageRow: {
     flexDirection: 'row',
     marginVertical: 4,
-    gap: 8,
+    gap: MESSAGE_ROW_GAP,
     alignItems: 'flex-start',
   },
   messageRowUser: {

@@ -2,9 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { parseToolUsage } from '../utils/terminalUtils';
 import { CLAUDE_MARKDOWN_LAYOUT_FIXES } from '../utils/terminalMarkdownStyles';
 import {
+  ASSISTANT_BUBBLE_MAX_WIDTH_RATIO,
+  getToolUseAvailableWidth,
+  getToolUseMinHealthyRatio,
   isToolUseWidthHealthy,
   TOOL_USE_LAYOUT_FIXES,
-  TOOL_USE_WIDTH_RATIO_THRESHOLD,
+  TOOL_USE_WIDTH_RATIO_TOLERANCE,
 } from '../utils/terminalToolUseStyles';
 
 /**
@@ -85,11 +88,19 @@ describe('tool use layout fixes', () => {
     expect(TOOL_USE_LAYOUT_FIXES.headerText.minWidth).toBe(0);
   });
 
-  it('should require tool-use cards to occupy a healthy share of the row width', () => {
-    expect(TOOL_USE_WIDTH_RATIO_THRESHOLD).toBe(0.65);
-    expect(isToolUseWidthHealthy(0.75)).toBe(true);
-    expect(isToolUseWidthHealthy(0.65)).toBe(true);
-    expect(isToolUseWidthHealthy(0.5)).toBe(false);
+  it('should derive the available width from the row minus avatar and gap', () => {
+    expect(getToolUseAvailableWidth(360, 32, 8)).toBe(320);
+  });
+
+  it('should compute the minimum healthy ratio from the real row geometry', () => {
+    expect(ASSISTANT_BUBBLE_MAX_WIDTH_RATIO).toBe(0.75);
+    expect(TOOL_USE_WIDTH_RATIO_TOLERANCE).toBe(0.05);
+    expect(getToolUseMinHealthyRatio(360, 32, 8)).toBeCloseTo(0.79375, 5);
+  });
+
+  it('should require tool-use cards to stay close to the intended assistant bubble width', () => {
+    expect(isToolUseWidthHealthy(270, 360, 32, 8)).toBe(true);
+    expect(isToolUseWidthHealthy(200, 360, 32, 8)).toBe(false);
   });
 });
 
