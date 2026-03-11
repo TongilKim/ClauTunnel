@@ -80,7 +80,9 @@ describe('message grouping logic', () => {
     const sorted = [...messages].sort((a, b) => a.timestamp - b.timestamp);
 
     for (const msg of sorted) {
-      if (msg.type === 'system') {
+      // Input, system messages are never grouped — each gets its own bubble.
+      // Only consecutive output chunks are grouped.
+      if (msg.type === 'system' || msg.type === 'input') {
         if (currentGroup) {
           groups.push(currentGroup);
           currentGroup = null;
@@ -131,6 +133,17 @@ describe('message grouping logic', () => {
     expect(groups).toHaveLength(2);
     expect(groups[0].type).toBe('input');
     expect(groups[1].type).toBe('output');
+  });
+
+  it('should not group consecutive input messages', () => {
+    const msgs: SimpleMsg[] = [
+      { type: 'input', content: 'First', timestamp: 1 },
+      { type: 'input', content: 'Second', timestamp: 2 },
+    ];
+    const groups = groupMessages(msgs);
+    expect(groups).toHaveLength(2);
+    expect(groups[0].content).toBe('First');
+    expect(groups[1].content).toBe('Second');
   });
 
   it('should break groups around system messages', () => {
