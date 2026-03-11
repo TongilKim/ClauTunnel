@@ -322,22 +322,29 @@ export function Terminal() {
             </Text>
           </View>
         ) : (
-          groupedMessages.map((group) => (
-            <AnimatedBubble key={group.key}>
-              {group.type === 'tool-use' && group.toolUseData ? (
-                <CollapsibleToolUse
-                  toolUseData={group.toolUseData}
-                  isDark={isDark}
-                  timestamp={group.timestamp}
-                />
-              ) : (
-                <MessageBubble
-                  message={group}
-                  isDark={isDark}
-                />
-              )}
-            </AnimatedBubble>
-          ))
+          (() => {
+            let userIdx = 0;
+            return groupedMessages.map((group) => {
+              const currentUserIdx = group.type === 'input' ? userIdx++ : undefined;
+              return (
+                <AnimatedBubble key={group.key}>
+                  {group.type === 'tool-use' && group.toolUseData ? (
+                    <CollapsibleToolUse
+                      toolUseData={group.toolUseData}
+                      isDark={isDark}
+                      timestamp={group.timestamp}
+                    />
+                  ) : (
+                    <MessageBubble
+                      message={group}
+                      isDark={isDark}
+                      userIndex={currentUserIdx}
+                    />
+                  )}
+                </AnimatedBubble>
+              );
+            });
+          })()
         )}
         {ListFooterComponent}
       </ScrollView>
@@ -401,9 +408,11 @@ function TypingIndicator({ isDark, isQueued }: TypingIndicatorProps) {
 interface MessageBubbleProps {
   message: GroupedMessage;
   isDark: boolean;
+  /** Zero-based index among user (input) bubbles – used for testID */
+  userIndex?: number;
 }
 
-function MessageBubble({ message, isDark }: MessageBubbleProps) {
+function MessageBubble({ message, isDark, userIndex }: MessageBubbleProps) {
   const isUser = message.type === 'input';
   const isSystem = message.type === 'system';
   const [showSelectModal, setShowSelectModal] = useState(false);
@@ -476,7 +485,7 @@ function MessageBubble({ message, isDark }: MessageBubbleProps) {
         {cleanContent.trim() && (
           <Pressable onLongPress={handleLongPress} delayLongPress={300}>
             <View
-              testID={isUser ? 'user-message-bubble' : undefined}
+              testID={isUser && userIndex != null ? `user-message-bubble-${userIndex}` : undefined}
               style={[
                 styles.bubble,
                 isUser

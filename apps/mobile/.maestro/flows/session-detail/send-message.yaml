@@ -25,7 +25,7 @@ appId: com.clautunnel.app
     id: "input-send-button"
 - extendedWaitUntil:
     visible:
-      id: "user-message-bubble"
+      id: "user-message-bubble-2"
     timeout: 3000
 - assertVisible: "Hello from Maestro test"
 - extendedWaitUntil:
