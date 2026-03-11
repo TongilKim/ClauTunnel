@@ -236,6 +236,14 @@ export class MobileServerManager {
   }
 
   async startNgrok(): Promise<string | null> {
+    // Kill any leftover ngrok processes to avoid ERR_NGROK_334
+    try {
+      execSync('killall ngrok', { stdio: 'pipe' });
+      await this.sleep(500);
+    } catch {
+      // No existing ngrok process — expected
+    }
+
     this.ensureLogDir();
 
     this.ngrokLogStream = createWriteStream(join(this.logDir, 'ngrok.log'));
