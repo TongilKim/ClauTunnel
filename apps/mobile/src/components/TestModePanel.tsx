@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import {
   buildMockMarkdownOverflowRiskMessage,
+  buildMockToolUseWidthMessage,
   isTestMode,
   MOCK_QUESTION_DATA,
   MOCK_PERMISSION_REQUEST,
@@ -24,6 +25,20 @@ export function TestModePanel() {
   const injectMarkdownOverflowRisk = () => {
     const { messages, lastSeq, scrollToBottom } = useConnectionStore.getState();
     const nextMessage = buildMockMarkdownOverflowRiskMessage(lastSeq + 1);
+
+    useConnectionStore.setState({
+      messages: [...messages, nextMessage],
+      lastSeq: nextMessage.seq,
+    });
+
+    setTimeout(() => {
+      scrollToBottom();
+    }, 50);
+  };
+
+  const injectToolUseWidthPreview = () => {
+    const { messages, lastSeq, scrollToBottom } = useConnectionStore.getState();
+    const nextMessage = buildMockToolUseWidthMessage(lastSeq + 1);
 
     useConnectionStore.setState({
       messages: [...messages, nextMessage],
@@ -66,6 +81,13 @@ export function TestModePanel() {
             onPress={injectMarkdownOverflowRisk}
           >
             <Text style={styles.buttonText}>Inject Markdown Wrap</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            testID="test-mode-trigger-tool-use-width"
+            style={styles.button}
+            onPress={injectToolUseWidthPreview}
+          >
+            <Text style={styles.buttonText}>Inject Tool Use</Text>
           </TouchableOpacity>
         </View>
       )}

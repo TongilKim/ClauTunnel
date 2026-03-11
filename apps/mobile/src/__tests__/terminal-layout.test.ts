@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { parseToolUsage } from '../utils/terminalUtils';
 import { CLAUDE_MARKDOWN_LAYOUT_FIXES } from '../utils/terminalMarkdownStyles';
+import {
+  isToolUseWidthHealthy,
+  TOOL_USE_LAYOUT_FIXES,
+  TOOL_USE_WIDTH_RATIO_THRESHOLD,
+} from '../utils/terminalToolUseStyles';
 
 /**
  * Terminal message bubble layout and utility tests.
@@ -60,6 +65,31 @@ describe('Claude markdown layout fixes', () => {
   it('should allow markdown text groups to shrink instead of clipping', () => {
     expect(CLAUDE_MARKDOWN_LAYOUT_FIXES.textgroup.flexShrink).toBe(1);
     expect(CLAUDE_MARKDOWN_LAYOUT_FIXES.textgroup.minWidth).toBe(0);
+  });
+});
+
+describe('tool use layout fixes', () => {
+  it('should let the tool-use bubble claim the assistant bubble width budget', () => {
+    expect(TOOL_USE_LAYOUT_FIXES.container.flex).toBe(1);
+    expect(TOOL_USE_LAYOUT_FIXES.container.minWidth).toBe(0);
+  });
+
+  it('should stretch tool-use header and body content to the container width', () => {
+    expect(TOOL_USE_LAYOUT_FIXES.contentWidth.width).toBe('100%');
+    expect(TOOL_USE_LAYOUT_FIXES.contentWidth.minWidth).toBe(0);
+  });
+
+  it('should keep the tool-use title row shrinkable before applying ellipsis', () => {
+    expect(TOOL_USE_LAYOUT_FIXES.headerLeft.minWidth).toBe(0);
+    expect(TOOL_USE_LAYOUT_FIXES.headerText.flexShrink).toBe(1);
+    expect(TOOL_USE_LAYOUT_FIXES.headerText.minWidth).toBe(0);
+  });
+
+  it('should require tool-use cards to occupy a healthy share of the row width', () => {
+    expect(TOOL_USE_WIDTH_RATIO_THRESHOLD).toBe(0.65);
+    expect(isToolUseWidthHealthy(0.75)).toBe(true);
+    expect(isToolUseWidthHealthy(0.65)).toBe(true);
+    expect(isToolUseWidthHealthy(0.5)).toBe(false);
   });
 });
 
