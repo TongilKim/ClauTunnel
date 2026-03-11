@@ -116,6 +116,7 @@ export function CommandPicker({
 
           <TextInput
             ref={inputRef}
+            testID="command-search-input"
             style={[styles.searchInput, isDark && styles.searchInputDark]}
             placeholder="Search commands..."
             placeholderTextColor={isDark ? '#6b7280' : '#9ca3af'}
