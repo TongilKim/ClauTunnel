@@ -1,0 +1,33 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "login-email-input"
+- inputText: "test@clautunnel.com"
+- tapOn:
+    id: "login-password-input"
+- inputText: "password123"
+- tapOn:
+    id: "login-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-card-test-session-1"
+    timeout: 5000
+- tapOn:
+    id: "session-card-test-session-1"
+- assertVisible: "Opus 4.6"
+- tapOn:
+    id: "input-commands-button"
+- extendedWaitUntil:
+    visible: "command-model"
+    timeout: 3000
+- tapOn: "command-model"
+- extendedWaitUntil:
+    visible: "Select Model"
+    timeout: 3000
+- tapOn: "Cancel"
+- assertNotVisible: "Select Model"
+- assertVisible: "Opus 4.6"
+- tapOn:
+    id: "session-back-button"
