@@ -1,0 +1,52 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "login-email-input"
+- inputText: "test@clautunnel.com"
+- tapOn:
+    id: "login-password-input"
+- inputText: "password123"
+- tapOn:
+    id: "login-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-card-test-session-1"
+    timeout: 5000
+- tapOn:
+    id: "session-card-test-session-1"
+- extendedWaitUntil:
+    visible:
+      id: "input-model-badge"
+    timeout: 3000
+
+# Verify initial model is Opus
+- assertVisible: "Opus 4.6"
+
+# Open model picker via command palette and switch to Sonnet
+- tapOn:
+    id: "input-commands-button"
+- extendedWaitUntil:
+    visible: "command-model"
+    timeout: 3000
+- tapOn: "command-model"
+- extendedWaitUntil:
+    visible:
+      id: "model-picker-modal"
+    timeout: 3000
+- tapOn:
+    id: "model-option-sonnet"
+
+# Verify model picker closes
+- assertNotVisible:
+    id: "model-picker-modal"
+
+# Verify badge updated to Sonnet (not still showing Opus)
+- extendedWaitUntil:
+    visible: "Sonnet 4"
+    timeout: 3000
+- assertNotVisible: "Opus 4.6"
+
+- tapOn:
+    id: "session-back-button"

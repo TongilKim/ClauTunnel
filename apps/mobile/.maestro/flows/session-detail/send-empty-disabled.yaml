@@ -1,0 +1,45 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "login-email-input"
+- inputText: "test@clautunnel.com"
+- tapOn:
+    id: "login-password-input"
+- inputText: "password123"
+- tapOn:
+    id: "login-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-card-test-session-1"
+    timeout: 5000
+- tapOn:
+    id: "session-card-test-session-1"
+- extendedWaitUntil:
+    visible:
+      id: "input-text"
+    timeout: 3000
+
+# Verify placeholder text
+- assertVisible: "Message Claude..."
+
+# Tap send button with empty input - should not send
+- tapOn:
+    id: "input-send-button"
+
+# Verify no mock response was generated
+- assertNotVisible: "Mock response to:"
+
+# Type spaces only and try to send
+- tapOn:
+    id: "input-text"
+- inputText: "   "
+- tapOn:
+    id: "input-send-button"
+
+# Verify still no mock response (whitespace-only not sent)
+- assertNotVisible: "Mock response to:"
+
+- tapOn:
+    id: "session-back-button"

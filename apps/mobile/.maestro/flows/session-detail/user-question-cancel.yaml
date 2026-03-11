@@ -1,0 +1,39 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "login-email-input"
+- inputText: "test@clautunnel.com"
+- tapOn:
+    id: "login-password-input"
+- inputText: "password123"
+- tapOn:
+    id: "login-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-card-test-session-1"
+    timeout: 5000
+- tapOn:
+    id: "session-card-test-session-1"
+
+# Trigger user question via test mode panel
+- tapOn:
+    id: "test-mode-toggle"
+- tapOn:
+    id: "test-mode-trigger-question"
+- assertVisible:
+    id: "user-question-modal"
+- assertVisible: "Which testing framework should we use?"
+
+# Cancel without answering
+- tapOn:
+    id: "user-question-cancel"
+- assertNotVisible:
+    id: "user-question-modal"
+
+# Verify no answer message was added
+- assertNotVisible: "Question answered"
+
+- tapOn:
+    id: "session-back-button"
