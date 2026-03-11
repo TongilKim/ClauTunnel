@@ -457,6 +457,13 @@ export class MobileServerManager {
     const host = tunnelUrl.replace(/^https?:\/\//, '');
     const expoUrl = `exp://${host}:443`;
     console.log('');
+    console.log('  ┌─────────────────────────────────────────────────┐');
+    console.log('  │  Expo Go is required to open this QR code.      │');
+    console.log('  │  iOS:     https://apps.apple.com/app/id982107779│');
+    console.log('  │  Android: https://play.google.com/store/apps/   │');
+    console.log('  │           details?id=host.exp.exponent          │');
+    console.log('  └─────────────────────────────────────────────────┘');
+    console.log('');
     console.log('  Scan with Expo Go:');
     qrcode.generate(expoUrl, { small: true }, (code: string) => {
       // Indent each line for alignment
