@@ -314,6 +314,7 @@ export default function SessionsScreen() {
                   </View>
                   {section.offlineCount > 0 && (
                     <TouchableOpacity
+                      testID={`machine-clear-ended-${section.id}`}
                       style={styles.sectionClearButton}
                       onPress={(e) => {
                         e.stopPropagation();
