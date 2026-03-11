@@ -1,0 +1,40 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "login-email-input"
+- inputText: "test@clautunnel.com"
+- tapOn:
+    id: "login-password-input"
+- inputText: "password123"
+- tapOn:
+    id: "login-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-card-test-session-1"
+    timeout: 5000
+
+# Verify sessions are visible (expanded state)
+- assertVisible:
+    id: "session-card-test-session-1"
+
+# Collapse machine section
+- tapOn:
+    id: "machine-section-test-machine-1"
+
+# Verify session cards are hidden
+- assertNotVisible:
+    id: "session-card-test-session-1"
+
+# Expand machine section again
+- tapOn:
+    id: "machine-section-test-machine-1"
+
+# Verify session cards are visible again
+- extendedWaitUntil:
+    visible:
+      id: "session-card-test-session-1"
+    timeout: 3000
+- assertVisible:
+    id: "session-card-test-session-1"
