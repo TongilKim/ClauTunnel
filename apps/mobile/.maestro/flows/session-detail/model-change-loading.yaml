@@ -21,7 +21,10 @@ appId: com.clautunnel.app
       id: "input-model-badge"
     timeout: 3000
 
-# Open model picker and switch model
+# Verify initial model is Opus
+- assertVisible: "Opus 4.6"
+
+# Open model picker via command palette and switch to Sonnet
 - tapOn:
     id: "input-commands-button"
 - extendedWaitUntil:
@@ -32,18 +35,18 @@ appId: com.clautunnel.app
     visible:
       id: "model-picker-modal"
     timeout: 3000
-
-# Select a different model (Haiku)
 - tapOn:
-    id: "model-option-haiku"
+    id: "model-option-sonnet"
 
-# Verify model picker closes and badge updates
+# Verify model picker closes
 - assertNotVisible:
     id: "model-picker-modal"
+
+# Verify badge updated to Sonnet (not still showing Opus)
 - extendedWaitUntil:
-    visible:
-      id: "input-model-badge"
+    visible: "Sonnet 4"
     timeout: 3000
+- assertNotVisible: "Opus 4.6"
 
 - tapOn:
     id: "session-back-button"

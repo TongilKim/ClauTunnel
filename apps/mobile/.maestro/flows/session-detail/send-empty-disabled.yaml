@@ -28,8 +28,8 @@ appId: com.clautunnel.app
 - tapOn:
     id: "input-send-button"
 
-# Verify no new messages appear (mock messages still the same)
-- assertVisible: "Hello! How can I help you today?"
+# Verify no mock response was generated
+- assertNotVisible: "Mock response to:"
 
 # Type spaces only and try to send
 - tapOn:
@@ -38,8 +38,8 @@ appId: com.clautunnel.app
 - tapOn:
     id: "input-send-button"
 
-# Verify still no new messages sent
-- assertVisible: "Hello! How can I help you today?"
+# Verify still no mock response (whitespace-only not sent)
+- assertNotVisible: "Mock response to:"
 
 - tapOn:
     id: "session-back-button"
