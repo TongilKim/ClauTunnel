@@ -631,7 +631,6 @@ function ClaudeMessage({ content, isDark }: ClaudeMessageProps) {
       color: isDark ? '#e5e5e5' : '#1f2937',
       fontSize: 14,
       lineHeight: 20,
-      flexShrink: 1,
     },
     paragraph: {
       marginTop: 0,
@@ -1109,6 +1108,7 @@ const styles = StyleSheet.create({
   bubbleContainer: {
     maxWidth: '75%',
     flexShrink: 1,
+    flexGrow: 1,
   },
   bubbleContainerUser: {
     alignItems: 'flex-end',
@@ -1128,7 +1128,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    overflow: 'hidden' as const,
   },
   bubbleUser: {
     backgroundColor: '#3b82f6',
