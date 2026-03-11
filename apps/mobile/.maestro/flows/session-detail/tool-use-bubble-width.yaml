@@ -16,8 +16,6 @@ appId: com.clautunnel.app
 
 - inputText: password123
 
-- hideKeyboard
-
 - tapOn:
     id: login-button
 
