@@ -1,0 +1,54 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "login-email-input"
+- inputText: "test@clautunnel.com"
+- tapOn:
+    id: "login-password-input"
+- inputText: "password123"
+- tapOn:
+    id: "login-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-card-test-session-1"
+    timeout: 5000
+
+# First clear ended sessions
+- tapOn:
+    id: "machine-clear-ended-test-machine-1"
+- assertVisible: "Clear Ended Sessions"
+- tapOn: "Delete"
+- extendedWaitUntil:
+    notVisible:
+      id: "session-card-test-session-2"
+    timeout: 3000
+
+# Now disconnect the active session via swipe
+- swipe:
+    id: "session-card-test-session-1"
+    direction: "LEFT"
+    duration: 400
+- extendedWaitUntil:
+    visible: "Disconnect"
+    timeout: 3000
+- tapOn:
+    id: "session-disconnect-test-session-1"
+- tapOn: "Disconnect"
+- extendedWaitUntil:
+    visible: "Ended"
+    timeout: 3000
+
+# Clear the now-ended session
+- tapOn:
+    id: "machine-clear-ended-test-machine-1"
+- assertVisible: "Clear Ended Sessions"
+- tapOn: "Delete"
+
+# Verify empty state
+- extendedWaitUntil:
+    visible:
+      id: "sessions-empty-state"
+    timeout: 5000
+- assertVisible: "No Sessions"

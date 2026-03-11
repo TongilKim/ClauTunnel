@@ -1,0 +1,49 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "login-email-input"
+- inputText: "test@clautunnel.com"
+- tapOn:
+    id: "login-password-input"
+- inputText: "password123"
+- tapOn:
+    id: "login-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-card-test-session-1"
+    timeout: 5000
+- tapOn:
+    id: "session-card-test-session-1"
+- extendedWaitUntil:
+    visible:
+      id: "input-model-badge"
+    timeout: 3000
+
+# Open model picker and switch model
+- tapOn:
+    id: "input-commands-button"
+- extendedWaitUntil:
+    visible: "command-model"
+    timeout: 3000
+- tapOn: "command-model"
+- extendedWaitUntil:
+    visible:
+      id: "model-picker-modal"
+    timeout: 3000
+
+# Select a different model (Haiku)
+- tapOn:
+    id: "model-option-haiku"
+
+# Verify model picker closes and badge updates
+- assertNotVisible:
+    id: "model-picker-modal"
+- extendedWaitUntil:
+    visible:
+      id: "input-model-badge"
+    timeout: 3000
+
+- tapOn:
+    id: "session-back-button"
