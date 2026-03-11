@@ -475,7 +475,24 @@ export class SdkSession extends EventEmitter {
     ) {
       // /compact can also complete with compact_boundary and no result message.
       this.scheduleCompactCompletionFallback();
+    } else if (message.type === 'auth_status') {
+      // Authentication status change from SDK
+      const authMsg = message as { type: 'auth_status'; isAuthenticating: boolean; error?: string; output?: string[] };
+      if (authMsg.error) {
+        this.emit('auth-error', {
+          errorCode: 'authentication_failed',
+          message: authMsg.error,
+        });
+      }
     } else if (message.type === 'assistant') {
+      // Check for API-level errors (auth failure, billing, rate limit, etc.)
+      const assistantError = (message as any).error as string | undefined;
+      if (assistantError) {
+        this.emit('auth-error', {
+          errorCode: assistantError,
+          message: assistantError,
+        });
+      }
       // Assistant text output and tool use
       if (message.message?.content) {
         for (const block of message.message.content) {

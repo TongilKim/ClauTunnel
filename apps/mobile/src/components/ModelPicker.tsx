@@ -63,6 +63,7 @@ export function ModelPicker({
           onPress={onClose}
         />
         <View
+          testID="model-picker-modal"
           style={[
             styles.sheet,
             isDark && styles.sheetDark,
@@ -90,6 +91,9 @@ export function ModelPicker({
                 return (
                   <TouchableOpacity
                     key={model.value}
+                    accessible={true}
+                    accessibilityLabel={`model-${model.value}`}
+                    testID={`model-option-${model.value}`}
                     style={[
                       styles.option,
                       isDark && styles.optionDark,

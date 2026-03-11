@@ -1,0 +1,33 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "login-email-input"
+- inputText: "test@clautunnel.com"
+- tapOn:
+    id: "login-password-input"
+- inputText: "password123"
+- tapOn:
+    id: "login-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-card-test-session-1"
+    timeout: 5000
+- tapOn:
+    id: "session-card-test-session-1"
+- tapOn:
+    id: "test-mode-toggle"
+- tapOn:
+    id: "test-mode-trigger-permission"
+- assertVisible:
+    id: "permission-request-modal"
+- assertVisible: "Permission Required"
+- assertVisible: "Bash"
+- tapOn:
+    id: "permission-allow-button"
+- assertNotVisible:
+    id: "permission-request-modal"
+- assertVisible: "Permission allowed for Bash"
+- tapOn:
+    id: "session-back-button"

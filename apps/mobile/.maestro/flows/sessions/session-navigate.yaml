@@ -1,0 +1,30 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "login-email-input"
+- inputText: "test@clautunnel.com"
+- tapOn:
+    id: "login-password-input"
+- inputText: "password123"
+- tapOn:
+    id: "login-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-card-test-session-1"
+    timeout: 5000
+- tapOn:
+    id: "session-card-test-session-1"
+- assertVisible:
+    id: "session-title"
+- assertVisible:
+    id: "session-status-badge"
+- assertVisible:
+    id: "terminal-scrollview"
+- assertVisible:
+    id: "input-text"
+- assertVisible: "Hello! How can I help you today?"
+- tapOn:
+    id: "session-back-button"
+- assertVisible: "Test MacBook"

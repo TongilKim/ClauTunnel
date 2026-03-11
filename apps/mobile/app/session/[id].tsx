@@ -17,6 +17,8 @@ import { Terminal } from '../../src/components/Terminal';
 import { InputBar } from '../../src/components/InputBar';
 import { UserQuestionPicker } from '../../src/components/UserQuestionPicker';
 import { PermissionRequestPicker } from '../../src/components/PermissionRequestPicker';
+import { TestModePanel } from '../../src/components/TestModePanel';
+import { isTestMode } from '../../src/utils/testMode';
 
 export default function SessionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -79,10 +81,11 @@ export default function SessionScreen() {
     return () => {
       disconnect();
     };
-  }, [id]);
+  }, [connect, disconnect, id]);
 
   // Request available models when connected
   useEffect(() => {
+    if (isTestMode()) return;
     if (state === 'connected') {
       requestModels();
     }
@@ -97,11 +100,12 @@ export default function SessionScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       {/* Custom Header */}
       <View style={[styles.header, isDark && styles.headerDark, { paddingTop: insets.top }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity testID="session-back-button" onPress={() => router.back()} style={styles.backButton}>
           <Text style={[styles.backText, isDark && styles.backTextDark]}>‹ Back</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={handleEditTitle} style={styles.titleButton}>
           <Text
+            testID="session-title"
             style={[styles.headerTitle, isDark && styles.headerTitleDark]}
             numberOfLines={1}
             ellipsizeMode="tail"
@@ -110,7 +114,7 @@ export default function SessionScreen() {
           </Text>
           <Text style={[styles.editIcon, isDark && styles.editIconDark]}>✎</Text>
         </TouchableOpacity>
-        <View style={[styles.statusBadge, styles[`statusBadge_${effectiveStatus}`]]}>
+        <View testID="session-status-badge" style={[styles.statusBadge, styles[`statusBadge_${effectiveStatus}`]]}>
           <View style={[styles.statusDot, styles[`statusDot_${effectiveStatus}`]]} />
           <Text style={[styles.statusText, styles[`statusText_${effectiveStatus}`]]}>
             {effectiveStatus === 'online'
@@ -144,6 +148,9 @@ export default function SessionScreen() {
         onDeny={(message) => sendPermissionResponse('deny', message)}
         onClose={clearPendingPermissionRequest}
       />
+
+      {/* Test mode panel for E2E testing */}
+      <TestModePanel />
     </KeyboardAvoidingView>
   );
 }

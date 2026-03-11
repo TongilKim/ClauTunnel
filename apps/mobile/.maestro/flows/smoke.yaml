@@ -1,0 +1,136 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+
+# Take debug screenshot to see initial state
+- takeScreenshot: app-launched
+
+# Sign in with mock credentials
+- assertVisible: "ClauTunnel"
+- tapOn:
+    id: "login-email-input"
+- inputText: "test@clautunnel.com"
+- tapOn:
+    id: "login-password-input"
+- inputText: "password123"
+- tapOn:
+    id: "login-button"
+
+# Session list — wait for mock data to render
+- extendedWaitUntil:
+    visible:
+      id: "sessions-stats-total"
+    timeout: 15000
+- assertVisible:
+    id: "machine-section-test-machine-1"
+- assertVisible:
+    id: "session-card-test-session-1"
+
+# Navigate to session detail
+- tapOn:
+    id: "session-card-test-session-1"
+- assertVisible:
+    id: "session-title"
+- assertVisible:
+    id: "terminal-scrollview"
+- assertVisible:
+    id: "input-text"
+
+# Send a message
+- tapOn:
+    id: "input-text"
+- inputText: "Hello from smoke test"
+- tapOn:
+    id: "input-send-button"
+- extendedWaitUntil:
+    visible: "Mock response to: Hello from smoke test"
+    timeout: 3000
+
+# Dismiss keyboard by tapping terminal area (hideKeyboard uses back button on Android)
+- tapOn:
+    id: "terminal-scrollview"
+- takeScreenshot: before-test-panel
+
+# Test model picker via command palette
+- assertVisible: "Opus 4.6"
+- tapOn:
+    id: "input-commands-button"
+- extendedWaitUntil:
+    visible: "command-model"
+    timeout: 3000
+- tapOn: "command-model"
+- extendedWaitUntil:
+    visible: "Select Model"
+    timeout: 3000
+- extendedWaitUntil:
+    visible: "model-haiku"
+    timeout: 3000
+- tapOn: "model-haiku"
+- assertNotVisible: "Select Model"
+- assertVisible:
+    id: "input-model-badge"
+- extendedWaitUntil:
+    visible: "Haiku 3.5"
+    timeout: 3000
+- assertNotVisible: "Opus 4.6"
+
+# Test AskUserQuestion flow — wait for toggle to be visible
+- extendedWaitUntil:
+    visible:
+      id: "test-mode-toggle"
+    timeout: 5000
+- tapOn:
+    id: "test-mode-toggle"
+- extendedWaitUntil:
+    visible:
+      id: "test-mode-trigger-question"
+    timeout: 3000
+- tapOn:
+    id: "test-mode-trigger-question"
+- extendedWaitUntil:
+    visible:
+      id: "user-question-modal"
+    timeout: 5000
+- assertVisible:
+    id: "user-question-title"
+- tapOn:
+    id: "user-question-option-0-0"
+- tapOn:
+    id: "user-question-submit"
+- assertNotVisible:
+    id: "user-question-modal"
+- assertVisible: "Question answered: Maestro"
+
+# Test Permission Request flow
+- tapOn:
+    id: "test-mode-trigger-permission"
+- assertVisible:
+    id: "permission-request-modal"
+- tapOn:
+    id: "permission-allow-button"
+- assertNotVisible:
+    id: "permission-request-modal"
+- assertVisible: "Permission allowed for Bash"
+
+# Close test mode panel
+- tapOn:
+    id: "test-mode-toggle"
+
+# Go back to session list
+- tapOn:
+    id: "session-back-button"
+- assertVisible:
+    id: "machine-section-test-machine-1"
+
+# Navigate to settings — tap the right half of the bottom tab bar
+# (Expo Router v6 tabs don't expose testID or text to Maestro)
+- tapOn:
+    point: "75%,93%"
+- extendedWaitUntil:
+    visible:
+      id: "settings-email"
+    timeout: 5000
+- assertVisible:
+    id: "settings-version"
+- assertVisible: "test@clautunnel.com"

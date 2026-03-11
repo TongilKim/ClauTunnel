@@ -1,0 +1,39 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "login-email-input"
+- inputText: "test@clautunnel.com"
+- tapOn:
+    id: "login-password-input"
+- inputText: "password123"
+- tapOn:
+    id: "login-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-card-test-session-2"
+    timeout: 5000
+
+# Swipe left on ended session to reveal delete action
+- swipe:
+    id: "session-card-test-session-2"
+    direction: "LEFT"
+    duration: 400
+- extendedWaitUntil:
+    visible: "Delete"
+    timeout: 3000
+- tapOn:
+    id: "session-delete-test-session-2"
+
+# Confirm deletion in alert
+- assertVisible: "Delete Session"
+- tapOn: "Delete"
+
+# Verify session is removed
+- extendedWaitUntil:
+    notVisible:
+      id: "session-card-test-session-2"
+    timeout: 3000
+- assertVisible:
+    id: "session-card-test-session-1"

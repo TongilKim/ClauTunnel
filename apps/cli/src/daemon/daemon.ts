@@ -107,6 +107,33 @@ export class Daemon extends EventEmitter {
       this.emit('error', error);
     });
 
+    // Wire up auth/API errors (authentication_failed, billing_error, rate_limit, etc.)
+    this.sdkSession.on('auth-error', async (errorInfo: { errorCode: string; message: string }) => {
+      const errorMessages: Record<string, string> = {
+        'authentication_failed': 'Claude CLI authentication expired. Please run "claude login" on the host machine.',
+        'billing_error': 'Billing error. Please check your Anthropic account billing status.',
+        'rate_limit': 'Rate limit reached. Please wait a moment and try again.',
+        'server_error': 'Anthropic API server error. Please try again later.',
+      };
+
+      const displayMessage = errorMessages[errorInfo.errorCode] || `API error: ${errorInfo.message}`;
+
+      if (this.options.hybrid !== false) {
+        process.stdout.write(`\n[Error] ${displayMessage}\n`);
+      }
+
+      this.emit('error', new Error(displayMessage));
+
+      if (this.realtimeClient) {
+        try {
+          await this.realtimeClient.broadcastError(displayMessage, errorInfo.errorCode);
+          await this.realtimeClient.broadcastComplete();
+        } catch {
+          // Silently handle broadcast errors
+        }
+      }
+    });
+
     // Broadcast commands when they're updated from init message (includes plugins/skills)
     this.sdkSession.on('commands-updated', async () => {
       await this.broadcastCommands();
