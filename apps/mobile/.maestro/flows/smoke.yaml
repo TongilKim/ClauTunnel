@@ -3,7 +3,11 @@ appId: com.clautunnel.app
 - launchApp:
     clearState: true
 
-# Take debug screenshot to see initial state
+# Wait for the login screen to finish rendering, especially on Android cold starts
+- extendedWaitUntil:
+    visible:
+      id: "login-email-input"
+    timeout: 15000
 - takeScreenshot: app-launched
 
 # Sign in with mock credentials
