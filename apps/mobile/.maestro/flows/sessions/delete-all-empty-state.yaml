@@ -46,9 +46,13 @@ appId: com.clautunnel.app
 - assertVisible: "Clear Ended Sessions"
 - tapOn: "Delete"
 
-# Verify empty state
+# Verify machine section remains but has no session cards
+# (machineOnlineStatus keeps the listener alive)
 - extendedWaitUntil:
     visible:
-      id: "sessions-empty-state"
-    timeout: 5000
-- assertVisible: "No Sessions"
+      id: "machine-section-test-machine-1"
+    timeout: 3000
+- assertNotVisible:
+    id: "session-card-test-session-1"
+- assertNotVisible:
+    id: "session-card-test-session-2"
