@@ -30,8 +30,18 @@ appId: com.clautunnel.app
 - assertVisible:
     id: terminal-scrollview
 
+- extendedWaitUntil:
+    visible:
+      id: test-mode-toggle
+    timeout: 5000
+
 - tapOn:
     id: test-mode-toggle
+
+- extendedWaitUntil:
+    visible:
+      id: test-mode-trigger-tool-use-width
+    timeout: 3000
 
 - tapOn:
     id: test-mode-trigger-tool-use-width
