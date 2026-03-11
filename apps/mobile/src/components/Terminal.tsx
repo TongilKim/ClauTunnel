@@ -34,6 +34,8 @@ interface GroupedMessage {
   toolUseData?: ToolUseData;
   /** Stable key derived from the first message's seq in the group */
   key: string;
+  /** Seq of the first message in the group – used for stable testIDs */
+  seq: number;
 }
 
 // Avatar components using text-based icons
@@ -201,8 +203,9 @@ export function Terminal() {
                       msg.type === 'output' ? 'output' :
                       msg.type === 'tool-use' ? 'tool-use' : 'system';
 
-      // System messages and tool-use messages should never be grouped
-      if (msgType === 'system' || msgType === 'tool-use') {
+      // Input, system, and tool-use messages are never grouped — each gets its own bubble.
+      // Only consecutive output chunks are grouped (Claude streams responses in parts).
+      if (msgType === 'system' || msgType === 'tool-use' || msgType === 'input') {
         if (currentGroup) {
           groups.push(currentGroup);
           currentGroup = null;
@@ -213,9 +216,10 @@ export function Terminal() {
           timestamp: msg.timestamp,
           toolUseData: msg.toolUseData,
           key: `${msgType}-${msg.seq}`,
+          seq: msg.seq,
         });
       } else if (currentGroup && currentGroup.type === msgType) {
-        // Append to current group (only for input/output)
+        // Append to current group (only for output)
         // Add newline between chunks so line breaks are preserved when rendering
         const chunk = msg.content || '';
         if (chunk && !currentGroup.content.endsWith('\n') && !chunk.startsWith('\n')) {
@@ -233,6 +237,7 @@ export function Terminal() {
           content: msg.content || '',
           timestamp: msg.timestamp,
           key: `${msgType}-${msg.seq}`,
+          seq: msg.seq,
         };
       }
     }
@@ -322,29 +327,22 @@ export function Terminal() {
             </Text>
           </View>
         ) : (
-          (() => {
-            let userIdx = 0;
-            return groupedMessages.map((group) => {
-              const currentUserIdx = group.type === 'input' ? userIdx++ : undefined;
-              return (
-                <AnimatedBubble key={group.key}>
-                  {group.type === 'tool-use' && group.toolUseData ? (
-                    <CollapsibleToolUse
-                      toolUseData={group.toolUseData}
-                      isDark={isDark}
-                      timestamp={group.timestamp}
-                    />
-                  ) : (
-                    <MessageBubble
-                      message={group}
-                      isDark={isDark}
-                      userIndex={currentUserIdx}
-                    />
-                  )}
-                </AnimatedBubble>
-              );
-            });
-          })()
+          groupedMessages.map((group) => (
+            <AnimatedBubble key={group.key}>
+              {group.type === 'tool-use' && group.toolUseData ? (
+                <CollapsibleToolUse
+                  toolUseData={group.toolUseData}
+                  isDark={isDark}
+                  timestamp={group.timestamp}
+                />
+              ) : (
+                <MessageBubble
+                  message={group}
+                  isDark={isDark}
+                />
+              )}
+            </AnimatedBubble>
+          ))
         )}
         {ListFooterComponent}
       </ScrollView>
@@ -408,11 +406,9 @@ function TypingIndicator({ isDark, isQueued }: TypingIndicatorProps) {
 interface MessageBubbleProps {
   message: GroupedMessage;
   isDark: boolean;
-  /** Zero-based index among user (input) bubbles – used for testID */
-  userIndex?: number;
 }
 
-function MessageBubble({ message, isDark, userIndex }: MessageBubbleProps) {
+function MessageBubble({ message, isDark }: MessageBubbleProps) {
   const isUser = message.type === 'input';
   const isSystem = message.type === 'system';
   const [showSelectModal, setShowSelectModal] = useState(false);
@@ -485,7 +481,7 @@ function MessageBubble({ message, isDark, userIndex }: MessageBubbleProps) {
         {cleanContent.trim() && (
           <Pressable onLongPress={handleLongPress} delayLongPress={300}>
             <View
-              testID={isUser && userIndex != null ? `user-message-bubble-${userIndex}` : undefined}
+              testID={isUser ? `user-message-bubble-${message.seq}` : undefined}
               style={[
                 styles.bubble,
                 isUser

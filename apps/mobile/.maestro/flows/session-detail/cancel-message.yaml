@@ -33,7 +33,7 @@ appId: com.clautunnel.app
 # Verify user message bubble is rendered
 - extendedWaitUntil:
     visible:
-      id: "user-message-bubble-2"
+      id: "user-message-bubble-4"
     timeout: 3000
 - assertVisible: "Tell me a long story"
 
