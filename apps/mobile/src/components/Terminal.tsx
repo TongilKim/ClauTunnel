@@ -1134,6 +1134,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 10,
+    // Clamp the inner bubble to the container cap during markdown reflow.
     maxWidth: '100%',
     overflow: 'hidden' as const,
   },

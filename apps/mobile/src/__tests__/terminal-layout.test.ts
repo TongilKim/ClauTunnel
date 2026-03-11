@@ -59,6 +59,7 @@ describe('Claude markdown layout fixes', () => {
 
   it('should allow markdown text groups to shrink instead of clipping', () => {
     expect(CLAUDE_MARKDOWN_LAYOUT_FIXES.textgroup.flexShrink).toBe(1);
+    expect(CLAUDE_MARKDOWN_LAYOUT_FIXES.textgroup.minWidth).toBe(0);
   });
 });
 

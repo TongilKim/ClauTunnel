@@ -16,5 +16,6 @@ export const CLAUDE_MARKDOWN_LAYOUT_FIXES = {
   },
   textgroup: {
     flexShrink: 1,
+    minWidth: 0,
   },
 } as const;
