@@ -9,6 +9,12 @@ import { v4 as uuidv4 } from 'uuid';
 
 /** Maximum characters to capture from tool use content */
 const MAX_TOOL_CONTENT = 10000;
+/** Grace period to wait for a result after compact lifecycle events */
+const COMPACT_FALLBACK_GRACE_MS = 40;
+/** Delay before dispatching queued prompt after compact fallback */
+const COMPACT_QUEUED_DISPATCH_DELAY_MS = 40;
+/** Guard window to ignore a stale compact result during immediate next-turn handoff */
+const COMPACT_STALE_RESULT_GUARD_MS = COMPACT_FALLBACK_GRACE_MS + COMPACT_QUEUED_DISPATCH_DELAY_MS;
 
 /** Commands unsupported in remote/mobile context */
 const UNSUPPORTED_COMMANDS = new Set([
@@ -66,6 +72,20 @@ export class SdkSession extends EventEmitter {
   private pendingPrompt: { prompt: string; attachments?: ImageAttachment[] } | null = null;
   // Tracks prompt during a resume attempt — used to auto-retry with a fresh session on failure
   private resumeAttemptPrompt: { prompt: string; attachments?: ImageAttachment[] } | null = null;
+  // Tracks whether the current in-flight prompt is a manual /compact command.
+  private awaitingCompactCompletionFallback: boolean = false;
+  // Monotonic counter for turn ordering.
+  private turnGeneration: number = 0;
+  // Generation of the current in-flight turn.
+  private activeTurnGeneration: number = 0;
+  // Timestamp when the current in-flight turn started.
+  private activeTurnStartedAtMs: number = 0;
+  // Generation whose late result should be ignored after compact fallback.
+  private compactLateResultSuppressedGeneration: number | null = null;
+  // Timer used to defer compact completion fallback in case result arrives.
+  private compactCompletionFallbackTimer: ReturnType<typeof setTimeout> | null = null;
+  // Timer used to dispatch queued prompt shortly after compact fallback.
+  private deferredQueuedPromptTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(options: SdkSessionOptions) {
     super();
@@ -264,6 +284,10 @@ export class SdkSession extends EventEmitter {
     // Recreate session so the next prompt uses the new mode.
     if (modeChanged) {
       this.clearPendingInteractionState('Session reconfigured');
+      this.clearCompactCompletionFallbackTimer();
+      this.clearDeferredQueuedPromptTimer();
+      this.awaitingCompactCompletionFallback = false;
+      this.clearCompactLateResultSuppression();
       if (this.v2Session) {
         this.v2Session.close();
         this.v2Session = null;
@@ -431,6 +455,26 @@ export class SdkSession extends EventEmitter {
         });
         this.emit('commands-updated', this.cachedCommands);
       }
+    } else if (
+      message.type === 'system' &&
+      'subtype' in message &&
+      message.subtype === 'status' &&
+      'status' in message &&
+      message.status === null &&
+      this.awaitingCompactCompletionFallback &&
+      this.isProcessing
+    ) {
+      // /compact can complete with status reset (compacting -> null) and no result message.
+      this.scheduleCompactCompletionFallback();
+    } else if (
+      message.type === 'system' &&
+      'subtype' in message &&
+      message.subtype === 'compact_boundary' &&
+      this.awaitingCompactCompletionFallback &&
+      this.isProcessing
+    ) {
+      // /compact can also complete with compact_boundary and no result message.
+      this.scheduleCompactCompletionFallback();
     } else if (message.type === 'auth_status') {
       // Authentication status change from SDK
       const authMsg = message as { type: 'auth_status'; isAuthenticating: boolean; error?: string; output?: string[] };
@@ -490,6 +534,11 @@ export class SdkSession extends EventEmitter {
         }
       }
     } else if (message.type === 'result') {
+      this.clearCompactCompletionFallbackTimer();
+      if (this.shouldIgnoreLateCompactResult()) {
+        return;
+      }
+
       // Emit result text if no assistant output was captured (e.g. slash commands like /context)
       if (!this.currentAssistantResponse.trim() && 'result' in message && message.result) {
         const resultText = String(message.result);
@@ -502,17 +551,8 @@ export class SdkSession extends EventEmitter {
       }
 
       this.currentAssistantResponse = '';
-      this.isProcessing = false;
-
-      // Auto-send queued message if one is pending
-      const queued = this.pendingPrompt;
-      if (queued) {
-        this.pendingPrompt = null;
-        // Don't emit 'complete' — mobile isTyping stays true seamlessly
-        this.sendPrompt(queued.prompt, queued.attachments);
-      } else {
-        this.emit('complete');
-      }
+      this.awaitingCompactCompletionFallback = false;
+      this.completeCurrentTurn();
     } else if (message.type === 'tool_progress') {
       // Tool progress (tool being used)
       if ('tool_name' in message) {
@@ -534,6 +574,17 @@ export class SdkSession extends EventEmitter {
       return;
     }
 
+    this.clearCompactCompletionFallbackTimer();
+    this.clearDeferredQueuedPromptTimer();
+    this.awaitingCompactCompletionFallback = /^\/compact(?:\s|$)/.test(prompt.trim());
+    this.activeTurnGeneration = ++this.turnGeneration;
+    this.activeTurnStartedAtMs = Date.now();
+    if (
+      this.compactLateResultSuppressedGeneration !== null &&
+      this.activeTurnGeneration > this.compactLateResultSuppressedGeneration + 1
+    ) {
+      this.clearCompactLateResultSuppression();
+    }
     this.isProcessing = true;
     this.currentAssistantResponse = '';
 
@@ -617,6 +668,9 @@ export class SdkSession extends EventEmitter {
         this.emit('output', `\n[Error: ${(error as Error).message}]\n`);
       }
       this.isProcessing = false;
+      this.clearCompactCompletionFallbackTimer();
+      this.clearDeferredQueuedPromptTimer();
+      this.awaitingCompactCompletionFallback = false;
     }
   }
 
@@ -651,6 +705,8 @@ export class SdkSession extends EventEmitter {
 
   cancel(): void {
     this.clearPendingInteractionState('Session cancelled');
+    this.clearCompactCompletionFallbackTimer();
+    this.clearDeferredQueuedPromptTimer();
     if (this.v2Session) {
       this.v2Session.close();
       this.v2Session = null;
@@ -658,6 +714,8 @@ export class SdkSession extends EventEmitter {
     }
     this.isProcessing = false;
     this.pendingPrompt = null;
+    this.awaitingCompactCompletionFallback = false;
+    this.clearCompactLateResultSuppression();
   }
 
   getSessionId(): string | null {
@@ -678,6 +736,10 @@ export class SdkSession extends EventEmitter {
     this.sessionId = sessionId;
     this.isProcessing = false;
     this.pendingPrompt = null;
+    this.clearCompactCompletionFallbackTimer();
+    this.clearDeferredQueuedPromptTimer();
+    this.awaitingCompactCompletionFallback = false;
+    this.clearCompactLateResultSuppression();
     this.conversationHistory = []; // Clear local history since we're resuming a different session
     this.emit('session-resumed', sessionId);
   }
@@ -703,6 +765,8 @@ export class SdkSession extends EventEmitter {
 
     this.currentModel = model;
     this.clearPendingInteractionState('Session reconfigured');
+    this.clearCompactCompletionFallbackTimer();
+    this.clearDeferredQueuedPromptTimer();
 
     // Close existing session - a new one will be created with the new model on next sendPrompt()
     if (this.v2Session) {
@@ -712,9 +776,13 @@ export class SdkSession extends EventEmitter {
       this.sessionId = null;
       this.isProcessing = false;
       this.pendingPrompt = null;
+      this.awaitingCompactCompletionFallback = false;
+      this.clearCompactLateResultSuppression();
       this.pendingContextTransfer = true;
     } else if (this.sessionId) {
       this.sessionId = null;
+      this.awaitingCompactCompletionFallback = false;
+      this.clearCompactLateResultSuppression();
       this.pendingContextTransfer = true;
     }
 
@@ -731,6 +799,8 @@ export class SdkSession extends EventEmitter {
 
   clearHistory(): void {
     this.conversationHistory = [];
+    this.clearCompactCompletionFallbackTimer();
+    this.clearDeferredQueuedPromptTimer();
     // Close existing session and force a fresh one on next prompt
     if (this.v2Session) {
       this.v2Session.close();
@@ -740,6 +810,90 @@ export class SdkSession extends EventEmitter {
     this.sessionId = null;
     this.isProcessing = false;
     this.pendingPrompt = null;
+    this.awaitingCompactCompletionFallback = false;
+    this.clearCompactLateResultSuppression();
+  }
+
+  private completeCompactCommandFallback(): void {
+    this.clearCompactCompletionFallbackTimer();
+    this.awaitingCompactCompletionFallback = false;
+    this.compactLateResultSuppressedGeneration = this.activeTurnGeneration;
+    this.currentAssistantResponse = '';
+    this.completeCurrentTurn(COMPACT_QUEUED_DISPATCH_DELAY_MS);
+  }
+
+  private scheduleCompactCompletionFallback(): void {
+    if (this.compactCompletionFallbackTimer) return;
+    this.compactCompletionFallbackTimer = setTimeout(() => {
+      this.compactCompletionFallbackTimer = null;
+      if (this.awaitingCompactCompletionFallback && this.isProcessing) {
+        this.completeCompactCommandFallback();
+      }
+    }, COMPACT_FALLBACK_GRACE_MS);
+  }
+
+  private clearCompactCompletionFallbackTimer(): void {
+    if (this.compactCompletionFallbackTimer) {
+      clearTimeout(this.compactCompletionFallbackTimer);
+      this.compactCompletionFallbackTimer = null;
+    }
+  }
+
+  private clearDeferredQueuedPromptTimer(): void {
+    if (this.deferredQueuedPromptTimer) {
+      clearTimeout(this.deferredQueuedPromptTimer);
+      this.deferredQueuedPromptTimer = null;
+    }
+  }
+
+  private clearCompactLateResultSuppression(): void {
+    this.compactLateResultSuppressedGeneration = null;
+  }
+
+  private shouldIgnoreLateCompactResult(): boolean {
+    const suppressedGeneration = this.compactLateResultSuppressedGeneration;
+    if (suppressedGeneration === null) return false;
+
+    this.clearCompactLateResultSuppression();
+
+    if (this.activeTurnGeneration === suppressedGeneration) return true;
+
+    if (this.activeTurnGeneration === suppressedGeneration + 1) {
+      const elapsedSinceTurnStart = Date.now() - this.activeTurnStartedAtMs;
+      return elapsedSinceTurnStart <= COMPACT_STALE_RESULT_GUARD_MS;
+    }
+
+    return false;
+  }
+
+  private completeCurrentTurn(deferQueuedDispatchMs: number = 0): void {
+    if (!this.isProcessing) return;
+
+    this.isProcessing = false;
+
+    // Auto-send queued message if one is pending.
+    if (!this.pendingPrompt) {
+      this.emit('complete');
+      return;
+    }
+
+    if (deferQueuedDispatchMs > 0) {
+      this.clearDeferredQueuedPromptTimer();
+      this.deferredQueuedPromptTimer = setTimeout(() => {
+        this.deferredQueuedPromptTimer = null;
+        const deferred = this.pendingPrompt;
+        if (!deferred || this.isProcessing) return;
+        this.pendingPrompt = null;
+        // Don't emit 'complete' — mobile isTyping stays true seamlessly
+        this.sendPrompt(deferred.prompt, deferred.attachments);
+      }, deferQueuedDispatchMs);
+      return;
+    }
+
+    const queued = this.pendingPrompt;
+    this.pendingPrompt = null;
+    // Don't emit 'complete' — mobile isTyping stays true seamlessly
+    this.sendPrompt(queued.prompt, queued.attachments);
   }
 
   private clearPendingInteractionState(reason: string): void {
