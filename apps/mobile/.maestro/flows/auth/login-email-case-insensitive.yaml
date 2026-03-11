@@ -1,0 +1,20 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+- assertVisible: "ClauTunnel"
+- tapOn:
+    id: "login-email-input"
+- inputText: "TEST@CLAUTUNNEL.COM"
+- tapOn:
+    id: "login-password-input"
+- inputText: "password123"
+- tapOn:
+    id: "login-button"
+- extendedWaitUntil:
+    visible:
+      id: "sessions-stats-total"
+    timeout: 5000
+- assertVisible: "Test MacBook"
+- assertVisible:
+    id: "session-card-test-session-1"

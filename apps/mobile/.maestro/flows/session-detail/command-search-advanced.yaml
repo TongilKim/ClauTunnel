@@ -1,0 +1,53 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "login-email-input"
+- inputText: "test@clautunnel.com"
+- tapOn:
+    id: "login-password-input"
+- inputText: "password123"
+- tapOn:
+    id: "login-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-card-test-session-1"
+    timeout: 5000
+- tapOn:
+    id: "session-card-test-session-1"
+
+# Open command picker
+- tapOn:
+    id: "input-commands-button"
+- extendedWaitUntil:
+    visible:
+      id: "command-picker-modal"
+    timeout: 3000
+
+# Leading slash should still match by command name
+- tapOn:
+    id: "command-search-input"
+- inputText: "/model"
+- assertVisible:
+    id: "command-option-model"
+- assertNotVisible:
+    id: "command-option-clear"
+
+# Description text should also match commands
+- clearText
+- inputText: "conversation"
+- assertVisible:
+    id: "command-option-clear"
+- assertNotVisible:
+    id: "command-option-model"
+
+- clearText
+- inputText: "previous"
+- assertVisible:
+    id: "command-option-resume"
+- assertNotVisible:
+    id: "command-option-clear"
+
+- tapOn:
+    id: "session-back-button"
