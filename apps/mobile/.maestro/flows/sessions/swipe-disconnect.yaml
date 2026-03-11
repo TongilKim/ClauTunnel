@@ -1,0 +1,39 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "login-email-input"
+- inputText: "test@clautunnel.com"
+- tapOn:
+    id: "login-password-input"
+- inputText: "password123"
+- tapOn:
+    id: "login-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-card-test-session-1"
+    timeout: 5000
+
+# Verify active session is visible
+- assertVisible: "Test Session"
+
+# Swipe left on active session to reveal disconnect action
+- swipe:
+    id: "session-card-test-session-1"
+    direction: "LEFT"
+    duration: 400
+- extendedWaitUntil:
+    visible: "Disconnect"
+    timeout: 3000
+- tapOn:
+    id: "session-disconnect-test-session-1"
+
+# Confirm disconnect in alert
+- assertVisible: "Disconnect Session"
+- tapOn: "Disconnect"
+
+# Verify session status changes to ended
+- extendedWaitUntil:
+    visible: "Ended"
+    timeout: 3000

@@ -16,6 +16,8 @@ import {
   canResumeSession,
   filterResumableSessions,
 } from '../utils/resumeSessionUtils';
+import { isTestMode } from '../utils/testMode';
+import { useSessionStore } from '../stores/sessionStore';
 
 interface ResumeSessionPickerProps {
   visible: boolean;
@@ -45,6 +47,15 @@ export function ResumeSessionPicker({
   const fetchRecentSessions = async () => {
     setIsLoading(true);
     setError(null);
+
+    if (isTestMode()) {
+      const sessions = useSessionStore
+        .getState()
+        .sessions.filter((session) => session.status !== 'active');
+      setSessions(filterResumableSessions(sessions, currentSessionId));
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const { data, error: fetchError } = await supabase
@@ -99,7 +110,10 @@ export function ResumeSessionPicker({
           activeOpacity={1}
           onPress={onClose}
         />
-        <View style={[styles.content, isDark && styles.contentDark]}>
+        <View
+          testID="resume-session-modal"
+          style={[styles.content, isDark && styles.contentDark]}
+        >
           <View style={styles.handle} />
           <Text style={[styles.title, isDark && styles.titleDark]}>
             Resume Session
@@ -133,7 +147,7 @@ export function ResumeSessionPicker({
                 </TouchableOpacity>
               </View>
             ) : sessions.length === 0 ? (
-              <View style={styles.emptyContainer}>
+              <View testID="resume-session-empty" style={styles.emptyContainer}>
                 <Text style={[styles.emptyText, isDark && styles.emptyTextDark]}>
                   No previous sessions found
                 </Text>
@@ -147,6 +161,7 @@ export function ResumeSessionPicker({
                 return (
                   <TouchableOpacity
                     key={session.id}
+                    testID={`resume-session-option-${session.id}`}
                     style={[
                       styles.sessionItem,
                       isDark && styles.sessionItemDark,

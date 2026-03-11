@@ -1,0 +1,33 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "login-email-input"
+- inputText: "test@clautunnel.com"
+- tapOn:
+    id: "login-password-input"
+- inputText: "password123"
+- tapOn:
+    id: "login-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-card-test-session-1"
+    timeout: 5000
+- tapOn:
+    id: "session-card-test-session-1"
+- assertVisible: "Hello! How can I help you today?"
+- tapOn:
+    id: "input-commands-button"
+- extendedWaitUntil:
+    visible: "command-clear"
+    timeout: 3000
+- tapOn: "command-clear"
+- assertVisible: "Clear Conversation"
+- tapOn: "Clear"
+- extendedWaitUntil:
+    visible: "Send a message to start chatting with Claude"
+    timeout: 3000
+- assertNotVisible: "Hello! How can I help you today?"
+- tapOn:
+    id: "session-back-button"

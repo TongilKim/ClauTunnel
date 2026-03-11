@@ -1,0 +1,41 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "login-email-input"
+- inputText: "test@clautunnel.com"
+- tapOn:
+    id: "login-password-input"
+- inputText: "password123"
+- tapOn:
+    id: "login-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-card-test-session-1"
+    timeout: 5000
+
+# Navigate to active session
+- tapOn:
+    id: "session-card-test-session-1"
+- extendedWaitUntil:
+    visible:
+      id: "session-status-badge"
+    timeout: 3000
+
+# Verify online status badge
+- assertVisible: "Online"
+
+# Go back
+- tapOn:
+    id: "session-back-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-card-test-session-1"
+    timeout: 3000
+
+# Verify session stats are displayed
+- assertVisible:
+    id: "sessions-stats-total"
+- assertVisible:
+    id: "sessions-stats-online"

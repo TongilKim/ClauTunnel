@@ -4,7 +4,12 @@ import type { Session, Machine, MachineCommand } from 'clautunnel-shared';
 import { REALTIME_CHANNELS } from 'clautunnel-shared';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { setupPresenceHandlers } from '../utils/presenceUtils';
-import { isTestMode, MOCK_SESSIONS, MOCK_MACHINES } from '../utils/testMode';
+import {
+  buildMockMachines,
+  buildMockSessions,
+  buildMockStartedSession,
+  isTestMode,
+} from '../utils/testMode';
 
 interface SessionStoreState {
   sessions: Session[];
@@ -43,8 +48,8 @@ const machinePresenceChannels: Map<string, RealtimeChannel> = new Map();
 const _testMode = isTestMode();
 
 export const useSessionStore = create<SessionStoreState>((set, get) => ({
-  sessions: _testMode ? (MOCK_SESSIONS as any) : [],
-  machines: _testMode ? (MOCK_MACHINES as any) : [],
+  sessions: _testMode ? (buildMockSessions() as any) : [],
+  machines: _testMode ? (buildMockMachines() as any) : [],
   isLoading: false,
   error: null,
   pendingSessionId: null,
@@ -113,6 +118,25 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
   },
 
   endSession: async (sessionId: string) => {
+    if (_testMode) {
+      set({ pendingSessionId: sessionId });
+      setTimeout(() => {
+        set((state) => ({
+          sessions: state.sessions.map((session) =>
+            session.id === sessionId
+              ? { ...session, status: 'ended' as const, ended_at: new Date().toISOString() }
+              : session
+          ),
+          pendingSessionId: null,
+          sessionOnlineStatus: {
+            ...state.sessionOnlineStatus,
+            [sessionId]: false,
+          },
+        }));
+      }, 150);
+      return;
+    }
+
     try {
       set({ pendingSessionId: sessionId });
 
@@ -175,6 +199,22 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
   },
 
   deleteSession: async (sessionId: string) => {
+    if (_testMode) {
+      set({ pendingSessionId: sessionId });
+      setTimeout(() => {
+        set((state) => {
+          const nextOnlineStatus = { ...state.sessionOnlineStatus };
+          delete nextOnlineStatus[sessionId];
+          return {
+            sessions: state.sessions.filter((session) => session.id !== sessionId),
+            pendingSessionId: null,
+            sessionOnlineStatus: nextOnlineStatus,
+          };
+        });
+      }, 150);
+      return;
+    }
+
     try {
       set({ pendingSessionId: sessionId });
 
@@ -199,6 +239,13 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
   },
 
   deleteEndedSessions: async () => {
+    if (_testMode) {
+      set((state) => ({
+        sessions: state.sessions.filter((session) => session.status !== 'ended'),
+      }));
+      return;
+    }
+
     try {
       set({ isLoading: true });
 
@@ -223,6 +270,15 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
   },
 
   deleteEndedSessionsForMachine: async (machineId: string) => {
+    if (_testMode) {
+      set((state) => ({
+        sessions: state.sessions.filter(
+          (session) => !(session.machine_id === machineId && session.status === 'ended')
+        ),
+      }));
+      return;
+    }
+
     try {
       // Get ended session IDs for this machine
       const endedSessionIds = get()
@@ -367,6 +423,17 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
   updateSessionTitle: async (sessionId: string, title: string) => {
     const dbTitle = title.trim() === '' ? null : title;
 
+    if (_testMode) {
+      set((state) => ({
+        sessions: state.sessions.map((s) =>
+          s.id === sessionId
+            ? { ...s, title: dbTitle ?? undefined }
+            : s
+        ),
+      }));
+      return;
+    }
+
     const { error } = await supabase
       .from('sessions')
       .update({ title: dbTitle })
@@ -384,6 +451,25 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
   },
 
   startSessionOnMachine: (machineId: string, onSuccess: (sessionId: string) => void) => {
+    if (_testMode) {
+      set({ isStartingSession: machineId, startSessionError: null });
+      setTimeout(() => {
+        const nextIndex = get().sessions.length + 1;
+        const newSession = buildMockStartedSession(nextIndex);
+        set((state) => ({
+          sessions: [newSession as any, ...state.sessions],
+          isStartingSession: null,
+          startSessionError: null,
+          sessionOnlineStatus: {
+            ...state.sessionOnlineStatus,
+            [newSession.id]: true,
+          },
+        }));
+        onSuccess(newSession.id);
+      }, 150);
+      return;
+    }
+
     set({ isStartingSession: machineId, startSessionError: null });
 
     const inputChannelName = REALTIME_CHANNELS.machineInput(machineId);

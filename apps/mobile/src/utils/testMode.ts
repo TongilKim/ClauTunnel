@@ -51,6 +51,8 @@ export const MOCK_MACHINES = [
   },
 ];
 
+export const MOCK_RESUME_SDK_SESSION_ID = 'mock-sdk-session-ended-1';
+
 export const MOCK_SESSIONS = [
   {
     id: 'test-session-1',
@@ -71,6 +73,8 @@ export const MOCK_SESSIONS = [
     machine_id: 'test-machine-1',
     status: 'ended' as const,
     title: 'Ended Session',
+    sdk_session_id: MOCK_RESUME_SDK_SESSION_ID,
+    model: 'sonnet',
     working_directory: '/Users/test/old-project',
     started_at: new Date(Date.now() - 3600000).toISOString(),
     ended_at: new Date().toISOString(),
@@ -82,6 +86,40 @@ export const MOCK_SESSIONS = [
     },
   },
 ];
+
+export function buildMockSessions() {
+  return MOCK_SESSIONS.map((session) => ({
+    ...session,
+    machines: session.machines ? { ...session.machines } : undefined,
+  }));
+}
+
+export function buildMockMachines() {
+  return MOCK_MACHINES.map((machine) => ({ ...machine }));
+}
+
+export function buildMockMessages() {
+  return MOCK_MESSAGES.map((message) => ({ ...message }));
+}
+
+export function buildMockStartedSession(index: number) {
+  return {
+    id: `test-session-${index}`,
+    machine_id: 'test-machine-1',
+    status: 'active' as const,
+    title: `Test Session ${index}`,
+    sdk_session_id: `mock-sdk-session-${index}`,
+    model: 'opus',
+    working_directory: `/Users/test/project-${index}`,
+    started_at: new Date().toISOString(),
+    machines: {
+      id: 'test-machine-1',
+      name: 'Test MacBook',
+      hostname: 'test-macbook.local',
+      status: 'online' as const,
+    },
+  };
+}
 
 export const MOCK_MODELS: ModelInfo[] = [
   {

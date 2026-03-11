@@ -1,0 +1,37 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "login-email-input"
+- inputText: "test@clautunnel.com"
+- tapOn:
+    id: "login-password-input"
+- inputText: "password123"
+- tapOn:
+    id: "login-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-card-test-session-1"
+    timeout: 5000
+- tapOn:
+    id: "session-card-test-session-1"
+- tapOn:
+    id: "input-commands-button"
+- extendedWaitUntil:
+    visible: "command-resume"
+    timeout: 3000
+- tapOn: "command-resume"
+- extendedWaitUntil:
+    visible:
+      id: "resume-session-modal"
+    timeout: 3000
+- assertVisible:
+    id: "resume-session-option-test-session-2"
+- tapOn:
+    id: "resume-session-option-test-session-2"
+- assertNotVisible:
+    id: "resume-session-modal"
+- assertVisible: "Resumed mock session mock-sdk-session-ended-1"
+- tapOn:
+    id: "session-back-button"

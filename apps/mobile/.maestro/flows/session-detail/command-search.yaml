@@ -1,0 +1,53 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "login-email-input"
+- inputText: "test@clautunnel.com"
+- tapOn:
+    id: "login-password-input"
+- inputText: "password123"
+- tapOn:
+    id: "login-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-card-test-session-1"
+    timeout: 5000
+- tapOn:
+    id: "session-card-test-session-1"
+
+# Open command picker
+- tapOn:
+    id: "input-commands-button"
+- extendedWaitUntil:
+    visible:
+      id: "command-picker-modal"
+    timeout: 3000
+
+# Verify multiple commands are visible
+- assertVisible:
+    id: "command-option-model"
+- assertVisible:
+    id: "command-option-clear"
+
+# Search for "model"
+- tapOn:
+    id: "command-search-input"
+- inputText: "model"
+- assertVisible:
+    id: "command-option-model"
+- assertNotVisible:
+    id: "command-option-clear"
+
+# Clear search and search for "clear"
+- clearText
+- inputText: "clear"
+- assertVisible:
+    id: "command-option-clear"
+- assertNotVisible:
+    id: "command-option-model"
+
+# Go back
+- tapOn:
+    id: "session-back-button"
