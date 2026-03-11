@@ -30,7 +30,11 @@ appId: com.clautunnel.app
 - tapOn:
     id: "input-send-button"
 
-# Verify message was sent
+# Verify user message bubble is rendered
+- extendedWaitUntil:
+    visible:
+      id: "user-message-bubble"
+    timeout: 3000
 - assertVisible: "Tell me a long story"
 
 # Tap stop button to cancel (should appear while typing)

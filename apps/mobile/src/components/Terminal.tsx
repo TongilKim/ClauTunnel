@@ -476,6 +476,7 @@ function MessageBubble({ message, isDark }: MessageBubbleProps) {
         {cleanContent.trim() && (
           <Pressable onLongPress={handleLongPress} delayLongPress={300}>
             <View
+              testID={isUser ? 'user-message-bubble' : undefined}
               style={[
                 styles.bubble,
                 isUser
