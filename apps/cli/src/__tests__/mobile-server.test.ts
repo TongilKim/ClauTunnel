@@ -33,6 +33,7 @@ function createMockProcess(): any {
   proc.stderr = new PassThrough();
   proc.kill = vi.fn();
   proc.pid = 12345;
+  proc.exitCode = null;
   return proc;
 }
 
@@ -93,8 +94,13 @@ describe('MobileServerManager', () => {
   });
 
   describe('checkPrerequisites', () => {
-    it('should pass when ngrok is installed', async () => {
-      mockedExecSync.mockReturnValue(Buffer.from('/usr/local/bin/ngrok'));
+    it('should pass when ngrok is installed and authtoken configured', async () => {
+      mockedExecSync.mockImplementation((cmd) => {
+        if (typeof cmd === 'string' && cmd.includes('ngrok config check')) {
+          return Buffer.from('Valid configuration file at /path/to/ngrok.yml');
+        }
+        return Buffer.from('/usr/local/bin/ngrok');
+      });
 
       const { MobileServerManager } = await import('../mobile/mobile-server.js');
       const manager = new MobileServerManager({
@@ -127,8 +133,34 @@ describe('MobileServerManager', () => {
       expect(result.issues[0]).toContain('ngrok is not installed');
     });
 
+    it('should report missing ngrok authtoken', async () => {
+      mockedExecSync.mockImplementation((cmd) => {
+        if (typeof cmd === 'string' && cmd.includes('ngrok config check')) {
+          throw new Error('no authtoken');
+        }
+        return Buffer.from('/usr/local/bin/ngrok');
+      });
+
+      const { MobileServerManager } = await import('../mobile/mobile-server.js');
+      const manager = new MobileServerManager({
+        mobileProjectPath: MOBILE_DIR,
+        supabaseUrl: 'https://test.supabase.co',
+        supabaseAnonKey: 'test-key',
+        logDir: LOG_DIR,
+      });
+
+      const result = manager.checkPrerequisites();
+      expect(result.ready).toBe(false);
+      expect(result.issues[0]).toContain('authtoken is not configured');
+    });
+
     it('should flag needsInstall when node_modules missing', async () => {
-      mockedExecSync.mockReturnValue(Buffer.from('/usr/local/bin/ngrok'));
+      mockedExecSync.mockImplementation((cmd) => {
+        if (typeof cmd === 'string' && cmd.includes('ngrok config check')) {
+          return Buffer.from('Valid configuration file');
+        }
+        return Buffer.from('/usr/local/bin/ngrok');
+      });
 
       const { MobileServerManager } = await import('../mobile/mobile-server.js');
       const manager = new MobileServerManager({
@@ -143,7 +175,12 @@ describe('MobileServerManager', () => {
     });
 
     it('should not flag needsInstall when node_modules exists', async () => {
-      mockedExecSync.mockReturnValue(Buffer.from('/usr/local/bin/ngrok'));
+      mockedExecSync.mockImplementation((cmd) => {
+        if (typeof cmd === 'string' && cmd.includes('ngrok config check')) {
+          return Buffer.from('Valid configuration file');
+        }
+        return Buffer.from('/usr/local/bin/ngrok');
+      });
       mkdirSync(join(MOBILE_DIR, 'node_modules'), { recursive: true });
 
       const { MobileServerManager } = await import('../mobile/mobile-server.js');
@@ -415,7 +452,12 @@ describe('MobileServerManager', () => {
 
     it('should return error when ngrok tunnel fails', async () => {
       // Prerequisites pass
-      mockedExecSync.mockReturnValue(Buffer.from('/usr/local/bin/ngrok'));
+      mockedExecSync.mockImplementation((cmd) => {
+        if (typeof cmd === 'string' && cmd.includes('ngrok config check')) {
+          return Buffer.from('Valid configuration file');
+        }
+        return Buffer.from('/usr/local/bin/ngrok');
+      });
       mkdirSync(join(MOBILE_DIR, 'node_modules'), { recursive: true });
 
       // ngrok spawn succeeds

@@ -67,15 +67,42 @@ export class MobileServerManager {
 
     // Path check is skipped here — ensureMobileProject handles it
 
-    // Check ngrok
+    // Check ngrok installation and authtoken
     try {
       execSync('which ngrok', { stdio: 'pipe' });
+
+      // ngrok is installed — verify authtoken is configured
+      try {
+        const configOutput = execSync('ngrok config check', {
+          stdio: 'pipe',
+          timeout: 5000,
+        }).toString();
+        // "Valid configuration file" means authtoken is set
+        if (!configOutput.toLowerCase().includes('valid')) {
+          issues.push(
+            'ngrok authtoken is not configured.\n' +
+            '  1. Sign up at https://ngrok.com\n' +
+            '  2. Copy your authtoken from https://dashboard.ngrok.com/get-started/your-authtoken\n' +
+            '  3. Run: ngrok config add-authtoken <your-token>'
+          );
+        }
+      } catch {
+        // ngrok config check failed — likely no authtoken
+        issues.push(
+          'ngrok authtoken is not configured.\n' +
+          '  1. Sign up at https://ngrok.com\n' +
+          '  2. Copy your authtoken from https://dashboard.ngrok.com/get-started/your-authtoken\n' +
+          '  3. Run: ngrok config add-authtoken <your-token>'
+        );
+      }
     } catch {
       issues.push(
         'ngrok is not installed.\n' +
         '  Install: brew install ngrok\n' +
-        '  Sign up: https://ngrok.com\n' +
-        '  Auth:    ngrok config add-authtoken <your-token>'
+        '  Then configure your account:\n' +
+        '  1. Sign up at https://ngrok.com\n' +
+        '  2. Copy your authtoken from https://dashboard.ngrok.com/get-started/your-authtoken\n' +
+        '  3. Run: ngrok config add-authtoken <your-token>'
       );
     }
 
@@ -213,14 +240,22 @@ export class MobileServerManager {
 
     this.ngrokLogStream = createWriteStream(join(this.logDir, 'ngrok.log'));
 
+    // Capture stderr for error diagnostics
+    let stderrData = '';
+
     this.ngrokProcess = spawn('ngrok', ['http', String(this.expoPort)], {
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: false,
     });
 
-    // Redirect output to log file
+    // Redirect stdout to log file
     this.ngrokProcess.stdout?.pipe(this.ngrokLogStream);
-    this.ngrokProcess.stderr?.pipe(this.ngrokLogStream);
+
+    // Capture stderr while also writing to log
+    this.ngrokProcess.stderr?.on('data', (chunk: Buffer) => {
+      stderrData += chunk.toString();
+      this.ngrokLogStream?.write(chunk);
+    });
 
     this.ngrokProcess.on('error', () => {
       // Silently handle spawn errors
@@ -229,6 +264,12 @@ export class MobileServerManager {
     // Poll for tunnel URL
     for (let i = 0; i < 10; i++) {
       await this.sleep(1000);
+
+      // Check if ngrok exited early (auth error, etc.)
+      if (this.ngrokProcess.exitCode !== null) {
+        break;
+      }
+
       const url = await this.getNgrokTunnelUrl();
       if (url) {
         this.tunnelUrl = url;
@@ -236,10 +277,41 @@ export class MobileServerManager {
       }
     }
 
-    // Failed to get tunnel URL
+    // Failed — set diagnostic error message
+    this.ngrokError = this.diagnoseNgrokFailure(stderrData);
+
     this.killProcess(this.ngrokProcess);
     this.ngrokProcess = null;
     return null;
+  }
+
+  /** Last ngrok error diagnosis (available after startNgrok fails) */
+  ngrokError: string | null = null;
+
+  private diagnoseNgrokFailure(stderr: string): string {
+    const lower = stderr.toLowerCase();
+
+    if (lower.includes('authtoken') || lower.includes('err_ngrok_105') || lower.includes('authentication')) {
+      return 'ngrok authentication failed.\n' +
+        '  Your authtoken may be invalid or expired.\n' +
+        '  1. Get a new token at https://dashboard.ngrok.com/get-started/your-authtoken\n' +
+        '  2. Run: ngrok config add-authtoken <your-token>';
+    }
+
+    if (lower.includes('tunnel session limit') || lower.includes('err_ngrok_108')) {
+      return 'ngrok free plan session limit reached.\n' +
+        '  Free accounts allow 1 tunnel at a time.\n' +
+        '  Close other ngrok tunnels or upgrade your plan at https://ngrok.com/pricing';
+    }
+
+    if (lower.includes('tcp dial') || lower.includes('connection refused')) {
+      return `ngrok could not connect to localhost:${this.expoPort}.\n` +
+        '  This is usually a timing issue — the tunnel started before Expo was ready.';
+    }
+
+    // Generic fallback with log path hint
+    return 'ngrok tunnel failed to start.\n' +
+      `  Check logs for details: ${join(this.logDir, 'ngrok.log')}`;
   }
 
   async startExpo(tunnelUrl: string): Promise<boolean> {
@@ -360,7 +432,7 @@ export class MobileServerManager {
     this.onProgress('Starting ngrok tunnel...');
     const tunnelUrl = await this.startNgrok();
     if (!tunnelUrl) {
-      return { started: false, error: 'Failed to start ngrok tunnel' };
+      return { started: false, error: this.ngrokError ?? 'Failed to start ngrok tunnel' };
     }
 
     // Step 6: Start Expo server
