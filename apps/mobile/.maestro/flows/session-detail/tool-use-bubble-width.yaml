@@ -1,0 +1,67 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+
+- assertVisible:
+    id: login-email-input
+
+- tapOn:
+    id: login-email-input
+
+- inputText: test@clautunnel.com
+
+- tapOn:
+    id: login-password-input
+
+- inputText: password123
+
+- tapOn:
+    id: login-button
+
+- assertVisible:
+    id: session-card-test-session-1
+
+- tapOn:
+    id: session-card-test-session-1
+
+- assertVisible:
+    id: terminal-scrollview
+
+- extendedWaitUntil:
+    visible:
+      id: test-mode-toggle
+    timeout: 5000
+
+- tapOn:
+    id: test-mode-toggle
+
+- extendedWaitUntil:
+    visible:
+      id: test-mode-trigger-tool-use-width
+    timeout: 3000
+
+- tapOn:
+    id: test-mode-trigger-tool-use-width
+
+- assertVisible:
+    id: tool-use-card-header
+
+- assertVisible:
+    id: tool-use-card-title
+
+- assertVisible:
+    id: tool-use-width-ok
+
+- takeScreenshot: tool-use-bubble-collapsed
+
+- tapOn:
+    id: tool-use-card-header
+
+- assertVisible:
+    id: tool-use-card-body
+
+- assertVisible:
+    id: tool-use-width-ok
+
+- takeScreenshot: tool-use-bubble-expanded

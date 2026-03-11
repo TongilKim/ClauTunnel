@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { parseToolUsage } from '../utils/terminalUtils';
 import { CLAUDE_MARKDOWN_LAYOUT_FIXES } from '../utils/terminalMarkdownStyles';
+import {
+  ASSISTANT_BUBBLE_MAX_WIDTH_RATIO,
+  getToolUseAvailableWidth,
+  getToolUseMinHealthyRatio,
+  isToolUseWidthHealthy,
+  TOOL_USE_LAYOUT_FIXES,
+  TOOL_USE_WIDTH_RATIO_TOLERANCE,
+} from '../utils/terminalToolUseStyles';
 
 /**
  * Terminal message bubble layout and utility tests.
@@ -60,6 +68,39 @@ describe('Claude markdown layout fixes', () => {
   it('should allow markdown text groups to shrink instead of clipping', () => {
     expect(CLAUDE_MARKDOWN_LAYOUT_FIXES.textgroup.flexShrink).toBe(1);
     expect(CLAUDE_MARKDOWN_LAYOUT_FIXES.textgroup.minWidth).toBe(0);
+  });
+});
+
+describe('tool use layout fixes', () => {
+  it('should let the tool-use bubble claim the assistant bubble width budget', () => {
+    expect(TOOL_USE_LAYOUT_FIXES.container.flex).toBe(1);
+    expect(TOOL_USE_LAYOUT_FIXES.container.minWidth).toBe(0);
+  });
+
+  it('should stretch tool-use header and body content to the container width', () => {
+    expect(TOOL_USE_LAYOUT_FIXES.contentWidth.width).toBe('100%');
+    expect(TOOL_USE_LAYOUT_FIXES.contentWidth.minWidth).toBe(0);
+  });
+
+  it('should keep the tool-use title row shrinkable before applying ellipsis', () => {
+    expect(TOOL_USE_LAYOUT_FIXES.headerLeft.minWidth).toBe(0);
+    expect(TOOL_USE_LAYOUT_FIXES.headerText.flexShrink).toBe(1);
+    expect(TOOL_USE_LAYOUT_FIXES.headerText.minWidth).toBe(0);
+  });
+
+  it('should derive the available width from the row minus avatar and gap', () => {
+    expect(getToolUseAvailableWidth(360, 32, 8)).toBe(320);
+  });
+
+  it('should compute the minimum healthy ratio from the real row geometry', () => {
+    expect(ASSISTANT_BUBBLE_MAX_WIDTH_RATIO).toBe(0.75);
+    expect(TOOL_USE_WIDTH_RATIO_TOLERANCE).toBe(0.05);
+    expect(getToolUseMinHealthyRatio(360, 32, 8)).toBeCloseTo(0.79375, 5);
+  });
+
+  it('should require tool-use cards to stay close to the intended assistant bubble width', () => {
+    expect(isToolUseWidthHealthy(270, 360, 32, 8)).toBe(true);
+    expect(isToolUseWidthHealthy(200, 360, 32, 8)).toBe(false);
   });
 });
 

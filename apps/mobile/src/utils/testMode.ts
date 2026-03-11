@@ -5,6 +5,7 @@ import type {
   UserQuestionData,
   PermissionRequestData,
   RealtimeMessage,
+  ToolUseEditData,
 } from 'clautunnel-shared';
 
 /**
@@ -109,6 +110,23 @@ export function buildMockMarkdownOverflowRiskMessage(seq: number): RealtimeMessa
   return {
     type: 'output',
     content: MOCK_MARKDOWN_OVERFLOW_RISK_MESSAGE,
+    timestamp: Date.now(),
+    seq,
+  };
+}
+
+export const MOCK_TOOL_USE_WIDTH_DATA: ToolUseEditData = {
+  action: 'Edit',
+  filePath: '/Users/test/project/apps/mobile/src/components/TerminalToolUseWidthPreview.tsx',
+  oldString: "style={styles.compactToolUseCard}",
+  newString: "style={[styles.compactToolUseCard, styles.toolUseCardFullWidth]}",
+};
+
+export function buildMockToolUseWidthMessage(seq: number): RealtimeMessage {
+  return {
+    type: 'tool-use',
+    content: JSON.stringify(MOCK_TOOL_USE_WIDTH_DATA),
+    toolUseData: MOCK_TOOL_USE_WIDTH_DATA,
     timestamp: Date.now(),
     seq,
   };

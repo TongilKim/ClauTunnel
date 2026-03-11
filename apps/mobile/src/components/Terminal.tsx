@@ -12,6 +12,7 @@ import {
   TextInput,
   Pressable,
   Keyboard,
+  type LayoutChangeEvent,
 } from 'react-native';
 import { Image } from 'expo-image';
 import Markdown from 'react-native-markdown-display';
@@ -21,11 +22,17 @@ import { useSessionStore } from '../stores/sessionStore';
 import type { RealtimeMessage, ToolUseData, ToolUseEditData, ToolUseWriteData, ToolUseGenericData } from 'clautunnel-shared';
 import { parseToolUsage, shortenPath } from '../utils/terminalUtils';
 import { CLAUDE_MARKDOWN_LAYOUT_FIXES } from '../utils/terminalMarkdownStyles';
+import {
+  isToolUseWidthHealthy,
+  TOOL_USE_LAYOUT_FIXES,
+} from '../utils/terminalToolUseStyles';
+import { isTestMode } from '../utils/testMode';
 
 /** Scroll offset threshold (px) from top to trigger loading older messages */
 const SCROLL_LOAD_THRESHOLD = 200;
 /** Delay (ms) before clearing pre-fetch state, allowing onContentSizeChange to fire first */
 const PREFETCH_CLEAR_DELAY = 500;
+const MESSAGE_ROW_GAP = 8;
 
 interface GroupedMessage {
   type: 'input' | 'output' | 'system' | 'tool-use';
@@ -785,7 +792,11 @@ interface CollapsibleToolUseProps {
 
 function CollapsibleToolUse({ toolUseData, isDark, timestamp }: CollapsibleToolUseProps) {
   const [expanded, setExpanded] = useState(false);
+  const [rowWidth, setRowWidth] = useState(0);
+  const [avatarWidth, setAvatarWidth] = useState(0);
+  const [headerWidth, setHeaderWidth] = useState(0);
   const formattedTime = formatTimestamp(timestamp);
+  const shouldShowTestProbe = isTestMode();
 
   const getHeaderLabel = () => {
     switch (toolUseData.action) {
@@ -798,23 +809,73 @@ function CollapsibleToolUse({ toolUseData, isDark, timestamp }: CollapsibleToolU
     }
   };
 
+  const handleRowLayout = useCallback((event: LayoutChangeEvent) => {
+    const nextWidth = event.nativeEvent.layout.width;
+    setRowWidth((prevWidth) => (Math.abs(prevWidth - nextWidth) < 0.5 ? prevWidth : nextWidth));
+  }, []);
+
+  const handleAvatarLayout = useCallback((event: LayoutChangeEvent) => {
+    const nextWidth = event.nativeEvent.layout.width;
+    setAvatarWidth((prevWidth) => (Math.abs(prevWidth - nextWidth) < 0.5 ? prevWidth : nextWidth));
+  }, []);
+
+  const handleHeaderLayout = useCallback((event: LayoutChangeEvent) => {
+    const nextWidth = event.nativeEvent.layout.width;
+    setHeaderWidth((prevWidth) => (Math.abs(prevWidth - nextWidth) < 0.5 ? prevWidth : nextWidth));
+  }, []);
+
+  const hasWidthMeasurement = rowWidth > 0 && avatarWidth > 0 && headerWidth > 0;
+  const isWidthHealthy = hasWidthMeasurement && isToolUseWidthHealthy(
+    headerWidth,
+    rowWidth,
+    avatarWidth,
+    MESSAGE_ROW_GAP,
+  );
+
   return (
-    <View style={styles.messageRow}>
-      <ClaudeAvatar />
-      <View style={[styles.bubbleContainer, styles.bubbleContainerClaude]}>
+    <View
+      testID="tool-use-card"
+      style={styles.messageRow}
+      onLayout={shouldShowTestProbe ? handleRowLayout : undefined}
+    >
+      {shouldShowTestProbe ? (
+        <View onLayout={handleAvatarLayout}>
+          <ClaudeAvatar />
+        </View>
+      ) : (
+        <ClaudeAvatar />
+      )}
+      <View
+        style={[
+          styles.bubbleContainer,
+          styles.bubbleContainerClaude,
+          TOOL_USE_LAYOUT_FIXES.container,
+        ]}
+      >
         <TouchableOpacity
+          testID="tool-use-card-header"
           onPress={() => setExpanded(!expanded)}
+          onLayout={shouldShowTestProbe ? handleHeaderLayout : undefined}
           style={[
             diffStyles.header,
+            TOOL_USE_LAYOUT_FIXES.contentWidth,
             isDark && diffStyles.headerDark,
           ]}
           activeOpacity={0.7}
         >
-          <View style={diffStyles.headerLeft}>
+          <View style={[diffStyles.headerLeft, TOOL_USE_LAYOUT_FIXES.headerLeft]}>
             <Text style={[diffStyles.headerIcon, isDark && diffStyles.headerIconDark]}>
               {toolUseData.action === 'Edit' ? '\u270E' : toolUseData.action === 'Write' ? '\u2710' : '\u2699'}
             </Text>
-            <Text style={[diffStyles.headerText, isDark && diffStyles.headerTextDark]} numberOfLines={1}>
+            <Text
+              testID="tool-use-card-title"
+              style={[
+                diffStyles.headerText,
+                TOOL_USE_LAYOUT_FIXES.headerText,
+                isDark && diffStyles.headerTextDark,
+              ]}
+              numberOfLines={1}
+            >
               {getHeaderLabel()}
             </Text>
           </View>
@@ -824,7 +885,14 @@ function CollapsibleToolUse({ toolUseData, isDark, timestamp }: CollapsibleToolU
         </TouchableOpacity>
 
         {expanded && (
-          <View style={[diffStyles.body, isDark && diffStyles.bodyDark]}>
+          <View
+            testID="tool-use-card-body"
+            style={[
+              diffStyles.body,
+              TOOL_USE_LAYOUT_FIXES.contentWidth,
+              isDark && diffStyles.bodyDark,
+            ]}
+          >
             {toolUseData.action === 'Edit' ? (
               <EditDiffContent data={toolUseData as ToolUseEditData} isDark={isDark} />
             ) : toolUseData.action === 'Write' ? (
@@ -840,6 +908,12 @@ function CollapsibleToolUse({ toolUseData, isDark, timestamp }: CollapsibleToolU
             Claude · {formattedTime}
           </Text>
         </View>
+        {shouldShowTestProbe && hasWidthMeasurement && (
+          <View
+            testID={isWidthHealthy ? 'tool-use-width-ok' : 'tool-use-width-bad'}
+            style={styles.toolUseProbeDot}
+          />
+        )}
       </View>
     </View>
   );
@@ -1110,7 +1184,7 @@ const styles = StyleSheet.create({
   messageRow: {
     flexDirection: 'row',
     marginVertical: 4,
-    gap: 8,
+    gap: MESSAGE_ROW_GAP,
     alignItems: 'flex-start',
   },
   messageRowUser: {
@@ -1208,6 +1282,16 @@ const styles = StyleSheet.create({
   },
   timestampDark: {
     color: '#6b7280',
+  },
+  toolUseProbeDot: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    width: 1,
+    height: 1,
+    borderRadius: 0.5,
+    backgroundColor: '#22c55e',
+    opacity: 0.02,
   },
   // Status indicator
   statusIndicator: {
