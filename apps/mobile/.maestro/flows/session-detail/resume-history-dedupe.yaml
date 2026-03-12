@@ -14,40 +14,32 @@ appId: com.clautunnel.app
     visible:
       id: "session-card-test-session-1"
     timeout: 5000
-
-# Navigate to session detail
 - tapOn:
     id: "session-card-test-session-1"
+- tapOn:
+    id: "input-commands-button"
+- extendedWaitUntil:
+    visible: "command-resume"
+    timeout: 3000
+- tapOn: "command-resume"
 - extendedWaitUntil:
     visible:
-      id: "session-title"
+      id: "resume-session-modal"
     timeout: 3000
-
-# Open rename modal
 - tapOn:
-    id: "session-edit-title-button"
+    id: "resume-session-option-test-session-2"
 - extendedWaitUntil:
-    visible:
-      id: "rename-session-modal"
+    visible: "Resumed mock answer from previous session"
     timeout: 3000
-
-# Clear existing text and type new title
+- assertVisible: "Resumed mock session mock-sdk-session-ended-1"
 - tapOn:
-    id: "rename-session-input"
-- clearText
-- inputText: "Renamed Session"
-- tapOn:
-    id: "rename-session-save"
-
-# Verify title updated
+    id: "input-commands-button"
 - extendedWaitUntil:
-    visible: "Renamed Session"
+    visible: "command-resume"
     timeout: 3000
-- assertVisible: "Renamed Session"
-
-# Go back and verify title persists in session list
+- tapOn: "command-resume"
 - tapOn:
-    id: "session-back-button"
+    id: "resume-session-option-test-session-2"
 - extendedWaitUntil:
-    visible: "Renamed Session"
+    visible: "Resume history already loaded for mock-sdk-session-ended-1"
     timeout: 3000

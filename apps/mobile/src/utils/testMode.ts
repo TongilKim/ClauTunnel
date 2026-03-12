@@ -151,6 +151,67 @@ export function buildMockStartedSession(index: number) {
   };
 }
 
+export type MockMutationKind =
+  | 'start-session'
+  | 'end-session'
+  | 'delete-session'
+  | 'update-title';
+
+const queuedMockMutationFailures: Record<MockMutationKind, string | null> = {
+  'start-session': null,
+  'end-session': null,
+  'delete-session': null,
+  'update-title': null,
+};
+
+const loadedMockResumeSessionIds = new Set<string>();
+
+export function queueMockMutationFailure(kind: MockMutationKind, message: string) {
+  queuedMockMutationFailures[kind] = message;
+}
+
+export function consumeMockMutationFailure(kind: MockMutationKind): string | null {
+  const message = queuedMockMutationFailures[kind];
+  queuedMockMutationFailures[kind] = null;
+  return message;
+}
+
+export function clearQueuedMockMutationFailures() {
+  (Object.keys(queuedMockMutationFailures) as MockMutationKind[]).forEach((kind) => {
+    queuedMockMutationFailures[kind] = null;
+  });
+}
+
+export function hasLoadedMockResumeHistory(sdkSessionId: string): boolean {
+  return loadedMockResumeSessionIds.has(sdkSessionId);
+}
+
+export function markLoadedMockResumeHistory(sdkSessionId: string) {
+  loadedMockResumeSessionIds.add(sdkSessionId);
+}
+
+export function clearLoadedMockResumeHistory() {
+  loadedMockResumeSessionIds.clear();
+}
+
+export function buildMockResumeHistoryMessages(startSeq: number): RealtimeMessage[] {
+  const now = Date.now();
+  return [
+    {
+      type: 'input',
+      content: 'Resumed question from previous session',
+      timestamp: now - 180000,
+      seq: startSeq,
+    },
+    {
+      type: 'output',
+      content: 'Resumed mock answer from previous session',
+      timestamp: now - 120000,
+      seq: startSeq + 1,
+    },
+  ];
+}
+
 export const MOCK_MODELS: ModelInfo[] = [
   {
     value: 'opus',
@@ -241,8 +302,12 @@ export const MOCK_MESSAGES: RealtimeMessage[] = [
   },
 ];
 
-export function buildMockClaudeResponse(input: string): string {
-  return `Mock response to: ${input.trim()}`;
+export function buildMockClaudeResponse(input: string, attachmentCount = 0): string {
+  const suffix =
+    attachmentCount > 0
+      ? ` with ${attachmentCount} attachment${attachmentCount === 1 ? '' : 's'}`
+      : '';
+  return `Mock response to: ${input.trim()}${suffix}`;
 }
 
 export function buildMockAnswerSummary(answers: Record<string, string>): string {
