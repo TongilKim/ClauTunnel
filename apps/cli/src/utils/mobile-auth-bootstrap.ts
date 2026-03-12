@@ -25,6 +25,7 @@ export async function createMobileAuthBootstrap({
     },
     body: JSON.stringify({
       action: 'create',
+      accessToken,
       refreshToken,
     }),
   });

@@ -37,6 +37,7 @@ describe('createMobileAuthBootstrap', () => {
         },
         body: JSON.stringify({
           action: 'create',
+          accessToken: 'access-token',
           refreshToken: 'refresh-token',
         }),
       }
