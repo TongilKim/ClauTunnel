@@ -25,6 +25,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Sessions',
+          tabBarButtonTestID: 'tab-sessions',
           tabBarIcon: ({ color }) => (
             <Text style={{ fontSize: 20, color }}>📱</Text>
           ),
@@ -34,6 +35,7 @@ export default function TabLayout() {
         name="settings"
         options={{
           title: 'Settings',
+          tabBarButtonTestID: 'tab-settings',
           tabBarIcon: ({ color }) => (
             <Text style={{ fontSize: 20, color }}>⚙️</Text>
           ),

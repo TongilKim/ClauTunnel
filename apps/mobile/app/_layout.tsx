@@ -37,22 +37,21 @@ export default function RootLayout() {
 
   // Initialize auth on app load — claim one-time CLI bootstrap code if available
   useEffect(() => {
-    if (isTestMode()) return;
-
     const controller = new AbortController();
 
     const handleAuth = async () => {
-      const bootstrapCode = process.env.EXPO_PUBLIC_MOBILE_BOOTSTRAP_CODE;
-      if (bootstrapCode) {
-        const success = await claimBootstrapCode(bootstrapCode, {
-          signal: controller.signal,
-        });
-        if (success) return;
+      // Skip bootstrap in test mode — initialize() handles mock auth persistence
+      if (!isTestMode()) {
+        const bootstrapCode = process.env.EXPO_PUBLIC_MOBILE_BOOTSTRAP_CODE;
+        if (bootstrapCode) {
+          const success = await claimBootstrapCode(bootstrapCode, {
+            signal: controller.signal,
+          });
+          if (success) return;
+          if (controller.signal.aborted) return;
+        }
       }
-      if (!controller.signal.aborted) {
-        // No bootstrap code or claim failed — fall back to persisted session check
-        void initialize();
-      }
+      void initialize();
     };
 
     void handleAuth();

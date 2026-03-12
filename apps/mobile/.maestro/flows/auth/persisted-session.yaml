@@ -14,18 +14,24 @@ appId: com.clautunnel.app
     visible:
       id: "sessions-stats-total"
     timeout: 5000
+- killApp
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible:
+      id: "sessions-stats-total"
+    timeout: 5000
 - tapOn:
     id: "tab-settings"
 - extendedWaitUntil:
     visible:
       id: "settings-email"
     timeout: 5000
-- assertVisible: "Account"
-- assertVisible:
-    id: "settings-email"
 - assertVisible: "test@clautunnel.com"
-- assertVisible: "About"
-- assertVisible:
-    id: "settings-version"
-- assertVisible:
+- tapOn:
     id: "settings-logout-button"
+- tapOn: "Sign Out"
+- extendedWaitUntil:
+    visible:
+      id: "login-email-input"
+    timeout: 5000

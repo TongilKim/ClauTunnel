@@ -14,40 +14,42 @@ appId: com.clautunnel.app
     visible:
       id: "session-card-test-session-1"
     timeout: 5000
-
-# Navigate to session detail
+- tapOn:
+    id: "test-mode-toggle"
+- tapOn:
+    id: "test-mode-trigger-start-session-error"
+- tapOn:
+    id: "machine-add-session-test-machine-1"
+- extendedWaitUntil:
+    visible: "Failed to Start Session"
+    timeout: 3000
+- tapOn: "OK"
 - tapOn:
     id: "session-card-test-session-1"
 - extendedWaitUntil:
     visible:
       id: "session-title"
     timeout: 3000
-
-# Open rename modal
+- tapOn:
+    id: "test-mode-toggle"
+- tapOn:
+    id: "test-mode-trigger-title-error"
 - tapOn:
     id: "session-edit-title-button"
 - extendedWaitUntil:
     visible:
       id: "rename-session-modal"
     timeout: 3000
-
-# Clear existing text and type new title
 - tapOn:
     id: "rename-session-input"
 - clearText
-- inputText: "Renamed Session"
+- inputText: "Broken Rename"
 - tapOn:
     id: "rename-session-save"
-
-# Verify title updated
 - extendedWaitUntil:
-    visible: "Renamed Session"
+    visible: "Session Error"
     timeout: 3000
-- assertVisible: "Renamed Session"
-
-# Go back and verify title persists in session list
+- assertVisible: "Mock title update failure from test mode"
+- tapOn: "OK"
 - tapOn:
-    id: "session-back-button"
-- extendedWaitUntil:
-    visible: "Renamed Session"
-    timeout: 3000
+    id: "rename-session-cancel"

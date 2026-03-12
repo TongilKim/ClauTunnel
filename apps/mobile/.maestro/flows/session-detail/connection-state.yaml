@@ -14,40 +14,29 @@ appId: com.clautunnel.app
     visible:
       id: "session-card-test-session-1"
     timeout: 5000
-
-# Navigate to session detail
 - tapOn:
     id: "session-card-test-session-1"
 - extendedWaitUntil:
     visible:
-      id: "session-title"
+      id: "session-status-badge"
     timeout: 3000
-
-# Open rename modal
 - tapOn:
-    id: "session-edit-title-button"
+    id: "test-mode-toggle"
+- tapOn:
+    id: "test-mode-trigger-reconnecting"
+- assertVisible: "Connecting"
+- tapOn:
+    id: "test-mode-trigger-connected"
 - extendedWaitUntil:
-    visible:
-      id: "rename-session-modal"
+    visible: "Online"
     timeout: 3000
-
-# Clear existing text and type new title
 - tapOn:
-    id: "rename-session-input"
-- clearText
-- inputText: "Renamed Session"
-- tapOn:
-    id: "rename-session-save"
-
-# Verify title updated
+    id: "test-mode-trigger-cli-offline"
 - extendedWaitUntil:
-    visible: "Renamed Session"
+    visible: "CLI Offline"
     timeout: 3000
-- assertVisible: "Renamed Session"
-
-# Go back and verify title persists in session list
 - tapOn:
     id: "session-back-button"
 - extendedWaitUntil:
-    visible: "Renamed Session"
+    visible: "Offline"
     timeout: 3000

@@ -16,6 +16,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useSessionStore } from '../../src/stores/sessionStore';
 import { SessionCard } from '../../src/components/SessionCard';
 import { EmptyState } from '../../src/components/EmptyState';
+import { TestModePanel } from '../../src/components/TestModePanel';
 import { isSessionOnlineForUI } from '../../src/utils/sessionStatus';
 import { isTestMode } from '../../src/utils/testMode';
 
@@ -40,9 +41,11 @@ export default function SessionsScreen() {
     sessions,
     machines,
     isLoading,
+    error,
     fetchSessions,
     fetchMachines,
     refreshSessions,
+    clearError,
     deleteEndedSessionsForMachine,
     setOpenSwipeableId,
     subscribeToPresence,
@@ -81,6 +84,14 @@ export default function SessionsScreen() {
       Alert.alert('Failed to Start Session', startSessionError);
     }
   }, [startSessionError]);
+
+  useEffect(() => {
+    if (error) {
+      Alert.alert('Session Error', error, [
+        { text: 'OK', onPress: clearError },
+      ]);
+    }
+  }, [error, clearError]);
 
   const onRefresh = useCallback(() => {
     fetchMachines();
@@ -367,6 +378,7 @@ export default function SessionsScreen() {
           />
         }
       />
+      <TestModePanel />
     </View>
   );
 }

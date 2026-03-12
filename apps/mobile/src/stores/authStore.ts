@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '../services/supabase';
 import type { User, Session } from '@supabase/supabase-js';
+import * as SecureStore from 'expo-secure-store';
 import {
   isTestMode,
   MOCK_TEST_CREDENTIALS,
@@ -25,6 +26,7 @@ interface AuthState {
 }
 
 const _testMode = isTestMode();
+const TEST_MODE_AUTH_EMAIL_KEY = 'clautunnel:test-mode-auth-email';
 
 function buildMockAuthState(email = MOCK_USER.email) {
   return {
@@ -40,6 +42,30 @@ function buildMockAuthState(email = MOCK_USER.email) {
       },
     } as Session,
   };
+}
+
+async function loadPersistedMockAuthEmail(): Promise<string | null> {
+  try {
+    return await SecureStore.getItemAsync(TEST_MODE_AUTH_EMAIL_KEY);
+  } catch {
+    return null;
+  }
+}
+
+async function persistMockAuthEmail(email: string) {
+  try {
+    await SecureStore.setItemAsync(TEST_MODE_AUTH_EMAIL_KEY, email);
+  } catch {
+    // Ignore SecureStore failures in E2E mode.
+  }
+}
+
+async function clearPersistedMockAuthEmail() {
+  try {
+    await SecureStore.deleteItemAsync(TEST_MODE_AUTH_EMAIL_KEY);
+  } catch {
+    // Ignore SecureStore failures in E2E mode.
+  }
 }
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -77,11 +103,21 @@ function listenForAuthChanges(set: (state: Partial<AuthState>) => void) {
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   session: null,
-  isLoading: false,
+  isLoading: true,
   error: null,
 
   initialize: async () => {
     if (_testMode) {
+      set({ isLoading: true, error: null });
+      const email = await loadPersistedMockAuthEmail();
+      if (email) {
+        set({
+          ...buildMockAuthState(email),
+          isLoading: false,
+          error: null,
+        });
+        return;
+      }
       set({ isLoading: false, error: null, user: null, session: null });
       return;
     }
@@ -236,6 +272,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         ...buildMockAuthState(email.trim().toLowerCase()),
         isLoading: false,
       });
+      await persistMockAuthEmail(email.trim().toLowerCase());
       return;
     }
 
@@ -269,6 +306,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         ...buildMockAuthState(email.trim().toLowerCase() || MOCK_USER.email),
         isLoading: false,
       });
+      await persistMockAuthEmail(email.trim().toLowerCase() || MOCK_USER.email);
       return;
     }
 
@@ -303,6 +341,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isLoading: false,
         error: null,
       });
+      await clearPersistedMockAuthEmail();
       return;
     }
 

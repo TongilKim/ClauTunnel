@@ -12,12 +12,14 @@ import {
   ScrollView,
   Text,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useConnectionStore } from '../stores/connectionStore';
 import { convertImageToBase64 } from '../utils/imageUtils';
 import { getModelBadgeState } from '../utils/modelBadgeState';
 import { getPermissionModeBadgeState } from '../utils/permissionModeBadgeState';
+import { isTestMode } from '../utils/testMode';
 import { CommandPicker } from './CommandPicker';
 import { ModelPicker } from './ModelPicker';
 import { InteractivePicker } from './InteractivePicker';
@@ -36,11 +38,16 @@ const INTERACTIVE_COMMANDS = new Set<string>([
   'hooks',
 ]);
 
+const TEST_ATTACHMENT_DATA =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9VEWilQAAAAASUVORK5CYII=';
+const TEST_ATTACHMENT_URI = `data:image/png;base64,${TEST_ATTACHMENT_DATA}`;
+
 interface InputBarProps {
   disabled?: boolean;
 }
 
 export function InputBar({ disabled }: InputBarProps) {
+  const testMode = isTestMode();
   const [input, setInput] = useState('');
   const [isScrollEnabled, setIsScrollEnabled] = useState(false);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
@@ -49,6 +56,8 @@ export function InputBar({ disabled }: InputBarProps) {
   const [showInteractivePicker, setShowInteractivePicker] = useState(false);
   const [showResumeSessionPicker, setShowResumeSessionPicker] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [showTestAttachmentMenu, setShowTestAttachmentMenu] = useState(false);
+  const [attachmentStatus, setAttachmentStatus] = useState<string | null>(null);
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
@@ -118,13 +127,20 @@ export function InputBar({ disabled }: InputBarProps) {
 
     try {
       // Convert images to base64 attachments
-      const attachments = await Promise.all(
-        selectedImages.map((uri) => convertImageToBase64(uri))
-      );
+      const attachments = testMode
+        ? selectedImages.map(() => ({
+            type: 'image' as const,
+            mediaType: 'image/png' as const,
+            data: TEST_ATTACHMENT_DATA,
+          }))
+        : await Promise.all(
+            selectedImages.map((uri) => convertImageToBase64(uri))
+          );
 
       const messageContent = input.trim();
       setInput('');
       setSelectedImages([]);
+      setAttachmentStatus(null);
 
       await sendInput(messageContent + '\n', attachments.length > 0 ? attachments : undefined);
     } catch {
@@ -190,6 +206,11 @@ export function InputBar({ disabled }: InputBarProps) {
   };
 
   const handleAttachment = async () => {
+    if (testMode) {
+      setShowTestAttachmentMenu(true);
+      return;
+    }
+
     Alert.alert(
       'Add Attachment',
       'Choose an option',
@@ -210,6 +231,39 @@ export function InputBar({ disabled }: InputBarProps) {
     );
   };
 
+  const setMockAttachmentSelection = (count: number, source: 'camera' | 'library') => {
+    setSelectedImages((prev) => [
+      ...prev,
+      ...Array.from({ length: count }, () => TEST_ATTACHMENT_URI),
+    ]);
+    setAttachmentStatus(
+      `${count} attachment${count === 1 ? '' : 's'} selected from ${source}.`
+    );
+    setShowTestAttachmentMenu(false);
+  };
+
+  const handleTestAttachmentChoice = (
+    choice: 'camera' | 'camera-denied' | 'library' | 'library-denied'
+  ) => {
+    if (choice === 'camera') {
+      setMockAttachmentSelection(1, 'camera');
+      return;
+    }
+
+    if (choice === 'library') {
+      setMockAttachmentSelection(2, 'library');
+      return;
+    }
+
+    setSelectedImages([]);
+    setAttachmentStatus(
+      choice === 'camera-denied'
+        ? 'Camera Access Required'
+        : 'Photo Library Access Required'
+    );
+    setShowTestAttachmentMenu(false);
+  };
+
   const handleContentSizeChange = useCallback(
     (event: NativeSyntheticEvent<TextInputContentSizeChangeEventData>) => {
       const contentHeight = event.nativeEvent.contentSize.height;
@@ -225,7 +279,13 @@ export function InputBar({ disabled }: InputBarProps) {
   const canSend = input.trim() && !isDisabled;
 
   const removeImage = (index: number) => {
-    setSelectedImages(selectedImages.filter((_, i) => i !== index));
+    const nextImages = selectedImages.filter((_, i) => i !== index);
+    setSelectedImages(nextImages);
+    setAttachmentStatus(
+      nextImages.length > 0
+        ? `${nextImages.length} attachment${nextImages.length === 1 ? '' : 's'} selected.`
+        : null
+    );
   };
 
   const handleCommandSelect = (command: SlashCommand) => {
@@ -324,15 +384,17 @@ export function InputBar({ disabled }: InputBarProps) {
         {/* Image previews */}
         {selectedImages.length > 0 && (
           <ScrollView
+            testID="input-attachment-preview-strip"
             horizontal
             showsHorizontalScrollIndicator={false}
             style={styles.imagePreviewContainer}
             contentContainerStyle={styles.imagePreviewContent}
           >
             {selectedImages.map((uri, index) => (
-              <View key={index} style={styles.imagePreviewWrapper}>
+              <View key={index} testID={`input-attachment-preview-${index}`} style={styles.imagePreviewWrapper}>
                 <Image source={{ uri }} style={styles.imagePreview} />
                 <TouchableOpacity
+                  testID={`input-attachment-remove-${index}`}
                   style={styles.removeImageButton}
                   onPress={() => removeImage(index)}
                 >
@@ -341,6 +403,24 @@ export function InputBar({ disabled }: InputBarProps) {
               </View>
             ))}
           </ScrollView>
+        )}
+
+        {selectedImages.length > 0 && (
+          <Text
+            testID="input-attachment-count"
+            style={[styles.attachmentCount, isDark && styles.attachmentCountDark]}
+          >
+            {selectedImages.length} attachment{selectedImages.length === 1 ? '' : 's'} selected
+          </Text>
+        )}
+
+        {testMode && attachmentStatus && (
+          <Text
+            testID="input-attachment-status"
+            style={[styles.attachmentStatus, isDark && styles.attachmentStatusDark]}
+          >
+            {attachmentStatus}
+          </Text>
         )}
 
         {/* Bottom toolbar */}
@@ -445,6 +525,63 @@ export function InputBar({ disabled }: InputBarProps) {
         onSelect={handleResumeSessionSelect}
         onClose={() => setShowResumeSessionPicker(false)}
       />
+
+      <Modal
+        visible={showTestAttachmentMenu}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowTestAttachmentMenu(false)}
+      >
+        <TouchableOpacity
+          style={styles.testAttachmentBackdrop}
+          activeOpacity={1}
+          onPress={() => setShowTestAttachmentMenu(false)}
+        >
+          <View
+            testID="test-attachment-menu"
+            style={[styles.testAttachmentSheet, isDark && styles.testAttachmentSheetDark]}
+          >
+            <Text style={[styles.testAttachmentTitle, isDark && styles.testAttachmentTitleDark]}>
+              Add Attachment
+            </Text>
+            <TouchableOpacity
+              testID="test-attachment-camera"
+              style={styles.testAttachmentAction}
+              onPress={() => handleTestAttachmentChoice('camera')}
+            >
+              <Text style={styles.testAttachmentActionText}>Take Photo</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              testID="test-attachment-camera-denied"
+              style={styles.testAttachmentAction}
+              onPress={() => handleTestAttachmentChoice('camera-denied')}
+            >
+              <Text style={styles.testAttachmentActionText}>Take Photo Denied</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              testID="test-attachment-library"
+              style={styles.testAttachmentAction}
+              onPress={() => handleTestAttachmentChoice('library')}
+            >
+              <Text style={styles.testAttachmentActionText}>Choose from Library</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              testID="test-attachment-library-denied"
+              style={styles.testAttachmentAction}
+              onPress={() => handleTestAttachmentChoice('library-denied')}
+            >
+              <Text style={styles.testAttachmentActionText}>Library Denied</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              testID="test-attachment-cancel"
+              style={[styles.testAttachmentAction, styles.testAttachmentCancel]}
+              onPress={() => setShowTestAttachmentMenu(false)}
+            >
+              <Text style={styles.testAttachmentCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -557,6 +694,23 @@ const styles = StyleSheet.create({
   },
   imagePreviewContent: {
     gap: 8,
+  },
+  attachmentCount: {
+    marginTop: 8,
+    fontSize: 13,
+    color: '#4b5563',
+    fontWeight: '600',
+  },
+  attachmentCountDark: {
+    color: '#d1d5db',
+  },
+  attachmentStatus: {
+    marginTop: 6,
+    fontSize: 13,
+    color: '#1d4ed8',
+  },
+  attachmentStatusDark: {
+    color: '#93c5fd',
   },
   imagePreviewWrapper: {
     position: 'relative',
@@ -710,5 +864,48 @@ const styles = StyleSheet.create({
   },
   imageIconSunDark: {
     backgroundColor: '#9ca3af',
+  },
+  testAttachmentBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  testAttachmentSheet: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 28,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    gap: 10,
+  },
+  testAttachmentSheetDark: {
+    backgroundColor: '#1f1f1f',
+  },
+  testAttachmentTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  testAttachmentTitleDark: {
+    color: '#f9fafb',
+  },
+  testAttachmentAction: {
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: '#eff6ff',
+  },
+  testAttachmentActionText: {
+    color: '#1d4ed8',
+    fontWeight: '600',
+  },
+  testAttachmentCancel: {
+    backgroundColor: '#f3f4f6',
+  },
+  testAttachmentCancelText: {
+    color: '#111827',
+    fontWeight: '600',
   },
 });

@@ -15,7 +15,7 @@ appId: com.clautunnel.app
       id: "sessions-stats-total"
     timeout: 5000
 - tapOn:
-    point: "75%,93%"
+    id: "tab-settings"
 - extendedWaitUntil:
     visible:
       id: "settings-logout-button"
