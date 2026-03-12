@@ -76,6 +76,9 @@ serve(async (req) => {
     const serviceRoleKey = getEnv('SUPABASE_SERVICE_ROLE_KEY');
     const bootstrapSecret = getEnv('MOBILE_AUTH_BOOTSTRAP_SECRET');
     const authHeader = req.headers.get('Authorization') ?? '';
+    const bearerToken = authHeader.startsWith('Bearer ')
+      ? authHeader.slice('Bearer '.length).trim()
+      : '';
 
     const serviceClient = createClient(supabaseUrl, serviceRoleKey);
     const authedClient = createClient(supabaseUrl, anonKey, {
@@ -94,10 +97,12 @@ serve(async (req) => {
     const nowIso = new Date().toISOString();
 
     if (body.action === 'create') {
+      const accessToken =
+        typeof body.accessToken === 'string' ? body.accessToken.trim() : bearerToken;
       const refreshToken =
         typeof body.refreshToken === 'string' ? body.refreshToken.trim() : '';
-      if (!refreshToken) {
-        return json(400, { error: 'refreshToken is required' });
+      if (!accessToken || !refreshToken) {
+        return json(400, { error: 'accessToken and refreshToken are required' });
       }
 
       const {
@@ -113,7 +118,10 @@ serve(async (req) => {
       const codeHash = await sha256(code);
       const expiresAt = new Date(Date.now() + BOOTSTRAP_TTL_MS).toISOString();
       const encryptedRefreshToken = await encryptBootstrapRefreshToken(
-        refreshToken,
+        JSON.stringify({
+          accessToken,
+          refreshToken,
+        }),
         bootstrapSecret
       );
 
@@ -226,12 +234,24 @@ serve(async (req) => {
         return json(410, { error: 'Bootstrap code is invalid or expired' });
       }
 
-      const refreshToken = await decryptBootstrapRefreshToken(
+      const sessionPayload = await decryptBootstrapRefreshToken(
         data.encrypted_refresh_token,
         bootstrapSecret
       );
+      const parsedPayload = JSON.parse(sessionPayload) as {
+        accessToken?: string;
+        refreshToken?: string;
+      };
+      const accessToken =
+        typeof parsedPayload.accessToken === 'string' ? parsedPayload.accessToken : '';
+      const refreshToken =
+        typeof parsedPayload.refreshToken === 'string' ? parsedPayload.refreshToken : '';
 
-      return json(200, { refreshToken });
+      if (!accessToken || !refreshToken) {
+        return json(500, { error: 'Stored bootstrap session payload is invalid' });
+      }
+
+      return json(200, { accessToken, refreshToken });
     }
 
     return json(400, { error: 'Unsupported action' });

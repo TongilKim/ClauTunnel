@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mockGetSession = vi.fn();
 const mockOnAuthStateChange = vi.fn();
 const mockRefreshSession = vi.fn();
+const mockSetSession = vi.fn();
 const mockInvoke = vi.fn();
 
 vi.mock('../services/supabase', () => ({
@@ -11,6 +12,7 @@ vi.mock('../services/supabase', () => ({
       getSession: mockGetSession,
       onAuthStateChange: mockOnAuthStateChange,
       refreshSession: mockRefreshSession,
+      setSession: mockSetSession,
       signInWithPassword: vi.fn(),
       signUp: vi.fn(),
       signOut: vi.fn(),
@@ -52,10 +54,13 @@ describe('AuthStore bootstrap auth', () => {
 
   it('claims a bootstrap code and signs in with the returned refresh token', async () => {
     mockInvoke.mockResolvedValue({
-      data: { refreshToken: 'server-refresh-token' },
+      data: {
+        accessToken: 'server-access-token',
+        refreshToken: 'server-refresh-token',
+      },
       error: null,
     });
-    mockRefreshSession.mockResolvedValue({
+    mockSetSession.mockResolvedValue({
       data: {
         session: {
           access_token: 'new-access',
@@ -74,7 +79,8 @@ describe('AuthStore bootstrap auth', () => {
     expect(mockInvoke).toHaveBeenCalledWith('mobile-auth-bootstrap', {
       body: { action: 'claim', code: 'one-time-code' },
     });
-    expect(mockRefreshSession).toHaveBeenCalledWith({
+    expect(mockSetSession).toHaveBeenCalledWith({
+      access_token: 'server-access-token',
       refresh_token: 'server-refresh-token',
     });
     expect(useAuthStore.getState().user?.email).toBe('user@example.com');
@@ -92,6 +98,7 @@ describe('AuthStore bootstrap auth', () => {
 
     expect(success).toBe(false);
     expect(useAuthStore.getState().error).toBe('code expired');
+    expect(mockSetSession).not.toHaveBeenCalled();
     expect(mockRefreshSession).not.toHaveBeenCalled();
   });
 
@@ -145,11 +152,15 @@ describe('AuthStore bootstrap auth', () => {
     });
     controller.abort();
     resolveInvoke?.({
-      data: { refreshToken: 'server-refresh-token' },
+      data: {
+        accessToken: 'server-access-token',
+        refreshToken: 'server-refresh-token',
+      },
       error: null,
     });
 
     await expect(pending).resolves.toBe(false);
+    expect(mockSetSession).not.toHaveBeenCalled();
     expect(mockRefreshSession).not.toHaveBeenCalled();
     expect(useAuthStore.getState().error).toBeNull();
     expect(useAuthStore.getState().isLoading).toBe(false);

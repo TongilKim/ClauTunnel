@@ -130,11 +130,36 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (error) throw error;
 
+      const accessToken =
+        data && typeof data.accessToken === 'string' ? data.accessToken : '';
       const refreshToken =
         data && typeof data.refreshToken === 'string' ? data.refreshToken : '';
 
+      if (accessToken && refreshToken) {
+        const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+
+        if (options?.signal?.aborted) {
+          set({ isLoading: false });
+          return false;
+        }
+
+        if (sessionError) throw sessionError;
+
+        set({
+          session: sessionData.session,
+          user: sessionData.session?.user ?? null,
+          isLoading: false,
+        });
+
+        listenForAuthChanges(set);
+        return true;
+      }
+
       if (!refreshToken) {
-        throw new Error('Bootstrap response missing refresh token');
+        throw new Error('Bootstrap response missing session tokens');
       }
 
       return await get().signInWithToken(refreshToken, options);
