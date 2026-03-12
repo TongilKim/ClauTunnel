@@ -127,4 +127,31 @@ describe('AuthStore bootstrap auth', () => {
     expect(unsubscribeSecond).not.toHaveBeenCalled();
     expect(mockOnAuthStateChange).toHaveBeenCalledTimes(2);
   });
+
+  it('does not continue into refresh auth when bootstrap claim is aborted mid-flight', async () => {
+    let resolveInvoke: ((value: unknown) => void) | null = null;
+    mockInvoke.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveInvoke = resolve;
+        })
+    );
+
+    const { useAuthStore } = await import('../stores/authStore');
+    const controller = new AbortController();
+
+    const pending = useAuthStore.getState().claimBootstrapCode('one-time-code', {
+      signal: controller.signal,
+    });
+    controller.abort();
+    resolveInvoke?.({
+      data: { refreshToken: 'server-refresh-token' },
+      error: null,
+    });
+
+    await expect(pending).resolves.toBe(false);
+    expect(mockRefreshSession).not.toHaveBeenCalled();
+    expect(useAuthStore.getState().error).toBeNull();
+    expect(useAuthStore.getState().isLoading).toBe(false);
+  });
 });

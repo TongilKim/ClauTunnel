@@ -16,8 +16,8 @@ interface AuthState {
 
   // Actions
   initialize: () => Promise<void>;
-  claimBootstrapCode: (code: string) => Promise<boolean>;
-  signInWithToken: (refreshToken: string) => Promise<boolean>;
+  claimBootstrapCode: (code: string, options?: { signal?: AbortSignal }) => Promise<boolean>;
+  signInWithToken: (refreshToken: string, options?: { signal?: AbortSignal }) => Promise<boolean>;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -53,6 +53,10 @@ function getErrorMessage(error: unknown, fallback: string) {
     return error.message;
   }
   return fallback;
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof Error && error.name === 'AbortError';
 }
 
 let _authSubscription: { unsubscribe: () => void } | null = null;
@@ -107,13 +111,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  claimBootstrapCode: async (code: string) => {
+  claimBootstrapCode: async (code: string, options?: { signal?: AbortSignal }) => {
     try {
+      if (options?.signal?.aborted) {
+        return false;
+      }
+
       set({ isLoading: true, error: null });
 
       const { data, error } = await supabase.functions.invoke('mobile-auth-bootstrap', {
         body: { action: 'claim', code },
       });
+
+      if (options?.signal?.aborted) {
+        set({ isLoading: false });
+        return false;
+      }
 
       if (error) throw error;
 
@@ -124,8 +137,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         throw new Error('Bootstrap response missing refresh token');
       }
 
-      return await get().signInWithToken(refreshToken);
+      return await get().signInWithToken(refreshToken, options);
     } catch (error) {
+      if (isAbortError(error) || options?.signal?.aborted) {
+        set({ isLoading: false });
+        return false;
+      }
       set({
         error: getErrorMessage(error, 'Failed to claim bootstrap code'),
         isLoading: false,
@@ -134,13 +151,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  signInWithToken: async (refreshToken: string) => {
+  signInWithToken: async (refreshToken: string, options?: { signal?: AbortSignal }) => {
     try {
+      if (options?.signal?.aborted) {
+        return false;
+      }
+
       set({ isLoading: true, error: null });
 
       const { data, error } = await supabase.auth.refreshSession({
         refresh_token: refreshToken,
       });
+
+      if (options?.signal?.aborted) {
+        set({ isLoading: false });
+        return false;
+      }
 
       if (error) throw error;
 
@@ -154,8 +180,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       return true;
     } catch (error) {
+      if (isAbortError(error) || options?.signal?.aborted) {
+        set({ isLoading: false });
+        return false;
+      }
       set({
-        error: error instanceof Error ? error.message : 'Failed to authenticate',
+        error: getErrorMessage(error, 'Failed to authenticate'),
         isLoading: false,
       });
       return false;

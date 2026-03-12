@@ -39,15 +39,17 @@ export default function RootLayout() {
   useEffect(() => {
     if (isTestMode()) return;
 
-    let cancelled = false;
+    const controller = new AbortController();
 
     const handleAuth = async () => {
       const bootstrapCode = process.env.EXPO_PUBLIC_MOBILE_BOOTSTRAP_CODE;
       if (bootstrapCode) {
-        const success = await claimBootstrapCode(bootstrapCode);
+        const success = await claimBootstrapCode(bootstrapCode, {
+          signal: controller.signal,
+        });
         if (success) return;
       }
-      if (!cancelled) {
+      if (!controller.signal.aborted) {
         // No bootstrap code or claim failed — fall back to persisted session check
         void initialize();
       }
@@ -56,7 +58,7 @@ export default function RootLayout() {
     void handleAuth();
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [claimBootstrapCode, initialize]);
 
