@@ -108,7 +108,7 @@ serve(async (req) => {
       const {
         data: { user },
         error: userError,
-      } = await authedClient.auth.getUser();
+      } = await authedClient.auth.getUser(accessToken);
 
       if (userError || !user) {
         return json(401, { error: 'Unauthorized' });

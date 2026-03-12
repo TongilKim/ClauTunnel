@@ -1,4 +1,4 @@
-import { useCallback, useState, useMemo, useEffect } from 'react';
+import { useCallback, useState, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,11 +14,13 @@ import {
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSessionStore } from '../../src/stores/sessionStore';
+import { useAuthStore } from '../../src/stores/authStore';
 import { SessionCard } from '../../src/components/SessionCard';
 import { EmptyState } from '../../src/components/EmptyState';
 import { TestModePanel } from '../../src/components/TestModePanel';
 import { isSessionOnlineForUI } from '../../src/utils/sessionStatus';
 import { isTestMode } from '../../src/utils/testMode';
+import { shouldPrimeSessionScreen } from '../../src/utils/sessionBootstrap';
 
 interface MachineSection {
   id: string;
@@ -36,6 +38,8 @@ export default function SessionsScreen() {
   const isDark = colorScheme === 'dark';
   const router = useRouter();
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  const primedUserIdRef = useRef<string | null>(null);
+  const { user, isLoading: authIsLoading } = useAuthStore();
 
   const {
     sessions,
@@ -68,6 +72,34 @@ export default function SessionsScreen() {
       });
     }, [fetchSessions, fetchMachines, subscribeToPresence, subscribeMachinePresence])
   );
+
+  // Prime machine/session data once after auth becomes ready on initial app entry.
+  useEffect(() => {
+    if (
+      !shouldPrimeSessionScreen({
+        isTestModeEnabled: isTestMode(),
+        authIsLoading,
+        userId: user?.id,
+        primedUserId: primedUserIdRef.current,
+      })
+    ) {
+      return;
+    }
+
+    primedUserIdRef.current = user!.id;
+    fetchMachines();
+    fetchSessions(true).then(() => {
+      subscribeToPresence();
+      subscribeMachinePresence();
+    });
+  }, [
+    authIsLoading,
+    user?.id,
+    fetchMachines,
+    fetchSessions,
+    subscribeToPresence,
+    subscribeMachinePresence,
+  ]);
 
   // Also subscribe when sessions or machines change
   useEffect(() => {

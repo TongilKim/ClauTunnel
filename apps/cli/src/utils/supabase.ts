@@ -27,6 +27,24 @@ export interface SessionTokenStore {
   clearSessionTokens(): void;
 }
 
+export async function getMobileBootstrapTokens(
+  supabase: SupabaseClient,
+  config: Pick<SessionTokenStore, 'getSessionTokens'>
+): Promise<{ accessToken: string; refreshToken: string } | null> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (session?.access_token && session.refresh_token) {
+    return {
+      accessToken: session.access_token,
+      refreshToken: session.refresh_token,
+    };
+  }
+
+  return config.getSessionTokens();
+}
+
 export async function restoreSession(
   supabase: SupabaseClient,
   config: SessionTokenStore

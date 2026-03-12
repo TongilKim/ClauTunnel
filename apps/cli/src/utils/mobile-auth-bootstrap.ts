@@ -20,7 +20,7 @@ export async function createMobileAuthBootstrap({
     method: 'POST',
     headers: {
       apikey: supabaseAnonKey,
-      Authorization: `Bearer ${accessToken}`,
+      Authorization: `Bearer ${supabaseAnonKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({

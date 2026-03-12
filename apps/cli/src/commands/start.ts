@@ -6,7 +6,11 @@ import { MachineRealtimeClient } from '../realtime/machine-client.js';
 import { Config, ConfigurationError } from '../utils/config.js';
 import { Logger } from '../utils/logger.js';
 import { Spinner } from '../utils/spinner.js';
-import { createSupabaseClient, restoreSession } from '../utils/supabase.js';
+import {
+  createSupabaseClient,
+  getMobileBootstrapTokens,
+  restoreSession,
+} from '../utils/supabase.js';
 import {
   promptYesNo,
   enableSleepPrevention,
@@ -233,7 +237,7 @@ export function createStartCommand(): Command {
 
         if (options.mobile !== false) {
           const mobileProjectPath = config.getMobileProjectPath();
-          const sessionTokens = config.getSessionTokens();
+          const sessionTokens = await getMobileBootstrapTokens(supabase, config);
           let bootstrapCode: string | undefined;
           let bootstrapWarning: string | null = null;
 

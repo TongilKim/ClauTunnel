@@ -6,6 +6,12 @@ const mockRefreshSession = vi.fn();
 const mockSetSession = vi.fn();
 const mockInvoke = vi.fn();
 
+vi.mock('expo-secure-store', () => ({
+  getItemAsync: vi.fn(),
+  setItemAsync: vi.fn(),
+  deleteItemAsync: vi.fn(),
+}));
+
 vi.mock('../services/supabase', () => ({
   supabase: {
     auth: {
