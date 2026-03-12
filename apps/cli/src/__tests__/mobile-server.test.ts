@@ -216,6 +216,23 @@ describe('MobileServerManager', () => {
       expect(content).toContain('EXPO_PUBLIC_SUPABASE_ANON_KEY=test-anon-key');
     });
 
+    it('should write a one-time bootstrap code instead of a refresh token', async () => {
+      const { MobileServerManager } = await import('../mobile/mobile-server.js');
+      const manager = new MobileServerManager({
+        mobileProjectPath: MOBILE_DIR,
+        supabaseUrl: 'https://test.supabase.co',
+        supabaseAnonKey: 'test-anon-key',
+        bootstrapCode: 'bootstrap-code-123',
+        logDir: LOG_DIR,
+      });
+
+      manager.ensureEnvFile();
+
+      const content = readFileSync(join(MOBILE_DIR, '.env'), 'utf-8');
+      expect(content).toContain('EXPO_PUBLIC_MOBILE_BOOTSTRAP_CODE=bootstrap-code-123');
+      expect(content).not.toContain('EXPO_PUBLIC_REFRESH_TOKEN=');
+    });
+
     it('should overwrite existing .env file', async () => {
       writeFileSync(join(MOBILE_DIR, '.env'), 'OLD_CONTENT=old');
 
