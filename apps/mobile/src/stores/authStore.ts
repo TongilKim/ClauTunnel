@@ -16,6 +16,8 @@ interface AuthState {
 
   // Actions
   initialize: () => Promise<void>;
+  claimBootstrapCode: (code: string) => Promise<boolean>;
+  signInWithToken: (refreshToken: string) => Promise<boolean>;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -40,6 +42,34 @@ function buildMockAuthState(email = MOCK_USER.email) {
   };
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error) return error.message;
+  if (
+    error &&
+    typeof error === 'object' &&
+    'message' in error &&
+    typeof error.message === 'string'
+  ) {
+    return error.message;
+  }
+  return fallback;
+}
+
+let _authSubscription: { unsubscribe: () => void } | null = null;
+
+function listenForAuthChanges(set: (state: Partial<AuthState>) => void) {
+  _authSubscription?.unsubscribe();
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange((_event, session) => {
+    set({
+      session,
+      user: session?.user ?? null,
+    });
+  });
+  _authSubscription = subscription;
+}
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   session: null,
@@ -55,7 +85,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
 
-      // Get current session
       const {
         data: { session },
         error,
@@ -69,18 +98,67 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isLoading: false,
       });
 
-      // Listen for auth changes
-      supabase.auth.onAuthStateChange((_event, session) => {
-        set({
-          session,
-          user: session?.user ?? null,
-        });
-      });
+      listenForAuthChanges(set);
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to initialize',
         isLoading: false,
       });
+    }
+  },
+
+  claimBootstrapCode: async (code: string) => {
+    try {
+      set({ isLoading: true, error: null });
+
+      const { data, error } = await supabase.functions.invoke('mobile-auth-bootstrap', {
+        body: { action: 'claim', code },
+      });
+
+      if (error) throw error;
+
+      const refreshToken =
+        data && typeof data.refreshToken === 'string' ? data.refreshToken : '';
+
+      if (!refreshToken) {
+        throw new Error('Bootstrap response missing refresh token');
+      }
+
+      return await get().signInWithToken(refreshToken);
+    } catch (error) {
+      set({
+        error: getErrorMessage(error, 'Failed to claim bootstrap code'),
+        isLoading: false,
+      });
+      return false;
+    }
+  },
+
+  signInWithToken: async (refreshToken: string) => {
+    try {
+      set({ isLoading: true, error: null });
+
+      const { data, error } = await supabase.auth.refreshSession({
+        refresh_token: refreshToken,
+      });
+
+      if (error) throw error;
+
+      set({
+        session: data.session,
+        user: data.session?.user ?? null,
+        isLoading: false,
+      });
+
+      listenForAuthChanges(set);
+
+      return true;
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to authenticate',
+        isLoading: false,
+      });
+      return false;
     }
   },
 

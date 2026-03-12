@@ -18,6 +18,7 @@ export interface MobileServerOptions {
   mobileProjectPath?: string;
   supabaseUrl: string;
   supabaseAnonKey: string;
+  bootstrapCode?: string;
   expoPort?: number;
   logDir?: string;
   onProgress?: (message: string) => void;
@@ -196,12 +197,15 @@ export class MobileServerManager {
 
   ensureEnvFile(): void {
     const envPath = join(this.mobileProjectPath, '.env');
-    const envContent = [
+    const lines = [
       `EXPO_PUBLIC_SUPABASE_URL=${this.options.supabaseUrl}`,
       `EXPO_PUBLIC_SUPABASE_ANON_KEY=${this.options.supabaseAnonKey}`,
-      '',
-    ].join('\n');
-    writeFileSync(envPath, envContent);
+    ];
+    if (this.options.bootstrapCode) {
+      lines.push(`EXPO_PUBLIC_MOBILE_BOOTSTRAP_CODE=${this.options.bootstrapCode}`);
+    }
+    lines.push('');
+    writeFileSync(envPath, lines.join('\n'));
   }
 
   installDependencies(): boolean {
@@ -457,21 +461,20 @@ export class MobileServerManager {
     const host = tunnelUrl.replace(/^https?:\/\//, '');
     const expoUrl = `exp://${host}:443`;
     console.log('');
+    console.log('  Scan with Expo Go:');
+    qrcode.generate(expoUrl, { small: true }, (code: string) => {
+      for (const line of code.split('\n')) {
+        console.log(`  ${line}`);
+      }
+    });
+    console.log(`  ${expoUrl}`);
+    console.log('');
     console.log('  ┌─────────────────────────────────────────────────┐');
     console.log('  │  Expo Go is required to open this QR code.      │');
     console.log('  │  iOS:     https://apps.apple.com/app/id982107779│');
     console.log('  │  Android: https://play.google.com/store/apps/   │');
     console.log('  │           details?id=host.exp.exponent          │');
     console.log('  └─────────────────────────────────────────────────┘');
-    console.log('');
-    console.log('  Scan with Expo Go:');
-    qrcode.generate(expoUrl, { small: true }, (code: string) => {
-      // Indent each line for alignment
-      for (const line of code.split('\n')) {
-        console.log(`  ${line}`);
-      }
-    });
-    console.log(`  ${expoUrl}`);
     console.log('');
 
     return { started: true, tunnelUrl };

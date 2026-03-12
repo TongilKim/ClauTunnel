@@ -216,6 +216,23 @@ describe('MobileServerManager', () => {
       expect(content).toContain('EXPO_PUBLIC_SUPABASE_ANON_KEY=test-anon-key');
     });
 
+    it('should write a one-time bootstrap code instead of a refresh token', async () => {
+      const { MobileServerManager } = await import('../mobile/mobile-server.js');
+      const manager = new MobileServerManager({
+        mobileProjectPath: MOBILE_DIR,
+        supabaseUrl: 'https://test.supabase.co',
+        supabaseAnonKey: 'test-anon-key',
+        bootstrapCode: 'bootstrap-code-123',
+        logDir: LOG_DIR,
+      });
+
+      manager.ensureEnvFile();
+
+      const content = readFileSync(join(MOBILE_DIR, '.env'), 'utf-8');
+      expect(content).toContain('EXPO_PUBLIC_MOBILE_BOOTSTRAP_CODE=bootstrap-code-123');
+      expect(content).not.toContain('EXPO_PUBLIC_REFRESH_TOKEN=');
+    });
+
     it('should overwrite existing .env file', async () => {
       writeFileSync(join(MOBILE_DIR, '.env'), 'OLD_CONTENT=old');
 
@@ -369,6 +386,34 @@ describe('MobileServerManager', () => {
       expect(url).toBeNull();
       expect(mockProc.kill).toHaveBeenCalled();
     }, 10000);
+  });
+
+  describe('startExpo', () => {
+    it('starts Expo without forcing a Metro cache clear', async () => {
+      const mockProc = createMockProcess();
+      mockedSpawn.mockReturnValue(mockProc);
+
+      const { MobileServerManager } = await import('../mobile/mobile-server.js');
+      const manager = new MobileServerManager({
+        mobileProjectPath: MOBILE_DIR,
+        supabaseUrl: 'https://test.supabase.co',
+        supabaseAnonKey: 'test-key',
+        logDir: LOG_DIR,
+      });
+
+      const startPromise = manager.startExpo('https://abc123.ngrok-free.app');
+      mockProc.stdout.emit('data', Buffer.from('Metro waiting on exp://abc123.ngrok-free.app:443\n'));
+      await expect(startPromise).resolves.toBe(true);
+
+      expect(mockedSpawn).toHaveBeenCalledWith(
+        'npx',
+        ['expo', 'start', '--port', '8081'],
+        expect.objectContaining({
+          cwd: MOBILE_DIR,
+          stdio: ['ignore', 'pipe', 'pipe'],
+        })
+      );
+    });
   });
 
   describe('stop', () => {

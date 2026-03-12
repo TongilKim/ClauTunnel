@@ -33,14 +33,32 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
-  const { user, isLoading, initialize } = useAuthStore();
+  const { user, isLoading, initialize, claimBootstrapCode } = useAuthStore();
 
-  // Initialize auth on app load (skip in test mode — stores have mock data from init)
+  // Initialize auth on app load — claim one-time CLI bootstrap code if available
   useEffect(() => {
-    if (!isTestMode()) {
-      initialize();
-    }
-  }, []);
+    if (isTestMode()) return;
+
+    let cancelled = false;
+
+    const handleAuth = async () => {
+      const bootstrapCode = process.env.EXPO_PUBLIC_MOBILE_BOOTSTRAP_CODE;
+      if (bootstrapCode) {
+        const success = await claimBootstrapCode(bootstrapCode);
+        if (success) return;
+      }
+      if (!cancelled) {
+        // No bootstrap code or claim failed — fall back to persisted session check
+        void initialize();
+      }
+    };
+
+    void handleAuth();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [claimBootstrapCode, initialize]);
 
   const redirectTo = useProtectedRoute(user, isLoading);
 

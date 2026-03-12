@@ -23,6 +23,7 @@ import {
 import { MobileServerManager } from '../mobile/mobile-server.js';
 import { acquirePidFile, removePidFile } from '../utils/pid.js';
 import { checkClaudeCliAuth } from '../utils/claude-auth.js';
+import { createMobileAuthBootstrap } from '../utils/mobile-auth-bootstrap.js';
 import type { MachineCommand } from 'clautunnel-shared';
 
 // Polyfill WebSocket for Node.js (Supabase Realtime needs this)
@@ -232,15 +233,40 @@ export function createStartCommand(): Command {
 
         if (options.mobile !== false) {
           const mobileProjectPath = config.getMobileProjectPath();
+          const sessionTokens = config.getSessionTokens();
+          let bootstrapCode: string | undefined;
+          let bootstrapWarning: string | null = null;
+
+          if (sessionTokens?.accessToken && sessionTokens.refreshToken) {
+            spinner.update('Preparing mobile auth...');
+            try {
+              const bootstrap = await createMobileAuthBootstrap({
+                supabaseUrl: config.getSupabaseUrl(),
+                supabaseAnonKey: config.getSupabaseAnonKey(),
+                accessToken: sessionTokens.accessToken,
+                refreshToken: sessionTokens.refreshToken,
+              });
+              bootstrapCode = bootstrap.code;
+            } catch (error) {
+              bootstrapWarning =
+                error instanceof Error ? error.message : 'Failed to prepare mobile auth';
+            }
+          }
+
           mobileServer = new MobileServerManager({
             mobileProjectPath,
             supabaseUrl: config.getSupabaseUrl(),
             supabaseAnonKey: config.getSupabaseAnonKey(),
+            bootstrapCode,
             onProgress: (msg) => spinner.update(msg),
           });
 
           const result = await mobileServer.start();
           spinner.stop();
+
+          if (bootstrapWarning) {
+            logger.warn(`Mobile auto-auth disabled: ${bootstrapWarning}`);
+          }
 
           if (result.started) {
             logger.info('');
