@@ -4,6 +4,10 @@ import {
   decryptBootstrapRefreshToken,
   encryptBootstrapRefreshToken,
 } from './crypto.ts';
+import {
+  takeBootstrapClaimRateLimit,
+  type BootstrapClaimRateLimitStore,
+} from './rate-limit.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,6 +16,8 @@ const corsHeaders = {
 };
 
 const BOOTSTRAP_TTL_MS = 300_000;
+const CLAIM_RATE_LIMIT_MAX_ATTEMPTS = 10;
+const CLAIM_RATE_LIMIT_WINDOW_MS = 300_000;
 
 function json(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), {
@@ -41,6 +47,18 @@ function getEnv(name: string) {
     throw new Error(`Missing required environment variable: ${name}`);
   }
   return value;
+}
+
+function getClientRateLimitKey(req: Request) {
+  const forwardedFor = req.headers.get('x-forwarded-for');
+  if (forwardedFor) {
+    return forwardedFor.split(',')[0]?.trim() || 'unknown';
+  }
+  const realIp = req.headers.get('x-real-ip');
+  if (realIp) return realIp.trim();
+  const cfConnectingIp = req.headers.get('cf-connecting-ip');
+  if (cfConnectingIp) return cfConnectingIp.trim();
+  return 'unknown';
 }
 
 serve(async (req) => {
@@ -126,6 +144,68 @@ serve(async (req) => {
       const code = typeof body.code === 'string' ? body.code.trim() : '';
       if (!code) {
         return json(400, { error: 'code is required' });
+      }
+
+      const rateLimitStore: BootstrapClaimRateLimitStore = {
+        async cleanupExpired(cutoffIso: string) {
+          await serviceClient
+            .from('mobile_auth_claim_rate_limits')
+            .delete()
+            .lt('window_started_at', cutoffIso);
+        },
+        async get(keyHash: string) {
+          const { data, error } = await serviceClient
+            .from('mobile_auth_claim_rate_limits')
+            .select('key_hash, attempt_count, window_started_at')
+            .eq('key_hash', keyHash)
+            .maybeSingle();
+
+          if (error || !data) {
+            return null;
+          }
+
+          return {
+            keyHash: data.key_hash,
+            attemptCount: data.attempt_count,
+            windowStartedAt: data.window_started_at,
+          };
+        },
+        async put(record) {
+          const { error } = await serviceClient
+            .from('mobile_auth_claim_rate_limits')
+            .upsert({
+              key_hash: record.keyHash,
+              attempt_count: record.attemptCount,
+              window_started_at: record.windowStartedAt,
+            });
+
+          if (error) {
+            throw new Error(error.message);
+          }
+        },
+      };
+
+      const rateLimit = await takeBootstrapClaimRateLimit(rateLimitStore, {
+        clientKey: getClientRateLimitKey(req),
+        now: new Date(),
+        maxAttempts: CLAIM_RATE_LIMIT_MAX_ATTEMPTS,
+        windowMs: CLAIM_RATE_LIMIT_WINDOW_MS,
+      });
+
+      if (!rateLimit.allowed) {
+        return new Response(
+          JSON.stringify({
+            error: 'Too many bootstrap claim attempts. Please wait and try again.',
+          }),
+          {
+            status: 429,
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json',
+              'Retry-After': String(rateLimit.retryAfterSec ?? 60),
+            },
+          }
+        );
       }
 
       const codeHash = await sha256(code);
