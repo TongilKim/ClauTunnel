@@ -44,6 +44,7 @@ vi.mock('../utils/testMode', () => ({
 describe('AuthStore bootstrap auth', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.resetModules();
     mockOnAuthStateChange.mockReturnValue({
       data: { subscription: { unsubscribe: vi.fn() } },
     });
@@ -92,5 +93,38 @@ describe('AuthStore bootstrap auth', () => {
     expect(success).toBe(false);
     expect(useAuthStore.getState().error).toBe('code expired');
     expect(mockRefreshSession).not.toHaveBeenCalled();
+  });
+
+  it('replaces the auth listener when token sign-in runs again', async () => {
+    const unsubscribeFirst = vi.fn();
+    const unsubscribeSecond = vi.fn();
+
+    mockOnAuthStateChange
+      .mockReturnValueOnce({
+        data: { subscription: { unsubscribe: unsubscribeFirst } },
+      })
+      .mockReturnValueOnce({
+        data: { subscription: { unsubscribe: unsubscribeSecond } },
+      });
+
+    mockRefreshSession.mockResolvedValue({
+      data: {
+        session: {
+          access_token: 'new-access',
+          refresh_token: 'new-refresh',
+          user: { id: 'user-1', email: 'user@example.com' },
+        },
+      },
+      error: null,
+    });
+
+    const { useAuthStore } = await import('../stores/authStore');
+
+    await useAuthStore.getState().signInWithToken('first-refresh-token');
+    await useAuthStore.getState().signInWithToken('second-refresh-token');
+
+    expect(unsubscribeFirst).toHaveBeenCalledTimes(1);
+    expect(unsubscribeSecond).not.toHaveBeenCalled();
+    expect(mockOnAuthStateChange).toHaveBeenCalledTimes(2);
   });
 });

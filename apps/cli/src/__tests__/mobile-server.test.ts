@@ -388,6 +388,34 @@ describe('MobileServerManager', () => {
     }, 10000);
   });
 
+  describe('startExpo', () => {
+    it('starts Expo without forcing a Metro cache clear', async () => {
+      const mockProc = createMockProcess();
+      mockedSpawn.mockReturnValue(mockProc);
+
+      const { MobileServerManager } = await import('../mobile/mobile-server.js');
+      const manager = new MobileServerManager({
+        mobileProjectPath: MOBILE_DIR,
+        supabaseUrl: 'https://test.supabase.co',
+        supabaseAnonKey: 'test-key',
+        logDir: LOG_DIR,
+      });
+
+      const startPromise = manager.startExpo('https://abc123.ngrok-free.app');
+      mockProc.stdout.emit('data', Buffer.from('Metro waiting on exp://abc123.ngrok-free.app:443\n'));
+      await expect(startPromise).resolves.toBe(true);
+
+      expect(mockedSpawn).toHaveBeenCalledWith(
+        'npx',
+        ['expo', 'start', '--port', '8081'],
+        expect.objectContaining({
+          cwd: MOBILE_DIR,
+          stdio: ['ignore', 'pipe', 'pipe'],
+        })
+      );
+    });
+  });
+
   describe('stop', () => {
     it('should kill ngrok and expo processes', async () => {
       const ngrokProc = createMockProcess();

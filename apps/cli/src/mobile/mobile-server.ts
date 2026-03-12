@@ -331,7 +331,7 @@ export class MobileServerManager {
 
     this.expoLogStream = createWriteStream(join(this.logDir, 'expo.log'));
 
-    this.expoProcess = spawn('npx', ['expo', 'start', '--port', String(this.expoPort), '--clear'], {
+    this.expoProcess = spawn('npx', ['expo', 'start', '--port', String(this.expoPort)], {
       cwd: this.mobileProjectPath,
       env: {
         ...process.env,

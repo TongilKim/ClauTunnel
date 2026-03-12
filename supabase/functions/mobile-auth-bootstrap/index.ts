@@ -1,5 +1,9 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import {
+  decryptBootstrapRefreshToken,
+  encryptBootstrapRefreshToken,
+} from './crypto.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,7 +11,7 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-const BOOTSTRAP_TTL_MS = 60_000;
+const BOOTSTRAP_TTL_MS = 300_000;
 
 function json(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), {
@@ -50,11 +54,13 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = getEnv('SUPABASE_URL');
+    const anonKey = getEnv('SUPABASE_ANON_KEY');
     const serviceRoleKey = getEnv('SUPABASE_SERVICE_ROLE_KEY');
+    const bootstrapSecret = getEnv('MOBILE_AUTH_BOOTSTRAP_SECRET');
     const authHeader = req.headers.get('Authorization') ?? '';
 
     const serviceClient = createClient(supabaseUrl, serviceRoleKey);
-    const authedClient = createClient(supabaseUrl, serviceRoleKey, {
+    const authedClient = createClient(supabaseUrl, anonKey, {
       global: {
         headers: {
           Authorization: authHeader,
@@ -68,14 +74,6 @@ serve(async (req) => {
     }
 
     const nowIso = new Date().toISOString();
-    await serviceClient
-      .from('mobile_auth_bootstraps')
-      .delete()
-      .not('used_at', 'is', null);
-    await serviceClient
-      .from('mobile_auth_bootstraps')
-      .delete()
-      .lt('expires_at', nowIso);
 
     if (body.action === 'create') {
       const refreshToken =
@@ -96,11 +94,24 @@ serve(async (req) => {
       const code = generateCode();
       const codeHash = await sha256(code);
       const expiresAt = new Date(Date.now() + BOOTSTRAP_TTL_MS).toISOString();
+      const encryptedRefreshToken = await encryptBootstrapRefreshToken(
+        refreshToken,
+        bootstrapSecret
+      );
+
+      await serviceClient
+        .from('mobile_auth_bootstraps')
+        .delete()
+        .not('used_at', 'is', null);
+      await serviceClient
+        .from('mobile_auth_bootstraps')
+        .delete()
+        .lt('expires_at', nowIso);
 
       const { error } = await serviceClient.from('mobile_auth_bootstraps').insert({
         user_id: user.id,
         code_hash: codeHash,
-        refresh_token: refreshToken,
+        encrypted_refresh_token: encryptedRefreshToken,
         expires_at: expiresAt,
       });
 
@@ -124,18 +135,23 @@ serve(async (req) => {
         .eq('code_hash', codeHash)
         .is('used_at', null)
         .gt('expires_at', nowIso)
-        .select('refresh_token')
+        .select('encrypted_refresh_token')
         .maybeSingle();
 
       if (error) {
         return json(500, { error: error.message });
       }
 
-      if (!data?.refresh_token) {
+      if (!data?.encrypted_refresh_token) {
         return json(410, { error: 'Bootstrap code is invalid or expired' });
       }
 
-      return json(200, { refreshToken: data.refresh_token });
+      const refreshToken = await decryptBootstrapRefreshToken(
+        data.encrypted_refresh_token,
+        bootstrapSecret
+      );
+
+      return json(200, { refreshToken });
     }
 
     return json(400, { error: 'Unsupported action' });

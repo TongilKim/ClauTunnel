@@ -55,17 +55,19 @@ function getErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
-let _authListenerRegistered = false;
+let _authSubscription: { unsubscribe: () => void } | null = null;
 
 function listenForAuthChanges(set: (state: Partial<AuthState>) => void) {
-  if (_authListenerRegistered) return;
-  _authListenerRegistered = true;
-  supabase.auth.onAuthStateChange((_event, session) => {
+  _authSubscription?.unsubscribe();
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange((_event, session) => {
     set({
       session,
       user: session?.user ?? null,
     });
   });
+  _authSubscription = subscription;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
