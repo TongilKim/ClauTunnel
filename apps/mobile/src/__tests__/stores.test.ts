@@ -20,8 +20,6 @@ vi.mock('../services/supabase', () => ({
     auth: {
       getSession: vi.fn(),
       onAuthStateChange: vi.fn(),
-      signInWithPassword: vi.fn(),
-      signUp: vi.fn(),
       signOut: vi.fn(),
     },
     from: vi.fn(),
@@ -46,59 +44,6 @@ describe('Store Logic', () => {
       expect(initialState.session).toBeNull();
       expect(initialState.isLoading).toBe(true);
       expect(initialState.error).toBeNull();
-    });
-
-    it('should have signIn action that sets isLoading', () => {
-      // Mock the signIn flow
-      let isLoading = false;
-      let error: string | null = null;
-
-      const signIn = async (email: string, password: string) => {
-        isLoading = true;
-        error = null;
-
-        // Simulate API call
-        await new Promise((resolve) => setTimeout(resolve, 10));
-
-        // Simulate success
-        isLoading = false;
-      };
-
-      // Test that signIn sets isLoading
-      expect(isLoading).toBe(false);
-    });
-
-    it('should have signIn action that sets error on failure', () => {
-      let error: string | null = null;
-
-      const setError = (message: string) => {
-        error = message;
-      };
-
-      setError('Invalid credentials');
-      expect(error).toBe('Invalid credentials');
-    });
-
-    it('should have signUp action that sets isLoading', () => {
-      let isLoading = false;
-
-      const startLoading = () => {
-        isLoading = true;
-      };
-
-      startLoading();
-      expect(isLoading).toBe(true);
-    });
-
-    it('should have signUp action that sets error on failure', () => {
-      let error: string | null = null;
-
-      const setError = (message: string) => {
-        error = message;
-      };
-
-      setError('Email already in use');
-      expect(error).toBe('Email already in use');
     });
 
     it('should clear error', () => {

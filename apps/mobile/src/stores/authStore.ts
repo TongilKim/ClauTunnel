@@ -1,12 +1,10 @@
 import { create } from 'zustand';
 import { supabase } from '../services/supabase';
 import type { User, Session } from '@supabase/supabase-js';
-import * as SecureStore from 'expo-secure-store';
 import { useConnectionStore } from './connectionStore';
 import { useSessionStore } from './sessionStore';
 import {
   isTestMode,
-  MOCK_TEST_CREDENTIALS,
   MOCK_USER,
   MOCK_SESSION,
 } from '../utils/testMode';
@@ -21,14 +19,11 @@ interface AuthState {
   initialize: () => Promise<void>;
   claimBootstrapCode: (code: string, options?: { signal?: AbortSignal }) => Promise<boolean>;
   signInWithToken: (refreshToken: string, options?: { signal?: AbortSignal }) => Promise<boolean>;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
 }
 
 const _testMode = isTestMode();
-const TEST_MODE_AUTH_EMAIL_KEY = 'clautunnel:test-mode-auth-email';
 
 function buildMockAuthState(email = MOCK_USER.email) {
   return {
@@ -44,29 +39,6 @@ function buildMockAuthState(email = MOCK_USER.email) {
       },
     } as Session,
   };
-}
-async function loadPersistedMockAuthEmail(): Promise<string | null> {
-  try {
-    return await SecureStore.getItemAsync(TEST_MODE_AUTH_EMAIL_KEY);
-  } catch {
-    return null;
-  }
-}
-
-async function persistMockAuthEmail(email: string) {
-  try {
-    await SecureStore.setItemAsync(TEST_MODE_AUTH_EMAIL_KEY, email);
-  } catch {
-    // Ignore SecureStore failures in E2E mode.
-  }
-}
-
-async function clearPersistedMockAuthEmail() {
-  try {
-    await SecureStore.deleteItemAsync(TEST_MODE_AUTH_EMAIL_KEY);
-  } catch {
-    // Ignore SecureStore failures in E2E mode.
-  }
 }
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -143,15 +115,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   initialize: async () => {
     if (_testMode) {
       set({ isLoading: true, error: null });
-      const email = await loadPersistedMockAuthEmail();
-      if (email) {
-        set({
-          ...buildMockAuthState(email),
-          isLoading: false,
-          error: null,
-        });
-        return;
-      }
       set({
         ...buildMockAuthState(),
         isLoading: false,
@@ -291,79 +254,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  signIn: async (email: string, password: string) => {
-    if (_testMode) {
-      set({
-        ...buildMockAuthState(email.trim().toLowerCase()),
-        isLoading: false,
-        error: null,
-      });
-      await persistMockAuthEmail(email.trim().toLowerCase());
-      return;
-    }
-
-    try {
-      set({ isLoading: true, error: null });
-
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-
-      set({
-        session: data.session,
-        user: data.user,
-        isLoading: false,
-      });
-    } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to sign in',
-        isLoading: false,
-      });
-    }
-  },
-
-  signUp: async (email: string, password: string) => {
-    if (_testMode) {
-      set({ isLoading: true, error: null });
-      set({
-        ...buildMockAuthState(email.trim().toLowerCase() || MOCK_USER.email),
-        isLoading: false,
-        error: null,
-      });
-      await persistMockAuthEmail(email.trim().toLowerCase() || MOCK_USER.email);
-      return;
-    }
-
-    try {
-      set({ isLoading: true, error: null });
-
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-
-      set({
-        session: data.session,
-        user: data.user,
-        isLoading: false,
-      });
-    } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to sign up',
-        isLoading: false,
-      });
-    }
-  },
-
   signOut: async () => {
     if (_testMode) {
       applySignedOutState(set);
-      await clearPersistedMockAuthEmail();
       return;
     }
 

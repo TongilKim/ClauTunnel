@@ -26,11 +26,6 @@ export const MOCK_USER = {
   email: 'test@clautunnel.com',
 } as const;
 
-export const MOCK_TEST_CREDENTIALS = {
-  email: MOCK_USER.email,
-  password: 'password123',
-} as const;
-
 export const MOCK_SESSION = {
   access_token: 'test-token',
   refresh_token: 'test-refresh',
