@@ -6,7 +6,6 @@ import { useConnectionStore } from './connectionStore';
 import { useSessionStore } from './sessionStore';
 import {
   isTestMode,
-  MOCK_TEST_CREDENTIALS,
   MOCK_USER,
   MOCK_SESSION,
 } from '../utils/testMode';
@@ -21,8 +20,6 @@ interface AuthState {
   initialize: () => Promise<void>;
   claimBootstrapCode: (code: string, options?: { signal?: AbortSignal }) => Promise<boolean>;
   signInWithToken: (refreshToken: string, options?: { signal?: AbortSignal }) => Promise<boolean>;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
 }
@@ -50,14 +47,6 @@ async function loadPersistedMockAuthEmail(): Promise<string | null> {
     return await SecureStore.getItemAsync(TEST_MODE_AUTH_EMAIL_KEY);
   } catch {
     return null;
-  }
-}
-
-async function persistMockAuthEmail(email: string) {
-  try {
-    await SecureStore.setItemAsync(TEST_MODE_AUTH_EMAIL_KEY, email);
-  } catch {
-    // Ignore SecureStore failures in E2E mode.
   }
 }
 
@@ -288,75 +277,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isLoading: false,
       });
       return false;
-    }
-  },
-
-  signIn: async (email: string, password: string) => {
-    if (_testMode) {
-      set({
-        ...buildMockAuthState(email.trim().toLowerCase()),
-        isLoading: false,
-        error: null,
-      });
-      await persistMockAuthEmail(email.trim().toLowerCase());
-      return;
-    }
-
-    try {
-      set({ isLoading: true, error: null });
-
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-
-      set({
-        session: data.session,
-        user: data.user,
-        isLoading: false,
-      });
-    } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to sign in',
-        isLoading: false,
-      });
-    }
-  },
-
-  signUp: async (email: string, password: string) => {
-    if (_testMode) {
-      set({ isLoading: true, error: null });
-      set({
-        ...buildMockAuthState(email.trim().toLowerCase() || MOCK_USER.email),
-        isLoading: false,
-        error: null,
-      });
-      await persistMockAuthEmail(email.trim().toLowerCase() || MOCK_USER.email);
-      return;
-    }
-
-    try {
-      set({ isLoading: true, error: null });
-
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-
-      set({
-        session: data.session,
-        user: data.user,
-        isLoading: false,
-      });
-    } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to sign up',
-        isLoading: false,
-      });
     }
   },
 
