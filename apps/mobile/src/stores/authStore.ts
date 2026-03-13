@@ -3,7 +3,6 @@ import { supabase } from '../services/supabase';
 import type { User, Session } from '@supabase/supabase-js';
 import {
   isTestMode,
-  MOCK_TEST_CREDENTIALS,
   MOCK_USER,
   MOCK_SESSION,
 } from '../utils/testMode';
@@ -40,15 +39,19 @@ function buildMockAuthState(email = MOCK_USER.email) {
   };
 }
 
-export const useAuthStore = create<AuthState>((set, get) => ({
-  user: null,
-  session: null,
+export const useAuthStore = create<AuthState>((set) => ({
+  user: _testMode ? (buildMockAuthState().user as User) : null,
+  session: _testMode ? (buildMockAuthState().session as Session) : null,
   isLoading: false,
   error: null,
 
   initialize: async () => {
     if (_testMode) {
-      set({ isLoading: false, error: null, user: null, session: null });
+      set({
+        ...buildMockAuthState(),
+        isLoading: false,
+        error: null,
+      });
       return;
     }
 
@@ -86,22 +89,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   signIn: async (email: string, password: string) => {
     if (_testMode) {
-      set({ isLoading: true, error: null });
-
-      if (
-        email.trim().toLowerCase() !== MOCK_TEST_CREDENTIALS.email ||
-        password !== MOCK_TEST_CREDENTIALS.password
-      ) {
-        set({
-          error: 'Invalid email or password',
-          isLoading: false,
-        });
-        return;
-      }
-
       set({
         ...buildMockAuthState(email.trim().toLowerCase()),
         isLoading: false,
+        error: null,
       });
       return;
     }
@@ -135,6 +126,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({
         ...buildMockAuthState(email.trim().toLowerCase() || MOCK_USER.email),
         isLoading: false,
+        error: null,
       });
       return;
     }

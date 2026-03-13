@@ -1,39 +1,18 @@
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
   useColorScheme,
-  Alert,
   ScrollView,
 } from 'react-native';
 import Constants from 'expo-constants';
 import { useAuthStore } from '../../src/stores/authStore';
-import { isTestMode } from '../../src/utils/testMode';
 
 export default function SettingsScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
-  const { user, signOut, isLoading } = useAuthStore();
-  const showLogout = isTestMode();
-
-  const handleLogout = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: async () => {
-            await signOut();
-          },
-        },
-      ]
-    );
-  };
+  const { user } = useAuthStore();
 
   const appVersion = Constants.expoConfig?.version || '0.1.0';
 
@@ -54,13 +33,11 @@ export default function SettingsScreen() {
               {user?.email || 'Not signed in'}
             </Text>
           </View>
-          {!showLogout && (
-            <View style={styles.noteRow}>
-              <Text style={[styles.noteText, isDark && styles.noteTextDark]}>
-                Account access is managed from the CLI QR flow.
-              </Text>
-            </View>
-          )}
+          <View style={styles.noteRow}>
+            <Text style={[styles.noteText, isDark && styles.noteTextDark]}>
+              Account access is managed from the CLI QR flow.
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -80,29 +57,6 @@ export default function SettingsScreen() {
           </View>
         </View>
       </View>
-
-      {showLogout && (
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, isDark && styles.sectionTitleDark]}>
-            Test Mode
-          </Text>
-          <View style={[styles.card, isDark && styles.cardDark]}>
-            <View style={styles.noteRow}>
-              <Text style={[styles.noteText, isDark && styles.noteTextDark]}>
-                Logout remains available in E2E test mode only.
-              </Text>
-            </View>
-          </View>
-          <TouchableOpacity
-            testID="settings-logout-button"
-            style={[styles.logoutButton, isLoading && styles.logoutButtonDisabled]}
-            onPress={handleLogout}
-            disabled={isLoading}
-          >
-            <Text style={styles.logoutButtonText}>Sign Out</Text>
-          </TouchableOpacity>
-        </View>
-      )}
     </ScrollView>
   );
 }
@@ -172,20 +126,5 @@ const styles = StyleSheet.create({
   },
   noteTextDark: {
     color: '#9ca3af',
-  },
-  logoutButton: {
-    backgroundColor: '#ef4444',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  logoutButtonDisabled: {
-    opacity: 0.7,
-  },
-  logoutButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
   },
 });
