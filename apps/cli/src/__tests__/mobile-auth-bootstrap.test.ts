@@ -32,7 +32,7 @@ describe('createMobileAuthBootstrap', () => {
         method: 'POST',
         headers: {
           apikey: 'anon-key',
-          Authorization: 'Bearer access-token',
+          Authorization: 'Bearer anon-key',
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
