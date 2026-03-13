@@ -10,8 +10,9 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
-import { Link } from 'expo-router';
+import { Link, Redirect } from 'expo-router';
 import { useAuthStore } from '../../src/stores/authStore';
+import { isTestMode } from '../../src/utils/testMode';
 
 export default function RegisterScreen() {
   const [email, setEmail] = useState('');
@@ -23,6 +24,10 @@ export default function RegisterScreen() {
   const isDark = colorScheme === 'dark';
 
   const { signUp, isLoading, error, clearError } = useAuthStore();
+
+  if (!isTestMode()) {
+    return <Redirect href="/(auth)" />;
+  }
 
   const handleRegister = async () => {
     setLocalError('');

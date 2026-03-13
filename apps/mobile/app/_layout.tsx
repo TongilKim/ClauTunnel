@@ -15,10 +15,11 @@ function useProtectedRoute(user: any, isLoading: boolean) {
   }
 
   const inAuthGroup = segments[0] === '(auth)';
+  const authEntry = isTestMode() ? '/(auth)/login' : '/(auth)';
 
   if (!user && !inAuthGroup) {
-    // Not authenticated, redirect to login
-    return '/(auth)/login';
+    // Not authenticated, redirect to the auth entry point for this build.
+    return authEntry;
   }
 
   if (user && inAuthGroup) {
