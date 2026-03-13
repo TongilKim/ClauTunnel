@@ -96,8 +96,9 @@ This command does everything automatically:
 
 1. Open **Expo Go** on your phone
 2. Scan the **QR code** shown in your terminal
-3. Log in with the same email and password you used in `clautunnel signup`
-4. Tap **"+ New Session"** on your machine to start chatting with Claude
+3. The app signs in automatically using the one-time bootstrap code from `clautunnel start`
+4. To switch accounts or log out, use `clautunnel login` / `clautunnel logout` on the CLI
+5. Tap **"+ New Session"** on your machine to start chatting with Claude
 
 ## Development
 

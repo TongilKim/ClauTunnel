@@ -2,17 +2,9 @@ appId: com.clautunnel.app
 ---
 - launchApp:
     clearState: true
-- tapOn:
-    id: "login-email-input"
-- inputText: "test@clautunnel.com"
-- tapOn:
-    id: "login-password-input"
-- inputText: "password123"
-- tapOn:
-    id: "login-button"
 - extendedWaitUntil:
     visible:
-      id: "session-card-test-session-1"
+      id: "sessions-stats-total"
     timeout: 5000
 - tapOn:
     id: "session-card-test-session-1"

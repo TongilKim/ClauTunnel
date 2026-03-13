@@ -18,7 +18,7 @@ export default function ConnectScreen() {
           to open this app.
         </Text>
         <Text style={[styles.caption, isDark && styles.captionDark]}>
-          Mobile login and signup are managed from the CLI flow.
+          Login and logout are managed from the CLI flow.
         </Text>
       </View>
     </View>

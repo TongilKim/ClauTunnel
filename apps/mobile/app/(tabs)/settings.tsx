@@ -35,7 +35,7 @@ export default function SettingsScreen() {
           </View>
           <View style={styles.noteRow}>
             <Text style={[styles.noteText, isDark && styles.noteTextDark]}>
-              Account access is managed from the CLI QR flow.
+              Login and logout are managed from the CLI.
             </Text>
           </View>
         </View>

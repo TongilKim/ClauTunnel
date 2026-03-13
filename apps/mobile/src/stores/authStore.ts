@@ -1,8 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../services/supabase';
 import type { User, Session } from '@supabase/supabase-js';
-import { useConnectionStore } from './connectionStore';
-import { useSessionStore } from './sessionStore';
 import {
   isTestMode,
   MOCK_USER,
@@ -19,7 +17,6 @@ interface AuthState {
   initialize: () => Promise<void>;
   claimBootstrapCode: (code: string, options?: { signal?: AbortSignal }) => Promise<boolean>;
   signInWithToken: (refreshToken: string, options?: { signal?: AbortSignal }) => Promise<boolean>;
-  signOut: () => Promise<void>;
   clearError: () => void;
 }
 
@@ -56,39 +53,6 @@ function getErrorMessage(error: unknown, fallback: string) {
 
 function isAbortError(error: unknown) {
   return error instanceof Error && error.name === 'AbortError';
-}
-
-function clearSessionStoreForSignOut() {
-  useSessionStore.getState().unsubscribeFromPresence();
-  useSessionStore.getState().unsubscribeMachinePresence();
-  useSessionStore.setState({
-    sessions: [],
-    machines: [],
-    isLoading: false,
-    error: null,
-    pendingSessionId: null,
-    openSwipeableId: null,
-    sessionOnlineStatus: {},
-    machineOnlineStatus: {},
-    isStartingSession: null,
-    startSessionError: null,
-  });
-}
-
-function applySignedOutState(set: (state: Partial<AuthState>) => void) {
-  clearSessionStoreForSignOut();
-  const disconnectResult = useConnectionStore.getState().disconnect();
-  if (disconnectResult && typeof disconnectResult.then === 'function') {
-    void disconnectResult.catch(() => {
-      // Best-effort channel cleanup.
-    });
-  }
-  set({
-    session: null,
-    user: null,
-    isLoading: false,
-    error: null,
-  });
 }
 
 let _authSubscription: { unsubscribe: () => void } | null = null;
@@ -251,22 +215,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isLoading: false,
       });
       return false;
-    }
-  },
-
-  signOut: async () => {
-    if (_testMode) {
-      applySignedOutState(set);
-      return;
-    }
-
-    set({ isLoading: true, error: null });
-    applySignedOutState(set);
-
-    try {
-      await supabase.auth.signOut({ scope: 'global' });
-    } catch (error) {
-      console.warn('[authStore] Remote sign-out failed:', getErrorMessage(error, 'Unknown sign-out error'));
     }
   },
 

@@ -5,29 +5,6 @@ const mockOnAuthStateChange = vi.fn();
 const mockRefreshSession = vi.fn();
 const mockSetSession = vi.fn();
 const mockInvoke = vi.fn();
-const mockSignOut = vi.fn();
-const mockConnectionDisconnect = vi.fn().mockResolvedValue(undefined);
-const mockUnsubscribeFromPresence = vi.fn();
-const mockUnsubscribeMachinePresence = vi.fn();
-const mockSessionSetState = vi.fn();
-
-vi.mock('../stores/connectionStore', () => ({
-  useConnectionStore: {
-    getState: () => ({
-      disconnect: mockConnectionDisconnect,
-    }),
-  },
-}));
-
-vi.mock('../stores/sessionStore', () => ({
-  useSessionStore: {
-    getState: () => ({
-      unsubscribeFromPresence: mockUnsubscribeFromPresence,
-      unsubscribeMachinePresence: mockUnsubscribeMachinePresence,
-    }),
-    setState: mockSessionSetState,
-  },
-}));
 
 vi.mock('../services/supabase', () => ({
   supabase: {
@@ -36,7 +13,6 @@ vi.mock('../services/supabase', () => ({
       onAuthStateChange: mockOnAuthStateChange,
       refreshSession: mockRefreshSession,
       setSession: mockSetSession,
-      signOut: mockSignOut,
     },
     functions: {
       invoke: mockInvoke,
@@ -183,47 +159,8 @@ describe('AuthStore bootstrap auth', () => {
     expect(useAuthStore.getState().isLoading).toBe(false);
   });
 
-  it('clears local auth and session state immediately on sign out', async () => {
-    let resolveRemoteSignOut: (() => void) | null = null;
-    mockSignOut.mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          resolveRemoteSignOut = () => resolve({ error: null });
-        })
-    );
-
+  it('does not expose a mobile signOut action', async () => {
     const { useAuthStore } = await import('../stores/authStore');
-
-    useAuthStore.setState({
-      user: { id: 'user-1', email: 'user@example.com' } as any,
-      session: { access_token: 'token', refresh_token: 'refresh' } as any,
-      isLoading: false,
-      error: null,
-    });
-
-    const pending = useAuthStore.getState().signOut();
-
-    expect(useAuthStore.getState().user).toBeNull();
-    expect(useAuthStore.getState().session).toBeNull();
-    expect(useAuthStore.getState().isLoading).toBe(false);
-    expect(mockUnsubscribeFromPresence).toHaveBeenCalledTimes(1);
-    expect(mockUnsubscribeMachinePresence).toHaveBeenCalledTimes(1);
-    expect(mockConnectionDisconnect).toHaveBeenCalledTimes(1);
-    expect(mockSessionSetState).toHaveBeenCalledWith({
-      sessions: [],
-      machines: [],
-      isLoading: false,
-      error: null,
-      pendingSessionId: null,
-      openSwipeableId: null,
-      sessionOnlineStatus: {},
-      machineOnlineStatus: {},
-      isStartingSession: null,
-      startSessionError: null,
-    });
-
-    resolveRemoteSignOut?.();
-    await expect(pending).resolves.toBeUndefined();
-    expect(mockSignOut).toHaveBeenCalledWith({ scope: 'global' });
+    expect((useAuthStore.getState() as Record<string, unknown>).signOut).toBeUndefined();
   });
 });
