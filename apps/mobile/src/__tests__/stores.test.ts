@@ -20,8 +20,6 @@ vi.mock('../services/supabase', () => ({
     auth: {
       getSession: vi.fn(),
       onAuthStateChange: vi.fn(),
-      signInWithPassword: vi.fn(),
-      signUp: vi.fn(),
       signOut: vi.fn(),
     },
     from: vi.fn(),

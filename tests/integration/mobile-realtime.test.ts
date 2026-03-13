@@ -43,17 +43,6 @@ const mockSupabase = {
       }),
     }),
   })),
-  auth: {
-    getSession: vi.fn().mockResolvedValue({
-      data: { session: { user: { id: 'user-123' } } },
-      error: null,
-    }),
-    signInWithPassword: vi.fn().mockResolvedValue({
-      data: { user: { id: 'user-123', email: 'test@example.com' }, session: {} },
-      error: null,
-    }),
-    signOut: vi.fn().mockResolvedValue({ error: null }),
-  },
 };
 
 describe('Mobile to Realtime Integration', () => {
@@ -246,53 +235,6 @@ describe('Mobile to Realtime Integration', () => {
       };
 
       await expect(sendInput('test')).rejects.toThrow('Not connected');
-    });
-  });
-
-  describe('Authentication Flow', () => {
-    it('should sign in user successfully', async () => {
-      const { data, error } = await mockSupabase.auth.signInWithPassword({
-        email: 'test@example.com',
-        password: 'password123',
-      });
-
-      expect(error).toBeNull();
-      expect(data.user).toBeDefined();
-      expect(data.user.email).toBe('test@example.com');
-    });
-
-    it('should handle sign in failure', async () => {
-      mockSupabase.auth.signInWithPassword = vi.fn().mockResolvedValue({
-        data: { user: null, session: null },
-        error: { message: 'Invalid credentials' },
-      });
-
-      const { data, error } = await mockSupabase.auth.signInWithPassword({
-        email: 'wrong@example.com',
-        password: 'wrong',
-      });
-
-      expect(error).toBeDefined();
-      expect(error.message).toBe('Invalid credentials');
-    });
-
-    it('should sign out and clear session', async () => {
-      const { error } = await mockSupabase.auth.signOut();
-
-      expect(error).toBeNull();
-      expect(mockSupabase.auth.signOut).toHaveBeenCalled();
-    });
-
-    it('should redirect to login when not authenticated', async () => {
-      mockSupabase.auth.getSession = vi.fn().mockResolvedValue({
-        data: { session: null },
-        error: null,
-      });
-
-      const { data } = await mockSupabase.auth.getSession();
-
-      expect(data.session).toBeNull();
-      // In real app, this would trigger redirect to login
     });
   });
 
