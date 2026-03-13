@@ -6,8 +6,10 @@ import {
   isTestMode,
   MOCK_QUESTION_DATA,
   MOCK_PERMISSION_REQUEST,
+  queueMockMutationFailure,
 } from '../utils/testMode';
 import { useConnectionStore } from '../stores/connectionStore';
+import { useSessionStore } from '../stores/sessionStore';
 
 export function TestModePanel() {
   const [expanded, setExpanded] = useState(false);
@@ -50,6 +52,58 @@ export function TestModePanel() {
     }, 50);
   };
 
+  const setReconnecting = () => {
+    useConnectionStore.setState({
+      state: 'reconnecting',
+      isTyping: false,
+      isMessageQueued: true,
+      error: null,
+    });
+  };
+
+  const restoreConnected = () => {
+    const { sessionId } = useConnectionStore.getState();
+    useConnectionStore.setState({
+      state: 'connected',
+      isCliOnline: true,
+      isTyping: false,
+      isMessageQueued: false,
+      error: null,
+    });
+
+    if (sessionId) {
+      useSessionStore.setState((state) => ({
+        sessionOnlineStatus: {
+          ...state.sessionOnlineStatus,
+          [sessionId]: true,
+        },
+      }));
+    }
+  };
+
+  const toggleCliOffline = () => {
+    const { sessionId } = useConnectionStore.getState();
+    if (!sessionId) return;
+
+    useSessionStore.setState((state) => {
+      const current = state.sessionOnlineStatus[sessionId] ?? true;
+      return {
+        sessionOnlineStatus: {
+          ...state.sessionOnlineStatus,
+          [sessionId]: !current,
+        },
+      };
+    });
+  };
+
+  const armStartSessionError = () => {
+    queueMockMutationFailure('start-session', 'Mock start-session failure from test mode');
+  };
+
+  const armTitleUpdateError = () => {
+    queueMockMutationFailure('update-title', 'Mock title update failure from test mode');
+  };
+
   return (
     <View style={styles.container}>
       <TouchableOpacity
@@ -88,6 +142,41 @@ export function TestModePanel() {
             onPress={injectToolUseWidthPreview}
           >
             <Text style={styles.buttonText}>Inject Tool Use</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            testID="test-mode-trigger-reconnecting"
+            style={styles.button}
+            onPress={setReconnecting}
+          >
+            <Text style={styles.buttonText}>Set Reconnecting</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            testID="test-mode-trigger-connected"
+            style={styles.button}
+            onPress={restoreConnected}
+          >
+            <Text style={styles.buttonText}>Restore Connected</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            testID="test-mode-trigger-cli-offline"
+            style={styles.button}
+            onPress={toggleCliOffline}
+          >
+            <Text style={styles.buttonText}>Toggle CLI Offline</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            testID="test-mode-trigger-start-session-error"
+            style={styles.button}
+            onPress={armStartSessionError}
+          >
+            <Text style={styles.buttonText}>Arm Start Error</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            testID="test-mode-trigger-title-error"
+            style={styles.button}
+            onPress={armTitleUpdateError}
+          >
+            <Text style={styles.buttonText}>Arm Title Error</Text>
           </TouchableOpacity>
         </View>
       )}

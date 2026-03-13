@@ -1,0 +1,42 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "login-email-input"
+- inputText: "test@clautunnel.com"
+- tapOn:
+    id: "login-password-input"
+- inputText: "password123"
+- tapOn:
+    id: "login-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-card-test-session-1"
+    timeout: 5000
+- tapOn:
+    id: "session-card-test-session-1"
+- extendedWaitUntil:
+    visible:
+      id: "session-status-badge"
+    timeout: 3000
+- tapOn:
+    id: "test-mode-toggle"
+- tapOn:
+    id: "test-mode-trigger-reconnecting"
+- assertVisible: "Connecting"
+- tapOn:
+    id: "test-mode-trigger-connected"
+- extendedWaitUntil:
+    visible: "Online"
+    timeout: 3000
+- tapOn:
+    id: "test-mode-trigger-cli-offline"
+- extendedWaitUntil:
+    visible: "CLI Offline"
+    timeout: 3000
+- tapOn:
+    id: "session-back-button"
+- extendedWaitUntil:
+    visible: "Offline"
+    timeout: 3000

@@ -8,6 +8,7 @@ import {
   buildMockMachines,
   buildMockSessions,
   buildMockStartedSession,
+  consumeMockMutationFailure,
   isTestMode,
 } from '../utils/testMode';
 
@@ -121,6 +122,11 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
     if (_testMode) {
       set({ pendingSessionId: sessionId });
       setTimeout(() => {
+        const failure = consumeMockMutationFailure('end-session');
+        if (failure) {
+          set({ pendingSessionId: null, error: failure });
+          return;
+        }
         set((state) => ({
           sessions: state.sessions.map((session) =>
             session.id === sessionId
@@ -202,6 +208,11 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
     if (_testMode) {
       set({ pendingSessionId: sessionId });
       setTimeout(() => {
+        const failure = consumeMockMutationFailure('delete-session');
+        if (failure) {
+          set({ pendingSessionId: null, error: failure });
+          return;
+        }
         set((state) => {
           const nextOnlineStatus = { ...state.sessionOnlineStatus };
           delete nextOnlineStatus[sessionId];
@@ -424,6 +435,11 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
     const dbTitle = title.trim() === '' ? null : title;
 
     if (_testMode) {
+      const failure = consumeMockMutationFailure('update-title');
+      if (failure) {
+        set({ error: failure });
+        return;
+      }
       set((state) => ({
         sessions: state.sessions.map((s) =>
           s.id === sessionId
@@ -454,6 +470,14 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
     if (_testMode) {
       set({ isStartingSession: machineId, startSessionError: null });
       setTimeout(() => {
+        const failure = consumeMockMutationFailure('start-session');
+        if (failure) {
+          set({
+            isStartingSession: null,
+            startSessionError: failure,
+          });
+          return;
+        }
         const nextIndex = get().sessions.length + 1;
         const newSession = buildMockStartedSession(nextIndex);
         set((state) => ({

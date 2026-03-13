@@ -1,0 +1,45 @@
+appId: com.clautunnel.app
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "login-email-input"
+- inputText: "test@clautunnel.com"
+- tapOn:
+    id: "login-password-input"
+- inputText: "password123"
+- tapOn:
+    id: "login-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-card-test-session-1"
+    timeout: 5000
+- tapOn:
+    id: "session-card-test-session-1"
+- tapOn:
+    id: "input-commands-button"
+- extendedWaitUntil:
+    visible: "command-resume"
+    timeout: 3000
+- tapOn: "command-resume"
+- extendedWaitUntil:
+    visible:
+      id: "resume-session-modal"
+    timeout: 3000
+- tapOn:
+    id: "resume-session-option-test-session-2"
+- extendedWaitUntil:
+    visible: "Resumed mock answer from previous session"
+    timeout: 3000
+- assertVisible: "Resumed mock session mock-sdk-session-ended-1"
+- tapOn:
+    id: "input-commands-button"
+- extendedWaitUntil:
+    visible: "command-resume"
+    timeout: 3000
+- tapOn: "command-resume"
+- tapOn:
+    id: "resume-session-option-test-session-2"
+- extendedWaitUntil:
+    visible: "Resume history already loaded for mock-sdk-session-ended-1"
+    timeout: 3000

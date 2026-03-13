@@ -10,6 +10,20 @@ CONFIG_FILE="$CONFIG_DIR/config.json"
 echo "=== ClauTunnel Fresh User Reset ==="
 echo ""
 
+# ─── Step 0: Kill running processes ──────────────────────────────────────────
+
+echo "[0/5] Stopping running processes..."
+if pgrep -f "clautunnel" > /dev/null 2>&1; then
+  pkill -f "clautunnel" 2>/dev/null && echo "  - clautunnel stopped" || echo "  - clautunnel: could not stop"
+else
+  echo "  - clautunnel: not running"
+fi
+if pgrep -x "ngrok" > /dev/null 2>&1; then
+  killall ngrok 2>/dev/null && echo "  - ngrok stopped" || echo "  - ngrok: could not stop"
+else
+  echo "  - ngrok: not running"
+fi
+
 # ─── Step 1: Clean Supabase DB (before deleting local config) ───────────────
 
 if [ -f "$CONFIG_FILE" ]; then
@@ -84,6 +98,19 @@ else
   echo "  - not installed, skipped"
 fi
 
+# Remove ngrok config (authtoken persists after uninstall)
+NGROK_CONFIG_MACOS="$HOME/Library/Application Support/ngrok/ngrok.yml"
+NGROK_CONFIG_LINUX="$HOME/.config/ngrok/ngrok.yml"
+if [ -f "$NGROK_CONFIG_MACOS" ]; then
+  rm -f "$NGROK_CONFIG_MACOS"
+  echo "  - ngrok config removed ($NGROK_CONFIG_MACOS)"
+elif [ -f "$NGROK_CONFIG_LINUX" ]; then
+  rm -f "$NGROK_CONFIG_LINUX"
+  echo "  - ngrok config removed ($NGROK_CONFIG_LINUX)"
+else
+  echo "  - ngrok config: already clean"
+fi
+
 # ─── Step 5: Remove local data ──────────────────────────────────────────────
 
 echo "[5/5] Removing local data (~/.clautunnel)..."
@@ -94,10 +121,23 @@ else
   echo "  - already clean"
 fi
 
+# ─── Clean local dev .env (bootstrap code may linger) ────────────────────────
+# Note: mobile_auth_bootstraps table rows are auto-cleaned by the Edge Function
+# and protected by RLS (USING false), so we skip DB-level cleanup here.
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+MOBILE_ENV="$SCRIPT_DIR/../apps/mobile/.env"
+if [ -f "$MOBILE_ENV" ]; then
+  rm -f "$MOBILE_ENV"
+  echo "  - apps/mobile/.env removed"
+fi
+
 echo ""
 echo "Done! Fresh user state restored."
+echo ""
 echo "Next steps:"
-echo "  1. npm install -g @tongil_kim/clautunnel"
-echo "  2. clautunnel setup"
-echo "  3. clautunnel login"
-echo "  4. clautunnel start"
+echo "  1. Delete Expo Go from your phone (clears saved auth session)"
+echo "  2. npm install -g @tongil_kim/clautunnel"
+echo "  3. clautunnel setup"
+echo "  4. clautunnel login"
+echo "  5. clautunnel start"

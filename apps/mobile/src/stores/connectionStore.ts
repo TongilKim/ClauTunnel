@@ -5,7 +5,11 @@ import {
   buildMockAnswerSummary,
   buildMockClaudeResponse,
   buildMockPermissionSummary,
+  buildMockResumeHistoryMessages,
+  clearLoadedMockResumeHistory,
+  hasLoadedMockResumeHistory,
   isTestMode,
+  markLoadedMockResumeHistory,
   MOCK_COMMANDS,
   MOCK_MESSAGES,
   MOCK_MODELS,
@@ -163,6 +167,7 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
   connect: async (sessionId: string) => {
     try {
       clearMockActions();
+      clearLoadedMockResumeHistory();
 
       // Clear all previous session state - each session has its own messages, typing state, model, commands, etc.
       set({
@@ -465,6 +470,7 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
 
   disconnect: async () => {
     clearMockActions();
+    clearLoadedMockResumeHistory();
 
     if (outputChannel) {
       await supabase.removeChannel(outputChannel);
@@ -512,7 +518,7 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
       scheduleMockAction(() => {
         const response: RealtimeMessage = {
           type: 'output',
-          content: buildMockClaudeResponse(content),
+          content: buildMockClaudeResponse(content, attachments?.length ?? 0),
           timestamp: Date.now(),
           seq: ++seq,
         };
@@ -680,6 +686,26 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
 
   sendResumeRequest: async (sdkSessionId: string) => {
     if (isTestMode() && get().state === 'connected') {
+      if (hasLoadedMockResumeHistory(sdkSessionId)) {
+        const duplicateNotice: RealtimeMessage = {
+          type: 'system',
+          content: `Resume history already loaded for ${sdkSessionId}`,
+          timestamp: Date.now(),
+          seq: ++seq,
+        };
+
+        set((state) => ({
+          messages: [...state.messages, duplicateNotice],
+          lastSeq: duplicateNotice.seq,
+          isTyping: false,
+          error: null,
+        }));
+        return;
+      }
+
+      const currentMessages = get().messages;
+      const oldestSeq = currentMessages[0]?.seq ?? 1;
+      const resumedMessages = buildMockResumeHistoryMessages(oldestSeq - 2);
       const message: RealtimeMessage = {
         type: 'system',
         content: `Resumed mock session ${sdkSessionId}`,
@@ -687,11 +713,13 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
         seq: ++seq,
       };
 
+      markLoadedMockResumeHistory(sdkSessionId);
       set((state) => ({
-        messages: [...state.messages, message],
+        messages: [...resumedMessages, ...state.messages, message],
         lastSeq: message.seq,
         isTyping: false,
         error: null,
+        oldestLoadedSeq: resumedMessages[0]?.seq ?? state.oldestLoadedSeq,
       }));
       return;
     }

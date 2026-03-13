@@ -116,10 +116,9 @@ appId: com.clautunnel.app
 - assertVisible:
     id: "machine-section-test-machine-1"
 
-# Navigate to settings — tap the right half of the bottom tab bar
-# (Expo Router v6 tabs don't expose testID or text to Maestro)
+# Navigate to settings
 - tapOn:
-    point: "75%,93%"
+    id: "tab-settings"
 - extendedWaitUntil:
     visible:
       id: "settings-email"

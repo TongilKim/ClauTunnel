@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useColorScheme, View, ActivityIndicator } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuthStore } from '../src/stores/authStore';
+import { isTestMode } from '../src/utils/testMode';
 
 function useProtectedRoute(user: any, isLoading: boolean) {
   const segments = useSegments();
@@ -32,12 +33,33 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
-  const { user, isLoading, initialize } = useAuthStore();
+  const { user, isLoading, initialize, claimBootstrapCode } = useAuthStore();
 
-  // Initialize auth on app load.
+  // Initialize auth on app load — claim one-time CLI bootstrap code if available
   useEffect(() => {
-    initialize();
-  }, [initialize]);
+    const controller = new AbortController();
+
+    const handleAuth = async () => {
+      // Skip bootstrap in test mode — initialize() handles mock auth persistence
+      if (!isTestMode()) {
+        const bootstrapCode = process.env.EXPO_PUBLIC_MOBILE_BOOTSTRAP_CODE;
+        if (bootstrapCode) {
+          const success = await claimBootstrapCode(bootstrapCode, {
+            signal: controller.signal,
+          });
+          if (success) return;
+          if (controller.signal.aborted) return;
+        }
+      }
+      void initialize();
+    };
+
+    void handleAuth();
+
+    return () => {
+      controller.abort();
+    };
+  }, [claimBootstrapCode, initialize]);
 
   const redirectTo = useProtectedRoute(user, isLoading);
 

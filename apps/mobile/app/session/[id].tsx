@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,9 @@ import {
   Platform,
   TouchableOpacity,
   Alert,
+  Modal,
+  Pressable,
+  TextInput,
 } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,6 +28,8 @@ export default function SessionScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
 
   const {
     connect,
@@ -39,28 +44,21 @@ export default function SessionScreen() {
     clearPendingPermissionRequest,
   } = useConnectionStore();
 
-  const { sessions, updateSessionTitle, sessionOnlineStatus } = useSessionStore();
+  const { sessions, updateSessionTitle, sessionOnlineStatus, error: sessionError, clearError } = useSessionStore();
   const isCliOnline = sessionOnlineStatus[id!] ?? null;
   const session = sessions.find((s) => s.id === id);
 
   const handleEditTitle = () => {
-    Alert.prompt(
-      'Rename Session',
-      'Enter a new name for this session',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Save',
-          onPress: (value?: string) => {
-            if (value !== undefined && id) {
-              updateSessionTitle(id, value);
-            }
-          },
-        },
-      ],
-      'plain-text',
-      session?.title || ''
-    );
+    setRenameValue(session?.title || '');
+    setShowRenameModal(true);
+  };
+
+  const handleRenameSave = async () => {
+    if (!id) return;
+    await updateSessionTitle(id, renameValue);
+    if (!useSessionStore.getState().error) {
+      setShowRenameModal(false);
+    }
   };
 
   // Compute effective status for badge display
@@ -91,6 +89,14 @@ export default function SessionScreen() {
     }
   }, [state]);
 
+  useEffect(() => {
+    if (sessionError) {
+      Alert.alert('Session Error', sessionError, [
+        { text: 'OK', onPress: clearError },
+      ]);
+    }
+  }, [sessionError, clearError]);
+
   return (
     <KeyboardAvoidingView
       style={[styles.container, isDark && styles.containerDark]}
@@ -103,7 +109,7 @@ export default function SessionScreen() {
         <TouchableOpacity testID="session-back-button" onPress={() => router.back()} style={styles.backButton}>
           <Text style={[styles.backText, isDark && styles.backTextDark]}>‹ Back</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={handleEditTitle} style={styles.titleButton}>
+        <TouchableOpacity testID="session-edit-title-button" onPress={handleEditTitle} style={styles.titleButton}>
           <Text
             testID="session-title"
             style={[styles.headerTitle, isDark && styles.headerTitleDark]}
@@ -116,7 +122,7 @@ export default function SessionScreen() {
         </TouchableOpacity>
         <View testID="session-status-badge" style={[styles.statusBadge, styles[`statusBadge_${effectiveStatus}`]]}>
           <View style={[styles.statusDot, styles[`statusDot_${effectiveStatus}`]]} />
-          <Text style={[styles.statusText, styles[`statusText_${effectiveStatus}`]]}>
+          <Text testID="session-status-text" style={[styles.statusText, styles[`statusText_${effectiveStatus}`]]}>
             {effectiveStatus === 'online'
               ? 'Online'
               : effectiveStatus === 'cliOffline'
@@ -148,6 +154,56 @@ export default function SessionScreen() {
         onDeny={(message) => sendPermissionResponse('deny', message)}
         onClose={clearPendingPermissionRequest}
       />
+
+      <Modal
+        visible={showRenameModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowRenameModal(false)}
+      >
+        <Pressable
+          style={styles.renameOverlay}
+          onPress={() => setShowRenameModal(false)}
+        >
+          <Pressable
+            testID="rename-session-modal"
+            style={[styles.renameCard, isDark && styles.renameCardDark]}
+            onPress={(event) => event.stopPropagation()}
+          >
+            <Text style={[styles.renameTitle, isDark && styles.renameTitleDark]}>
+              Rename Session
+            </Text>
+            <Text style={[styles.renameSubtitle, isDark && styles.renameSubtitleDark]}>
+              Enter a new name for this session
+            </Text>
+            <TextInput
+              testID="rename-session-input"
+              style={[styles.renameInput, isDark && styles.renameInputDark]}
+              value={renameValue}
+              onChangeText={setRenameValue}
+              placeholder="Session name"
+              placeholderTextColor={isDark ? '#6b7280' : '#9ca3af'}
+              autoFocus
+            />
+            <View style={styles.renameActions}>
+              <TouchableOpacity
+                testID="rename-session-cancel"
+                style={[styles.renameButton, styles.renameButtonSecondary]}
+                onPress={() => setShowRenameModal(false)}
+              >
+                <Text style={styles.renameButtonSecondaryText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="rename-session-save"
+                style={[styles.renameButton, styles.renameButtonPrimary]}
+                onPress={handleRenameSave}
+              >
+                <Text style={styles.renameButtonPrimaryText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Test mode panel for E2E testing */}
       <TestModePanel />
@@ -272,5 +328,77 @@ const styles = StyleSheet.create({
   },
   statusText_disconnected: {
     color: '#6b7280',
+  },
+  renameOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  renameCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    gap: 12,
+  },
+  renameCardDark: {
+    backgroundColor: '#1f1f1f',
+  },
+  renameTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  renameTitleDark: {
+    color: '#f9fafb',
+  },
+  renameSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  renameSubtitleDark: {
+    color: '#9ca3af',
+  },
+  renameInput: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#111827',
+    backgroundColor: '#f9fafb',
+  },
+  renameInputDark: {
+    backgroundColor: '#111827',
+    borderColor: '#374151',
+    color: '#f9fafb',
+  },
+  renameActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+  },
+  renameButton: {
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  renameButtonSecondary: {
+    backgroundColor: '#e5e7eb',
+  },
+  renameButtonPrimary: {
+    backgroundColor: '#3b82f6',
+  },
+  renameButtonSecondaryText: {
+    color: '#111827',
+    fontWeight: '600',
+  },
+  renameButtonPrimaryText: {
+    color: '#ffffff',
+    fontWeight: '600',
   },
 });

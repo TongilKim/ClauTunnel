@@ -15,17 +15,21 @@ appId: com.clautunnel.app
       id: "session-title"
     timeout: 3000
 
-# Tap title to edit (opens Alert.prompt on iOS)
+# Open rename modal
 - tapOn:
-    id: "session-title"
+    id: "session-edit-title-button"
 - extendedWaitUntil:
-    visible: "Rename Session"
+    visible:
+      id: "rename-session-modal"
     timeout: 3000
 
 # Clear existing text and type new title
+- tapOn:
+    id: "rename-session-input"
 - clearText
 - inputText: "Renamed Session"
-- tapOn: "Save"
+- tapOn:
+    id: "rename-session-save"
 
 # Verify title updated
 - extendedWaitUntil:
