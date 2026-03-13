@@ -17,8 +17,8 @@ function useProtectedRoute(user: any, isLoading: boolean) {
   const inAuthGroup = segments[0] === '(auth)';
 
   if (!user && !inAuthGroup) {
-    // Not authenticated, redirect to login
-    return '/(auth)/login';
+    // Not authenticated, redirect to the CLI guidance screen.
+    return '/(auth)';
   }
 
   if (user && inAuthGroup) {

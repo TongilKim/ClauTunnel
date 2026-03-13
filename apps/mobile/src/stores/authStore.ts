@@ -45,7 +45,6 @@ function buildMockAuthState(email = MOCK_USER.email) {
     } as Session,
   };
 }
-
 async function loadPersistedMockAuthEmail(): Promise<string | null> {
   try {
     return await SecureStore.getItemAsync(TEST_MODE_AUTH_EMAIL_KEY);
@@ -136,9 +135,9 @@ function listenForAuthChanges(set: (state: Partial<AuthState>) => void) {
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
-  user: null,
-  session: null,
-  isLoading: true,
+  user: _testMode ? (buildMockAuthState().user as User) : null,
+  session: _testMode ? (buildMockAuthState().session as Session) : null,
+  isLoading: _testMode ? false : true,
   error: null,
 
   initialize: async () => {
@@ -153,7 +152,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         });
         return;
       }
-      set({ isLoading: false, error: null, user: null, session: null });
+      set({
+        ...buildMockAuthState(),
+        isLoading: false,
+        error: null,
+      });
       return;
     }
 
@@ -290,22 +293,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   signIn: async (email: string, password: string) => {
     if (_testMode) {
-      set({ isLoading: true, error: null });
-
-      if (
-        email.trim().toLowerCase() !== MOCK_TEST_CREDENTIALS.email ||
-        password !== MOCK_TEST_CREDENTIALS.password
-      ) {
-        set({
-          error: 'Invalid email or password',
-          isLoading: false,
-        });
-        return;
-      }
-
       set({
         ...buildMockAuthState(email.trim().toLowerCase()),
         isLoading: false,
+        error: null,
       });
       await persistMockAuthEmail(email.trim().toLowerCase());
       return;
@@ -340,6 +331,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({
         ...buildMockAuthState(email.trim().toLowerCase() || MOCK_USER.email),
         isLoading: false,
+        error: null,
       });
       await persistMockAuthEmail(email.trim().toLowerCase() || MOCK_USER.email);
       return;

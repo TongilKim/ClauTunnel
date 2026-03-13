@@ -5,17 +5,14 @@ const mockOnAuthStateChange = vi.fn();
 const mockRefreshSession = vi.fn();
 const mockSetSession = vi.fn();
 const mockInvoke = vi.fn();
+const mockSecureStoreGetItem = vi.fn();
+const mockSecureStoreSetItem = vi.fn();
+const mockSecureStoreDeleteItem = vi.fn();
 const mockSignOut = vi.fn();
 const mockConnectionDisconnect = vi.fn().mockResolvedValue(undefined);
 const mockUnsubscribeFromPresence = vi.fn();
 const mockUnsubscribeMachinePresence = vi.fn();
 const mockSessionSetState = vi.fn();
-
-vi.mock('expo-secure-store', () => ({
-  getItemAsync: vi.fn(),
-  setItemAsync: vi.fn(),
-  deleteItemAsync: vi.fn(),
-}));
 
 vi.mock('../stores/connectionStore', () => ({
   useConnectionStore: {
@@ -52,6 +49,12 @@ vi.mock('../services/supabase', () => ({
   },
 }));
 
+vi.mock('expo-secure-store', () => ({
+  getItemAsync: mockSecureStoreGetItem,
+  setItemAsync: mockSecureStoreSetItem,
+  deleteItemAsync: mockSecureStoreDeleteItem,
+}));
+
 vi.mock('../utils/testMode', () => ({
   isTestMode: () => false,
   MOCK_TEST_CREDENTIALS: {
@@ -76,6 +79,9 @@ describe('AuthStore bootstrap auth', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    mockSecureStoreGetItem.mockResolvedValue(null);
+    mockSecureStoreSetItem.mockResolvedValue(undefined);
+    mockSecureStoreDeleteItem.mockResolvedValue(undefined);
     mockOnAuthStateChange.mockReturnValue({
       data: { subscription: { unsubscribe: vi.fn() } },
     });
