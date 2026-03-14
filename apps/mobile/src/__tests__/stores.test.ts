@@ -33,6 +33,8 @@ vi.mock('../services/supabase', () => ({
     channel: vi.fn(),
     removeChannel: vi.fn(),
   },
+  SUPABASE_URL: 'https://test.supabase.co',
+  SUPABASE_ANON_KEY: 'test-anon-key',
 }));
 
 // Test store logic without React Native dependencies

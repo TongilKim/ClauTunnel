@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { supabase } from '../services/supabase';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '../services/supabase';
 import type { User, Session } from '@supabase/supabase-js';
 import {
   isTestMode,
@@ -103,21 +103,29 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       // Call the Edge Function to redeem the pairing code
       // Using fetch() directly instead of supabase.functions.invoke() to get
-      // the actual error message from the response body on non-2xx responses
-      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-      const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
-      const response = await fetch(
-        `${supabaseUrl}/functions/v1/redeem-mobile-pairing`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseAnonKey}`,
-            'apikey': supabaseAnonKey!,
-          },
-          body: JSON.stringify({ code }),
-        }
-      );
+      // the actual error message from the response body on non-2xx responses.
+      // Retry on network errors — when the app transitions from background to
+      // foreground (e.g. scanning a QR from camera), the network stack may not
+      // be ready immediately.
+      const url = `${SUPABASE_URL}/functions/v1/redeem-mobile-pairing`;
+      const fetchOptions = {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'apikey': SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ code }),
+      };
+
+      let response: Response;
+      try {
+        response = await fetch(url, fetchOptions);
+      } catch (networkError) {
+        // Retry once after a short delay for background→foreground transitions
+        await new Promise((r) => setTimeout(r, 1500));
+        response = await fetch(url, fetchOptions);
+      }
 
       const data = await response.json();
 

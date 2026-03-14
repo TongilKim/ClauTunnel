@@ -42,14 +42,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check if already redeemed
-    if (pairing.redeemed_at) {
-      return new Response(
-        JSON.stringify({ error: "Pairing code already used" }),
-        { status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     // Check if expired
     if (new Date(pairing.expires_at) < new Date()) {
       return new Response(
