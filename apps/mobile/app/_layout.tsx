@@ -6,7 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuthStore } from '../src/stores/authStore';
 import { isTestMode } from '../src/utils/testMode';
 
-function useProtectedRoute(user: any, isLoading: boolean) {
+function useProtectedRoute(isPaired: boolean, isLoading: boolean) {
   const segments = useSegments();
 
   // If still loading, don't redirect yet
@@ -14,15 +14,15 @@ function useProtectedRoute(user: any, isLoading: boolean) {
     return null;
   }
 
-  const inAuthGroup = segments[0] === '(auth)';
+  const inPairScreen = segments[0] === 'pair';
 
-  if (!user && !inAuthGroup) {
-    // Not authenticated, redirect to login
-    return '/(auth)/login';
+  if (!isPaired && !inPairScreen) {
+    // Not paired, redirect to pair screen
+    return '/pair';
   }
 
-  if (user && inAuthGroup) {
-    // Authenticated but in auth group, redirect to main app
+  if (isPaired && inPairScreen) {
+    // Paired but on pair screen, redirect to main app
     return '/(tabs)';
   }
 
@@ -33,7 +33,7 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
-  const { user, isLoading, initialize } = useAuthStore();
+  const { isPaired, isLoading, initialize } = useAuthStore();
 
   // Initialize auth on app load (skip in test mode — stores have mock data from init)
   useEffect(() => {
@@ -42,7 +42,7 @@ export default function RootLayout() {
     }
   }, []);
 
-  const redirectTo = useProtectedRoute(user, isLoading);
+  const redirectTo = useProtectedRoute(isPaired, isLoading);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -59,7 +59,7 @@ export default function RootLayout() {
           },
         }}
       >
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="pair" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen
           name="session/[id]"

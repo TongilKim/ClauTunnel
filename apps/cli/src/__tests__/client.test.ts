@@ -76,7 +76,7 @@ describe('RealtimeClient', () => {
     const expectedOutputChannel = REALTIME_CHANNELS.sessionOutput(
       'test-session-123'
     );
-    expect(mockSupabase.channel).toHaveBeenCalledWith(expectedOutputChannel);
+    expect(mockSupabase.channel).toHaveBeenCalledWith(expectedOutputChannel, { config: { private: true } });
   });
 
   it('should connect to input channel with session ID', async () => {
@@ -90,7 +90,7 @@ describe('RealtimeClient', () => {
     const expectedInputChannel = REALTIME_CHANNELS.sessionInput(
       'test-session-123'
     );
-    expect(mockSupabase.channel).toHaveBeenCalledWith(expectedInputChannel);
+    expect(mockSupabase.channel).toHaveBeenCalledWith(expectedInputChannel, { config: { private: true } });
   });
 
   it('should emit connected event when channels subscribe successfully', async () => {
@@ -131,7 +131,7 @@ describe('RealtimeClient', () => {
     const expectedPresenceChannel = REALTIME_CHANNELS.sessionPresence(
       'test-session-123'
     );
-    expect(mockSupabase.channel).toHaveBeenCalledWith(expectedPresenceChannel);
+    expect(mockSupabase.channel).toHaveBeenCalledWith(expectedPresenceChannel, { config: { private: true } });
   });
 
   it('should track presence when connected', async () => {

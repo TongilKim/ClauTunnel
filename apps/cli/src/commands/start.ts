@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import WebSocket from 'ws';
+import { v4 as uuidv4 } from 'uuid';
 import { Daemon } from '../daemon/daemon.js';
 import { MachineManager } from '../daemon/machine.js';
 import { MachineRealtimeClient } from '../realtime/machine-client.js';
@@ -231,11 +232,27 @@ export function createStartCommand(): Command {
         let mobileServer: MobileServerManager | null = null;
 
         if (options.mobile !== false) {
+          // Create a one-time pairing code for mobile device authentication
+          const pairingCode = uuidv4();
+          const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 min
+
+          const { error: pairingError } = await supabase
+            .from('mobile_pairings')
+            .insert({ user_id: user.id, code: pairingCode, expires_at: expiresAt });
+
+          if (pairingError) {
+            spinner.fail('Failed to create mobile pairing code');
+            logger.error(pairingError.message);
+            removePidFile();
+            process.exit(1);
+          }
+
           const mobileProjectPath = config.getMobileProjectPath();
           mobileServer = new MobileServerManager({
             mobileProjectPath,
             supabaseUrl: config.getSupabaseUrl(),
             supabaseAnonKey: config.getSupabaseAnonKey(),
+            pairingCode,
             onProgress: (msg) => spinner.update(msg),
           });
 

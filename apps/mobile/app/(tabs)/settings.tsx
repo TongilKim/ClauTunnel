@@ -14,19 +14,19 @@ export default function SettingsScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
-  const { user, signOut, isLoading } = useAuthStore();
+  const { user, disconnect, isLoading } = useAuthStore();
 
-  const handleLogout = () => {
+  const handleDisconnect = () => {
     Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
+      'Disconnect Device',
+      'This will unpair this device. You will need to scan a new QR code from "clautunnel start" to reconnect.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Sign Out',
+          text: 'Disconnect',
           style: 'destructive',
           onPress: async () => {
-            await signOut();
+            await disconnect();
           },
         },
       ]
@@ -49,7 +49,7 @@ export default function SettingsScreen() {
           <View style={styles.row}>
             <Text style={[styles.label, isDark && styles.labelDark]}>Email</Text>
             <Text testID="settings-email" style={[styles.value, isDark && styles.valueDark]}>
-              {user?.email || 'Not signed in'}
+              {user?.email || 'Not paired'}
             </Text>
           </View>
         </View>
@@ -72,14 +72,14 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      {/* Sign Out Button */}
+      {/* Disconnect Button */}
       <TouchableOpacity
         testID="settings-logout-button"
         style={[styles.logoutButton, isLoading && styles.logoutButtonDisabled]}
-        onPress={handleLogout}
+        onPress={handleDisconnect}
         disabled={isLoading}
       >
-        <Text style={styles.logoutButtonText}>Sign Out</Text>
+        <Text style={styles.logoutButtonText}>Disconnect Device</Text>
       </TouchableOpacity>
     </ScrollView>
   );

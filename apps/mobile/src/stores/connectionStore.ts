@@ -277,7 +277,7 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
 
       // Subscribe to output channel
       const outputChannelName = REALTIME_CHANNELS.sessionOutput(sessionId);
-      outputChannel = supabase.channel(outputChannelName);
+      outputChannel = supabase.channel(outputChannelName, { config: { private: true } });
 
       outputChannel.on('broadcast', { event: 'output' }, (payload) => {
         const message = payload.payload as RealtimeMessage;
@@ -431,7 +431,7 @@ export const useConnectionStore = create<ConnectionStoreState>((set, get) => ({
 
       // Subscribe to input channel (for sending)
       const inputChannelName = REALTIME_CHANNELS.sessionInput(sessionId);
-      inputChannel = supabase.channel(inputChannelName);
+      inputChannel = supabase.channel(inputChannelName, { config: { private: true } });
 
       // Wait for subscriptions
       await Promise.all([

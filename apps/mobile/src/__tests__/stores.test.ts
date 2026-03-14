@@ -19,10 +19,15 @@ vi.mock('../services/supabase', () => ({
   supabase: {
     auth: {
       getSession: vi.fn(),
+      setSession: vi.fn(),
+      verifyOtp: vi.fn(),
       onAuthStateChange: vi.fn(),
       signInWithPassword: vi.fn(),
       signUp: vi.fn(),
       signOut: vi.fn(),
+    },
+    functions: {
+      invoke: vi.fn(),
     },
     from: vi.fn(),
     channel: vi.fn(),
@@ -33,72 +38,20 @@ vi.mock('../services/supabase', () => ({
 // Test store logic without React Native dependencies
 describe('Store Logic', () => {
   describe('AuthStore', () => {
-    it('should have initial state', () => {
-      // Test initial state structure
+    it('should have initial state with isPaired false', () => {
       const initialState = {
         user: null,
         session: null,
+        isPaired: false,
         isLoading: true,
         error: null,
       };
 
       expect(initialState.user).toBeNull();
       expect(initialState.session).toBeNull();
+      expect(initialState.isPaired).toBe(false);
       expect(initialState.isLoading).toBe(true);
       expect(initialState.error).toBeNull();
-    });
-
-    it('should have signIn action that sets isLoading', () => {
-      // Mock the signIn flow
-      let isLoading = false;
-      let error: string | null = null;
-
-      const signIn = async (email: string, password: string) => {
-        isLoading = true;
-        error = null;
-
-        // Simulate API call
-        await new Promise((resolve) => setTimeout(resolve, 10));
-
-        // Simulate success
-        isLoading = false;
-      };
-
-      // Test that signIn sets isLoading
-      expect(isLoading).toBe(false);
-    });
-
-    it('should have signIn action that sets error on failure', () => {
-      let error: string | null = null;
-
-      const setError = (message: string) => {
-        error = message;
-      };
-
-      setError('Invalid credentials');
-      expect(error).toBe('Invalid credentials');
-    });
-
-    it('should have signUp action that sets isLoading', () => {
-      let isLoading = false;
-
-      const startLoading = () => {
-        isLoading = true;
-      };
-
-      startLoading();
-      expect(isLoading).toBe(true);
-    });
-
-    it('should have signUp action that sets error on failure', () => {
-      let error: string | null = null;
-
-      const setError = (message: string) => {
-        error = message;
-      };
-
-      setError('Email already in use');
-      expect(error).toBe('Email already in use');
     });
 
     it('should clear error', () => {
@@ -110,6 +63,102 @@ describe('Store Logic', () => {
 
       clearError();
       expect(error).toBeNull();
+    });
+
+    describe('disconnect', () => {
+      it('should call supabase.auth.signOut with local scope', async () => {
+        const { supabase } = await import('../services/supabase');
+        const mockSignOut = vi.mocked(supabase.auth.signOut);
+        mockSignOut.mockResolvedValue({ error: null } as any);
+
+        vi.resetModules();
+        const { useAuthStore } = await import('../stores/authStore');
+        const store = useAuthStore.getState();
+        await store.disconnect();
+
+        expect(mockSignOut).toHaveBeenCalledWith({ scope: 'local' });
+      });
+    });
+
+    describe('initialize', () => {
+      it('should check for existing session via getSession', async () => {
+        const { supabase } = await import('../services/supabase');
+        const mockGetSession = vi.mocked(supabase.auth.getSession);
+        const mockOnAuthStateChange = vi.mocked(supabase.auth.onAuthStateChange);
+
+        mockGetSession.mockResolvedValue({
+          data: { session: null },
+          error: null,
+        } as any);
+        mockOnAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } } as any);
+
+        vi.resetModules();
+        const { useAuthStore } = await import('../stores/authStore');
+        const store = useAuthStore.getState();
+        await store.initialize();
+
+        expect(mockGetSession).toHaveBeenCalled();
+      });
+    });
+
+    describe('redeemPairingCode', () => {
+      it('should call Edge Function and verifyOtp on success', async () => {
+        const { supabase } = await import('../services/supabase');
+        const mockInvoke = vi.mocked(supabase.functions.invoke);
+        const mockVerifyOtp = vi.mocked(supabase.auth.verifyOtp);
+        const mockOnAuthStateChange = vi.mocked(supabase.auth.onAuthStateChange);
+
+        mockInvoke.mockResolvedValue({
+          data: { hashed_token: 'test-hashed-token' },
+          error: null,
+        } as any);
+
+        mockVerifyOtp.mockResolvedValue({
+          data: {
+            session: {
+              access_token: 'new-token',
+              refresh_token: 'new-refresh',
+              user: { id: 'user-1', email: 'test@test.com' },
+            },
+            user: { id: 'user-1', email: 'test@test.com' },
+          },
+          error: null,
+        } as any);
+
+        mockOnAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } } as any);
+
+        vi.resetModules();
+        const { useAuthStore } = await import('../stores/authStore');
+        const store = useAuthStore.getState();
+        await store.redeemPairingCode('test-pairing-uuid');
+
+        expect(mockInvoke).toHaveBeenCalledWith('redeem-mobile-pairing', {
+          body: { code: 'test-pairing-uuid' },
+        });
+        expect(mockVerifyOtp).toHaveBeenCalledWith({
+          token_hash: 'test-hashed-token',
+          type: 'email',
+        });
+      });
+
+      it('should set error when Edge Function fails', async () => {
+        const { supabase } = await import('../services/supabase');
+        const mockInvoke = vi.mocked(supabase.functions.invoke);
+
+        mockInvoke.mockResolvedValue({
+          data: { error: 'Pairing code expired' },
+          error: null,
+        } as any);
+
+        vi.resetModules();
+        const { useAuthStore } = await import('../stores/authStore');
+        const store = useAuthStore.getState();
+        await store.redeemPairingCode('expired-code');
+
+        const state = useAuthStore.getState();
+        expect(state.error).toBe('Pairing code expired');
+        expect(state.isPaired).toBe(false);
+      });
     });
   });
 

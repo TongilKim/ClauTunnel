@@ -18,6 +18,7 @@ export interface MobileServerOptions {
   mobileProjectPath?: string;
   supabaseUrl: string;
   supabaseAnonKey: string;
+  pairingCode?: string;
   expoPort?: number;
   logDir?: string;
   onProgress?: (message: string) => void;
@@ -196,12 +197,12 @@ export class MobileServerManager {
 
   ensureEnvFile(): void {
     const envPath = join(this.mobileProjectPath, '.env');
-    const envContent = [
+    const lines = [
       `EXPO_PUBLIC_SUPABASE_URL=${this.options.supabaseUrl}`,
       `EXPO_PUBLIC_SUPABASE_ANON_KEY=${this.options.supabaseAnonKey}`,
       '',
-    ].join('\n');
-    writeFileSync(envPath, envContent);
+    ];
+    writeFileSync(envPath, lines.join('\n'));
   }
 
   installDependencies(): boolean {
@@ -332,11 +333,12 @@ export class MobileServerManager {
 
     this.expoLogStream = createWriteStream(join(this.logDir, 'expo.log'));
 
-    this.expoProcess = spawn('npx', ['expo', 'start', '--port', String(this.expoPort)], {
+    this.expoProcess = spawn('npx', ['expo', 'start', '--clear', '--port', String(this.expoPort)], {
       cwd: this.mobileProjectPath,
       env: {
         ...process.env,
         EXPO_PACKAGER_PROXY_URL: tunnelUrl,
+        EXPO_PUBLIC_TUNNEL_URL: tunnelUrl,
       },
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: false,
@@ -437,18 +439,18 @@ export class MobileServerManager {
       }
     }
 
-    // Step 4: Sync .env file
-    this.onProgress('Syncing credentials...');
-    this.ensureEnvFile();
-
-    // Step 5: Start ngrok tunnel
+    // Step 4: Start ngrok tunnel (before .env so we have the tunnel URL)
     this.onProgress('Starting ngrok tunnel...');
     const tunnelUrl = await this.startNgrok();
     if (!tunnelUrl) {
       return { started: false, error: this.ngrokError ?? 'Failed to start ngrok tunnel' };
     }
 
-    // Step 6: Start Expo server
+    // Step 5: Sync .env file
+    this.onProgress('Syncing credentials...');
+    this.ensureEnvFile();
+
+    // Step 6: Start Expo server (pass tunnel URL so mobile app can fetch tokens at runtime)
     this.onProgress('Starting Expo server...');
     const expoStarted = await this.startExpo(tunnelUrl);
     if (!expoStarted) {
@@ -458,9 +460,10 @@ export class MobileServerManager {
     }
 
     // Step 7: Show QR code for Expo Go
-    // Convert https://xxx.ngrok-free.app → exp://xxx.ngrok-free.app:443
+    // Convert https://xxx.ngrok-free.app → exp://xxx.ngrok-free.app:443/--/pair?code=UUID
     const host = tunnelUrl.replace(/^https?:\/\//, '');
-    const expoUrl = `exp://${host}:443`;
+    const pairingParam = this.options.pairingCode ? `/--/pair?code=${this.options.pairingCode}` : '';
+    const expoUrl = `exp://${host}:443${pairingParam}`;
     console.log('');
     console.log('  ┌─────────────────────────────────────────────────┐');
     console.log('  │  Expo Go is required to open this QR code.      │');

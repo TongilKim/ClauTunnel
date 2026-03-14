@@ -216,6 +216,27 @@ describe('MobileServerManager', () => {
       expect(content).toContain('EXPO_PUBLIC_SUPABASE_ANON_KEY=test-anon-key');
     });
 
+    it('should NOT include CLI tokens in .env (tokens go in public/cli-auth.json)', async () => {
+      const { MobileServerManager } = await import('../mobile/mobile-server.js');
+      const manager = new MobileServerManager({
+        mobileProjectPath: MOBILE_DIR,
+        supabaseUrl: 'https://test.supabase.co',
+        supabaseAnonKey: 'test-anon-key',
+        sessionTokens: {
+          accessToken: 'test-access-token',
+          refreshToken: 'test-refresh-token',
+        },
+        logDir: LOG_DIR,
+      });
+
+      manager.ensureEnvFile();
+
+      const content = readFileSync(join(MOBILE_DIR, '.env'), 'utf-8');
+      expect(content).not.toContain('EXPO_PUBLIC_CLI_ACCESS_TOKEN');
+      expect(content).not.toContain('EXPO_PUBLIC_CLI_REFRESH_TOKEN');
+      expect(content).not.toContain('test-access-token');
+    });
+
     it('should overwrite existing .env file', async () => {
       writeFileSync(join(MOBILE_DIR, '.env'), 'OLD_CONTENT=old');
 
@@ -232,6 +253,21 @@ describe('MobileServerManager', () => {
       const content = readFileSync(join(MOBILE_DIR, '.env'), 'utf-8');
       expect(content).not.toContain('OLD_CONTENT');
       expect(content).toContain('https://new.supabase.co');
+    });
+  });
+
+  describe('pairingCode option', () => {
+    it('should accept pairingCode in options', async () => {
+      const { MobileServerManager } = await import('../mobile/mobile-server.js');
+      const manager = new MobileServerManager({
+        mobileProjectPath: MOBILE_DIR,
+        supabaseUrl: 'https://test.supabase.co',
+        supabaseAnonKey: 'test-anon-key',
+        pairingCode: 'test-uuid-code',
+        logDir: LOG_DIR,
+      });
+
+      expect(manager).toBeDefined();
     });
   });
 
