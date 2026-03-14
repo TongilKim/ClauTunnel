@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   useColorScheme,
   ActivityIndicator,
 } from 'react-native';
+import * as Linking from 'expo-linking';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuthStore } from '../src/stores/authStore';
 
@@ -17,13 +18,31 @@ export default function PairScreen() {
 
   const { redeemPairingCode, isPaired, isLoading, error } = useAuthStore();
   const [attempted, setAttempted] = useState(false);
+  const attemptedRef = useRef(false);
 
+  // Handle cold-start deep links (code available from route params)
   useEffect(() => {
     if (code && !attempted) {
       setAttempted(true);
+      attemptedRef.current = true;
       redeemPairingCode(code);
     }
   }, [code, attempted]);
+
+  // Handle warm-start deep links (app already open, QR scanned from camera).
+  // The URL event fires before expo-router updates useLocalSearchParams,
+  // so this prevents the instructions screen from flashing.
+  useEffect(() => {
+    const subscription = Linking.addEventListener('url', (event) => {
+      const match = event.url.match(/code=([^&]+)/);
+      if (match && !attemptedRef.current) {
+        setAttempted(true);
+        attemptedRef.current = true;
+        redeemPairingCode(match[1]);
+      }
+    });
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     if (isPaired) {
@@ -38,7 +57,7 @@ export default function PairScreen() {
           ClauTunnel
         </Text>
 
-        {isLoading && code ? (
+        {isLoading || (code && !attempted) ? (
           <>
             <ActivityIndicator size="large" color="#3b82f6" style={styles.spinner} />
             <Text style={[styles.status, isDark && styles.statusDark]}>
