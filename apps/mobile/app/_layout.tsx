@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Stack, Redirect, useSegments } from 'expo-router';
+import * as Linking from 'expo-linking';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme, View, ActivityIndicator } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -38,7 +39,11 @@ export default function RootLayout() {
   // Initialize auth on app load (skip in test mode — stores have mock data from init)
   useEffect(() => {
     if (!isTestMode()) {
-      initialize();
+      // Pass the initial URL so initialize() can detect re-pairing deep links
+      // and sign out the old session before routing decisions are made
+      Linking.getInitialURL().then((url) => {
+        initialize(url);
+      });
     }
   }, []);
 

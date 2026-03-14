@@ -119,6 +119,11 @@ export class Config {
     this.saveConfig();
   }
 
+  clearMachineId(): void {
+    delete this.data.machineId;
+    this.saveConfig();
+  }
+
   getSessionTokens(): ConfigData['sessionTokens'] | undefined {
     return this.data.sessionTokens;
   }

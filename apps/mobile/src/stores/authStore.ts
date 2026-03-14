@@ -15,7 +15,7 @@ interface AuthState {
   error: string | null;
 
   // Actions
-  initialize: () => Promise<void>;
+  initialize: (initialUrl?: string | null) => Promise<void>;
   redeemPairingCode: (code: string) => Promise<void>;
   disconnect: () => Promise<void>;
   clearError: () => void;
@@ -30,7 +30,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isLoading: true,
   error: null,
 
-  initialize: async () => {
+  initialize: async (initialUrl?: string | null) => {
     if (_testMode) {
       set({ isLoading: false, error: null, user: null, session: null, isPaired: false });
       return;
@@ -47,21 +47,29 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (error) throw error;
 
-      const isPaired = !!session;
-
-      set({
-        session,
-        user: session?.user ?? null,
-        isPaired,
-        isLoading: false,
-      });
-
-      // Listen for auth changes (token refresh, etc.)
-      supabase.auth.onAuthStateChange((_event, session) => {
+      // If app was opened with a pairing code and already has a session,
+      // sign out the old session so re-pairing can proceed.
+      // This must happen before isLoading is set to false to prevent
+      // routing from redirecting to tabs with the stale session.
+      if (initialUrl?.includes('code=') && session) {
+        await supabase.auth.signOut({ scope: 'local' });
+        set({ session: null, user: null, isPaired: false, isLoading: false });
+      } else {
         set({
           session,
           user: session?.user ?? null,
           isPaired: !!session,
+          isLoading: false,
+        });
+      }
+
+      // Listen for auth changes (token refresh, re-pairing, etc.)
+      // Registered once regardless of path above
+      supabase.auth.onAuthStateChange((_event, newSession) => {
+        set({
+          session: newSession,
+          user: newSession?.user ?? null,
+          isPaired: !!newSession,
         });
       });
     } catch (error) {
@@ -87,16 +95,38 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
 
+      // Sign out any existing session first (re-pairing with a different account)
+      if (get().isPaired) {
+        await supabase.auth.signOut({ scope: 'local' });
+        set({ session: null, user: null, isPaired: false });
+      }
+
       // Call the Edge Function to redeem the pairing code
-      const { data, error: fnError } = await supabase.functions.invoke(
-        'redeem-mobile-pairing',
-        { body: { code } }
+      // Using fetch() directly instead of supabase.functions.invoke() to get
+      // the actual error message from the response body on non-2xx responses
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+      const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/redeem-mobile-pairing`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseAnonKey}`,
+            'apikey': supabaseAnonKey!,
+          },
+          body: JSON.stringify({ code }),
+        }
       );
 
-      if (fnError) throw fnError;
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || `Pairing failed (${response.status})`);
+      }
 
       if (!data?.hashed_token) {
-        throw new Error(data?.error || 'Failed to redeem pairing code');
+        throw new Error('Failed to redeem pairing code');
       }
 
       // Verify the OTP to get a full Supabase session
@@ -116,15 +146,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         user: verifyData.user,
         isPaired: true,
         isLoading: false,
-      });
-
-      // Listen for auth changes
-      supabase.auth.onAuthStateChange((_event, session) => {
-        set({
-          session,
-          user: session?.user ?? null,
-          isPaired: !!session,
-        });
       });
     } catch (error) {
       set({

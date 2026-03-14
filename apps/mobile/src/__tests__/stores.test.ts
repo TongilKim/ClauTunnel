@@ -104,14 +104,14 @@ describe('Store Logic', () => {
     describe('redeemPairingCode', () => {
       it('should call Edge Function and verifyOtp on success', async () => {
         const { supabase } = await import('../services/supabase');
-        const mockInvoke = vi.mocked(supabase.functions.invoke);
         const mockVerifyOtp = vi.mocked(supabase.auth.verifyOtp);
         const mockOnAuthStateChange = vi.mocked(supabase.auth.onAuthStateChange);
 
-        mockInvoke.mockResolvedValue({
-          data: { hashed_token: 'test-hashed-token' },
-          error: null,
-        } as any);
+        const mockFetch = vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({ hashed_token: 'test-hashed-token' }),
+        });
+        vi.stubGlobal('fetch', mockFetch);
 
         mockVerifyOtp.mockResolvedValue({
           data: {
@@ -132,23 +132,28 @@ describe('Store Logic', () => {
         const store = useAuthStore.getState();
         await store.redeemPairingCode('test-pairing-uuid');
 
-        expect(mockInvoke).toHaveBeenCalledWith('redeem-mobile-pairing', {
-          body: { code: 'test-pairing-uuid' },
-        });
+        expect(mockFetch).toHaveBeenCalledWith(
+          expect.stringContaining('/functions/v1/redeem-mobile-pairing'),
+          expect.objectContaining({
+            method: 'POST',
+            body: JSON.stringify({ code: 'test-pairing-uuid' }),
+          })
+        );
         expect(mockVerifyOtp).toHaveBeenCalledWith({
           token_hash: 'test-hashed-token',
           type: 'email',
         });
+
+        vi.unstubAllGlobals();
       });
 
       it('should set error when Edge Function fails', async () => {
-        const { supabase } = await import('../services/supabase');
-        const mockInvoke = vi.mocked(supabase.functions.invoke);
-
-        mockInvoke.mockResolvedValue({
-          data: { error: 'Pairing code expired' },
-          error: null,
-        } as any);
+        const mockFetch = vi.fn().mockResolvedValue({
+          ok: false,
+          status: 410,
+          json: () => Promise.resolve({ error: 'Pairing code expired' }),
+        });
+        vi.stubGlobal('fetch', mockFetch);
 
         vi.resetModules();
         const { useAuthStore } = await import('../stores/authStore');
@@ -158,6 +163,8 @@ describe('Store Logic', () => {
         const state = useAuthStore.getState();
         expect(state.error).toBe('Pairing code expired');
         expect(state.isPaired).toBe(false);
+
+        vi.unstubAllGlobals();
       });
     });
   });

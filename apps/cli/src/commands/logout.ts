@@ -41,6 +41,7 @@ export function createLogoutCommand(): Command {
     }
 
     config.clearSessionTokens();
+    config.clearMachineId();
     logger.info('Logged out successfully.');
   });
 
