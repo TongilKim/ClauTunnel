@@ -288,7 +288,7 @@ export class MobileServerManager {
     // Failed — set diagnostic error message
     this.ngrokError = this.diagnoseNgrokFailure(stderrData);
 
-    this.killProcess(this.ngrokProcess);
+    this.killProcessTree(this.ngrokProcess);
     this.ngrokProcess = null;
     return null;
   }
@@ -324,6 +324,11 @@ export class MobileServerManager {
 
   async startExpo(tunnelUrl: string): Promise<boolean> {
     this.ensureLogDir();
+
+    // Kill any process occupying the expo port to avoid
+    // "Port X is running this app in another window" interactive prompt
+    // which hangs in non-interactive mode
+    this.killProcessOnPort(this.expoPort);
 
     this.expoLogStream = createWriteStream(join(this.logDir, 'expo.log'));
 
@@ -479,14 +484,17 @@ export class MobileServerManager {
 
   async stop(): Promise<void> {
     if (this.expoProcess) {
-      this.killProcess(this.expoProcess);
+      this.killProcessTree(this.expoProcess);
       this.expoProcess = null;
     }
 
     if (this.ngrokProcess) {
-      this.killProcess(this.ngrokProcess);
+      this.killProcessTree(this.ngrokProcess);
       this.ngrokProcess = null;
     }
+
+    // Also force-free the expo port in case child processes survived
+    this.killProcessOnPort(this.expoPort);
 
     if (this.expoLogStream) {
       this.expoLogStream.end();
@@ -539,25 +547,51 @@ export class MobileServerManager {
     });
   }
 
-  private killProcess(proc: ChildProcess): void {
+  private killProcessTree(proc: ChildProcess): void {
+    const pid = proc.pid;
+    if (!pid) return;
+
+    // Kill the parent process
     try {
       proc.kill('SIGTERM');
-      // Give it 3 seconds before SIGKILL
-      setTimeout(() => {
-        try {
-          proc.kill('SIGKILL');
-        } catch {
-          // Already dead
-        }
-      }, 3000);
     } catch {
-      // Process already exited
+      // Already dead
+    }
+
+    // Also kill child processes (e.g., Metro bundler spawned by Expo)
+    // Parent SIGTERM alone may not propagate to all children
+    try {
+      const children = execSync(`pgrep -P ${pid}`, { stdio: 'pipe' }).toString().trim();
+      for (const childPid of children.split('\n').filter(Boolean)) {
+        try {
+          process.kill(parseInt(childPid, 10), 'SIGTERM');
+        } catch { /* already gone */ }
+      }
+    } catch {
+      // No children or pgrep not available
     }
   }
 
   private ensureLogDir(): void {
     if (!existsSync(this.logDir)) {
       mkdirSync(this.logDir, { recursive: true });
+    }
+  }
+
+  private killProcessOnPort(port: number): void {
+    try {
+      const output = execSync(`lsof -ti tcp:${port}`, { stdio: 'pipe' }).toString().trim();
+      if (output) {
+        for (const pid of output.split('\n')) {
+          try {
+            process.kill(parseInt(pid, 10), 'SIGTERM');
+          } catch {
+            // Process already gone
+          }
+        }
+      }
+    } catch {
+      // No process on port — expected
     }
   }
 
