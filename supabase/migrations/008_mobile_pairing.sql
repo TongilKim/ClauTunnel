@@ -1,6 +1,7 @@
--- Mobile pairing table: one-time codes for CLI-to-mobile device pairing
--- The CLI generates a high-entropy UUID code, embeds it in a QR URL,
+-- Mobile pairing table: short-lived codes for CLI-to-mobile device pairing
+-- The CLI creates a pairing code (via Edge Function), embeds it in a QR URL,
 -- and the mobile app redeems it via an Edge Function to get its own Supabase session.
+-- Codes are reusable within their TTL (5 min) to support disconnect/re-pair flows.
 
 CREATE TABLE mobile_pairings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -20,10 +21,8 @@ CREATE INDEX idx_mobile_pairings_expires_at ON mobile_pairings(expires_at);
 -- Enable Row Level Security
 ALTER TABLE mobile_pairings ENABLE ROW LEVEL SECURITY;
 
--- Users can insert their own pairing codes
-CREATE POLICY mobile_pairings_insert_policy ON mobile_pairings
-  FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+-- NOTE: INSERT policy was dropped in 010_restrict_pairing_insert.sql.
+-- Pairing codes are created exclusively via the create-mobile-pairing Edge Function.
 
 -- Users can view their own pairing codes
 CREATE POLICY mobile_pairings_select_policy ON mobile_pairings

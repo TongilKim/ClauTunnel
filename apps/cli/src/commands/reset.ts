@@ -275,4 +275,15 @@ async function cleanSupabaseDb(logger: Logger): Promise<void> {
   } catch {
     logger.info('  - machines: skipped');
   }
+
+  // Delete mobile_pairings
+  try {
+    const res = await fetch(`${supabaseUrl}/rest/v1/mobile_pairings?select=*`, {
+      method: 'DELETE',
+      headers,
+    });
+    logger.info(res.ok ? '  - mobile_pairings cleared' : '  - mobile_pairings: skipped');
+  } catch {
+    logger.info('  - mobile_pairings: skipped');
+  }
 }

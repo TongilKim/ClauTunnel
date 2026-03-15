@@ -112,6 +112,12 @@ else
         -H "apikey: $SUPABASE_ANON_KEY" \
         -H "Authorization: $AUTH_HEADER" \
         -H "Prefer: return=minimal" > /dev/null 2>&1 && echo "  - machines cleared (sessions + messages cascade)" || echo "  - machines: skipped"
+
+      # Delete mobile_pairings
+      curl -s -X DELETE "$SUPABASE_URL/rest/v1/mobile_pairings?select=*" \
+        -H "apikey: $SUPABASE_ANON_KEY" \
+        -H "Authorization: $AUTH_HEADER" \
+        -H "Prefer: return=minimal" > /dev/null 2>&1 && echo "  - mobile_pairings cleared" || echo "  - mobile_pairings: skipped"
     else
       echo "[3/7] Skipping DB cleanup (missing credentials)"
     fi
