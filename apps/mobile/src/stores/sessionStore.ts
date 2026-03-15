@@ -143,7 +143,7 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
       // Send disconnect notification to CLI via realtime
       try {
         const inputChannelName = REALTIME_CHANNELS.sessionInput(sessionId);
-        const tempChannel = supabase.channel(inputChannelName);
+        const tempChannel = supabase.channel(inputChannelName, { config: { private: true } });
 
         // Subscribe and send disconnect message
         await new Promise<void>((resolve) => {
@@ -342,7 +342,7 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
       if (presenceChannels.has(session.id)) continue;
 
       const channelName = REALTIME_CHANNELS.sessionPresence(session.id);
-      const channel = supabase.channel(channelName);
+      const channel = supabase.channel(channelName, { config: { private: true } });
 
       setupPresenceHandlers(channel, session.id, (entityId, isOnline, entries) => {
         set((s) => {
@@ -399,7 +399,7 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
       if (machinePresenceChannels.has(machineId)) continue;
 
       const channelName = REALTIME_CHANNELS.machinePresence(machineId);
-      const channel = supabase.channel(channelName);
+      const channel = supabase.channel(channelName, { config: { private: true } });
 
       setupPresenceHandlers(channel, machineId, (entityId, isOnline) => {
         set((s) => ({
@@ -475,8 +475,8 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
     const inputChannelName = REALTIME_CHANNELS.machineInput(machineId);
     const outputChannelName = REALTIME_CHANNELS.machineOutput(machineId);
 
-    const inputChannel = supabase.channel(inputChannelName);
-    const outputChannel = supabase.channel(outputChannelName);
+    const inputChannel = supabase.channel(inputChannelName, { config: { private: true } });
+    const outputChannel = supabase.channel(outputChannelName, { config: { private: true } });
 
     let timeoutId: ReturnType<typeof setTimeout>;
 

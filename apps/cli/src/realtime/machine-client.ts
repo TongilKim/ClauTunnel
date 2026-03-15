@@ -23,9 +23,11 @@ export class MachineRealtimeClient extends EventEmitter {
   }
 
   async connect(): Promise<boolean> {
+    const privateConfig = { config: { private: true } };
+
     // Subscribe to input channel (receives commands from mobile)
     const inputChannelName = REALTIME_CHANNELS.machineInput(this.machineId);
-    this.inputChannel = this.supabase.channel(inputChannelName);
+    this.inputChannel = this.supabase.channel(inputChannelName, privateConfig);
 
     this.inputChannel.on('broadcast', { event: 'machine-command' }, (payload) => {
       this.emit('command', payload.payload as MachineCommand);
@@ -33,7 +35,7 @@ export class MachineRealtimeClient extends EventEmitter {
 
     // Subscribe to output channel (sends responses to mobile)
     const outputChannelName = REALTIME_CHANNELS.machineOutput(this.machineId);
-    this.outputChannel = this.supabase.channel(outputChannelName);
+    this.outputChannel = this.supabase.channel(outputChannelName, privateConfig);
 
     const results = await Promise.all([
       subscribeWithTimeout(this.inputChannel, 'machine-input'),
@@ -45,7 +47,7 @@ export class MachineRealtimeClient extends EventEmitter {
     // Set up presence channel to track listener online status
     if (connected) {
       const presenceChannelName = REALTIME_CHANNELS.machinePresence(this.machineId);
-      this.presenceChannel = this.supabase.channel(presenceChannelName);
+      this.presenceChannel = this.supabase.channel(presenceChannelName, privateConfig);
 
       this.presenceChannel.subscribe(async (status) => {
         if (status === 'SUBSCRIBED' && this.presenceChannel) {

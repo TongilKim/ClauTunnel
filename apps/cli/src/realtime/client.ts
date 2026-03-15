@@ -37,13 +37,15 @@ export class RealtimeClient extends EventEmitter {
   }
 
   async connect(): Promise<void> {
+    const privateConfig = { config: { private: true } };
+
     // Subscribe to output channel (CLI broadcasts to mobile)
     const outputChannelName = REALTIME_CHANNELS.sessionOutput(this.sessionId);
-    this.outputChannel = this.supabase.channel(outputChannelName);
+    this.outputChannel = this.supabase.channel(outputChannelName, privateConfig);
 
     // Subscribe to input channel (mobile sends to CLI)
     const inputChannelName = REALTIME_CHANNELS.sessionInput(this.sessionId);
-    this.inputChannel = this.supabase.channel(inputChannelName);
+    this.inputChannel = this.supabase.channel(inputChannelName, privateConfig);
 
     this.inputChannel.on('broadcast', { event: 'input' }, (payload) => {
       this.emit('input', payload.payload as RealtimeMessage);
@@ -60,7 +62,7 @@ export class RealtimeClient extends EventEmitter {
     // Set up presence channel to track CLI online status
     if (this.realtimeEnabled) {
       const presenceChannelName = REALTIME_CHANNELS.sessionPresence(this.sessionId);
-      this.presenceChannel = this.supabase.channel(presenceChannelName);
+      this.presenceChannel = this.supabase.channel(presenceChannelName, privateConfig);
 
       // Subscribe and track presence - re-track on every SUBSCRIBED (handles reconnection)
       this.presenceChannel.subscribe(async (status, err) => {

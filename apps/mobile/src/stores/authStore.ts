@@ -1,9 +1,8 @@
 import { create } from 'zustand';
-import { supabase } from '../services/supabase';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '../services/supabase';
 import type { User, Session } from '@supabase/supabase-js';
 import {
   isTestMode,
-  MOCK_TEST_CREDENTIALS,
   MOCK_USER,
   MOCK_SESSION,
 } from '../utils/testMode';
@@ -11,51 +10,36 @@ import {
 interface AuthState {
   user: User | null;
   session: Session | null;
+  isPaired: boolean;
   isLoading: boolean;
   error: string | null;
 
   // Actions
-  initialize: () => Promise<void>;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
-  signOut: () => Promise<void>;
+  initialize: (initialUrl?: string | null) => Promise<void>;
+  redeemPairingCode: (code: string) => Promise<void>;
+  disconnect: () => Promise<void>;
   clearError: () => void;
 }
 
 const _testMode = isTestMode();
 
-function buildMockAuthState(email = MOCK_USER.email) {
-  return {
-    user: {
-      ...MOCK_USER,
-      email,
-    } as User,
-    session: {
-      ...MOCK_SESSION,
-      user: {
-        ...MOCK_USER,
-        email,
-      },
-    } as Session,
-  };
-}
-
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   session: null,
-  isLoading: false,
+  isPaired: false,
+  isLoading: true,
   error: null,
 
-  initialize: async () => {
+  initialize: async (initialUrl?: string | null) => {
     if (_testMode) {
-      set({ isLoading: false, error: null, user: null, session: null });
+      set({ isLoading: false, error: null, user: null, session: null, isPaired: false });
       return;
     }
 
     try {
       set({ isLoading: true, error: null });
 
-      // Get current session
+      // Check for existing session in SecureStore (persisted from a previous pairing)
       const {
         data: { session },
         error,
@@ -63,17 +47,29 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (error) throw error;
 
-      set({
-        session,
-        user: session?.user ?? null,
-        isLoading: false,
-      });
-
-      // Listen for auth changes
-      supabase.auth.onAuthStateChange((_event, session) => {
+      // If app was opened with a pairing code and already has a session,
+      // sign out the old session so re-pairing can proceed.
+      // This must happen before isLoading is set to false to prevent
+      // routing from redirecting to tabs with the stale session.
+      if (initialUrl?.includes('code=') && session) {
+        await supabase.auth.signOut({ scope: 'local' });
+        set({ session: null, user: null, isPaired: false, isLoading: false });
+      } else {
         set({
           session,
           user: session?.user ?? null,
+          isPaired: !!session,
+          isLoading: false,
+        });
+      }
+
+      // Listen for auth changes (token refresh, re-pairing, etc.)
+      // Registered once regardless of path above
+      supabase.auth.onAuthStateChange((_event, newSession) => {
+        set({
+          session: newSession,
+          user: newSession?.user ?? null,
+          isPaired: !!newSession,
         });
       });
     } catch (error) {
@@ -84,89 +80,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  signIn: async (email: string, password: string) => {
-    if (_testMode) {
-      set({ isLoading: true, error: null });
-
-      if (
-        email.trim().toLowerCase() !== MOCK_TEST_CREDENTIALS.email ||
-        password !== MOCK_TEST_CREDENTIALS.password
-      ) {
-        set({
-          error: 'Invalid email or password',
-          isLoading: false,
-        });
-        return;
-      }
-
-      set({
-        ...buildMockAuthState(email.trim().toLowerCase()),
-        isLoading: false,
-      });
-      return;
-    }
-
-    try {
-      set({ isLoading: true, error: null });
-
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-
-      set({
-        session: data.session,
-        user: data.user,
-        isLoading: false,
-      });
-    } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to sign in',
-        isLoading: false,
-      });
-    }
-  },
-
-  signUp: async (email: string, password: string) => {
-    if (_testMode) {
-      set({ isLoading: true, error: null });
-      set({
-        ...buildMockAuthState(email.trim().toLowerCase() || MOCK_USER.email),
-        isLoading: false,
-      });
-      return;
-    }
-
-    try {
-      set({ isLoading: true, error: null });
-
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-
-      set({
-        session: data.session,
-        user: data.user,
-        isLoading: false,
-      });
-    } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to sign up',
-        isLoading: false,
-      });
-    }
-  },
-
-  signOut: async () => {
+  redeemPairingCode: async (code: string) => {
     if (_testMode) {
       set({
-        session: null,
-        user: null,
+        user: MOCK_USER as User,
+        session: MOCK_SESSION as unknown as Session,
+        isPaired: true,
         isLoading: false,
         error: null,
       });
@@ -176,18 +95,102 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
 
-      const { error } = await supabase.auth.signOut();
+      // Sign out any existing session first (re-pairing with a different account)
+      if (get().isPaired) {
+        await supabase.auth.signOut({ scope: 'local' });
+        set({ session: null, user: null, isPaired: false });
+      }
+
+      // Call the Edge Function to redeem the pairing code
+      // Using fetch() directly instead of supabase.functions.invoke() to get
+      // the actual error message from the response body on non-2xx responses.
+      // Retry on network errors — when the app transitions from background to
+      // foreground (e.g. scanning a QR from camera), the network stack may not
+      // be ready immediately.
+      const url = `${SUPABASE_URL}/functions/v1/redeem-mobile-pairing`;
+      const fetchOptions = {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'apikey': SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ code }),
+      };
+
+      let response: Response;
+      try {
+        response = await fetch(url, fetchOptions);
+      } catch (networkError) {
+        // Retry once after a short delay for background→foreground transitions
+        await new Promise((r) => setTimeout(r, 1500));
+        response = await fetch(url, fetchOptions);
+      }
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || `Pairing failed (${response.status})`);
+      }
+
+      if (!data?.hashed_token) {
+        throw new Error('Failed to redeem pairing code');
+      }
+
+      // Verify the OTP to get a full Supabase session
+      const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
+        token_hash: data.hashed_token,
+        type: 'email',
+      });
+
+      if (verifyError) throw verifyError;
+
+      if (!verifyData.session) {
+        throw new Error('No session returned from verification');
+      }
+
+      set({
+        session: verifyData.session,
+        user: verifyData.user,
+        isPaired: true,
+        isLoading: false,
+      });
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to pair device',
+        isLoading: false,
+      });
+    }
+  },
+
+  disconnect: async () => {
+    if (_testMode) {
+      set({
+        session: null,
+        user: null,
+        isPaired: false,
+        isLoading: false,
+        error: null,
+      });
+      return;
+    }
+
+    try {
+      set({ isLoading: true, error: null });
+
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
 
       if (error) throw error;
 
       set({
         session: null,
         user: null,
+        isPaired: false,
         isLoading: false,
       });
     } catch (error) {
       set({
-        error: error instanceof Error ? error.message : 'Failed to sign out',
+        error: error instanceof Error ? error.message : 'Failed to disconnect',
         isLoading: false,
       });
     }
