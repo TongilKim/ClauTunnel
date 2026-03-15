@@ -17,17 +17,17 @@ export default function PairScreen() {
   const isDark = colorScheme === 'dark';
 
   const { redeemPairingCode, isPaired, isLoading, error } = useAuthStore();
-  const [attempted, setAttempted] = useState(false);
-  const attemptedRef = useRef(false);
+  const [attemptedCode, setAttemptedCode] = useState<string | null>(null);
+  const attemptedCodeRef = useRef<string | null>(null);
 
   // Handle cold-start deep links (code available from route params)
   useEffect(() => {
-    if (code && !attempted) {
-      setAttempted(true);
-      attemptedRef.current = true;
+    if (code && code !== attemptedCode) {
+      setAttemptedCode(code);
+      attemptedCodeRef.current = code;
       redeemPairingCode(code);
     }
-  }, [code, attempted]);
+  }, [code, attemptedCode]);
 
   // Handle warm-start deep links (app already open, QR scanned from camera).
   // The URL event fires before expo-router updates useLocalSearchParams,
@@ -35,9 +35,9 @@ export default function PairScreen() {
   useEffect(() => {
     const subscription = Linking.addEventListener('url', (event) => {
       const match = event.url.match(/code=([^&]+)/);
-      if (match && !attemptedRef.current) {
-        setAttempted(true);
-        attemptedRef.current = true;
+      if (match && match[1] !== attemptedCodeRef.current) {
+        setAttemptedCode(match[1]);
+        attemptedCodeRef.current = match[1];
         redeemPairingCode(match[1]);
       }
     });
@@ -57,7 +57,7 @@ export default function PairScreen() {
           ClauTunnel
         </Text>
 
-        {isLoading || (code && !attempted) ? (
+        {isLoading || (code && code !== attemptedCode) ? (
           <>
             <ActivityIndicator size="large" color="#3b82f6" style={styles.spinner} />
             <Text style={[styles.status, isDark && styles.statusDark]}>
