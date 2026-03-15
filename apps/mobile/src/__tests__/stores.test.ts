@@ -168,6 +168,278 @@ describe('Store Logic', () => {
 
         vi.unstubAllGlobals();
       });
+
+      it('should retry on network failure and succeed', async () => {
+        const { supabase } = await import('../services/supabase');
+        const mockVerifyOtp = vi.mocked(supabase.auth.verifyOtp);
+        const mockOnAuthStateChange = vi.mocked(supabase.auth.onAuthStateChange);
+
+        // First call throws network error, second succeeds
+        const mockFetch = vi.fn()
+          .mockRejectedValueOnce(new TypeError('Network request failed'))
+          .mockResolvedValueOnce({
+            ok: true,
+            json: () => Promise.resolve({ hashed_token: 'retry-token' }),
+          });
+        vi.stubGlobal('fetch', mockFetch);
+
+        mockVerifyOtp.mockResolvedValue({
+          data: {
+            session: {
+              access_token: 'new-token',
+              refresh_token: 'new-refresh',
+              user: { id: 'user-1', email: 'test@test.com' },
+            },
+            user: { id: 'user-1', email: 'test@test.com' },
+          },
+          error: null,
+        } as any);
+
+        mockOnAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } } as any);
+
+        vi.resetModules();
+        const { useAuthStore } = await import('../stores/authStore');
+        const store = useAuthStore.getState();
+        await store.redeemPairingCode('test-code');
+
+        // Should have been called twice (initial + retry)
+        expect(mockFetch).toHaveBeenCalledTimes(2);
+        // Should still verify OTP after retry succeeds
+        expect(mockVerifyOtp).toHaveBeenCalledWith({
+          token_hash: 'retry-token',
+          type: 'email',
+        });
+
+        const state = useAuthStore.getState();
+        expect(state.isPaired).toBe(true);
+
+        vi.unstubAllGlobals();
+      });
+
+      it('should surface error when both fetch attempts fail', async () => {
+        const mockFetch = vi.fn()
+          .mockRejectedValueOnce(new TypeError('Network request failed'))
+          .mockRejectedValueOnce(new TypeError('Network request failed'));
+        vi.stubGlobal('fetch', mockFetch);
+
+        vi.resetModules();
+        const { useAuthStore } = await import('../stores/authStore');
+        const store = useAuthStore.getState();
+        await store.redeemPairingCode('test-code');
+
+        const state = useAuthStore.getState();
+        expect(state.error).toBe('Network request failed');
+        expect(state.isPaired).toBe(false);
+        expect(state.isLoading).toBe(false);
+
+        vi.unstubAllGlobals();
+      });
+
+      it('should set error when verifyOtp fails', async () => {
+        const { supabase } = await import('../services/supabase');
+        const mockVerifyOtp = vi.mocked(supabase.auth.verifyOtp);
+        const mockOnAuthStateChange = vi.mocked(supabase.auth.onAuthStateChange);
+
+        const mockFetch = vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({ hashed_token: 'test-token' }),
+        });
+        vi.stubGlobal('fetch', mockFetch);
+
+        mockVerifyOtp.mockResolvedValue({
+          data: { session: null, user: null },
+          error: new Error('Token has expired'),
+        } as any);
+
+        mockOnAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } } as any);
+
+        vi.resetModules();
+        const { useAuthStore } = await import('../stores/authStore');
+        const store = useAuthStore.getState();
+        await store.redeemPairingCode('test-code');
+
+        const state = useAuthStore.getState();
+        expect(state.error).toBe('Token has expired');
+        expect(state.isPaired).toBe(false);
+        expect(state.isLoading).toBe(false);
+
+        vi.unstubAllGlobals();
+      });
+
+      it('should sign out existing session before re-pairing', async () => {
+        const { supabase } = await import('../services/supabase');
+        const mockSignOut = vi.mocked(supabase.auth.signOut);
+        const mockVerifyOtp = vi.mocked(supabase.auth.verifyOtp);
+        const mockOnAuthStateChange = vi.mocked(supabase.auth.onAuthStateChange);
+
+        mockSignOut.mockResolvedValue({ error: null } as any);
+
+        const mockFetch = vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({ hashed_token: 'new-token' }),
+        });
+        vi.stubGlobal('fetch', mockFetch);
+
+        mockVerifyOtp.mockResolvedValue({
+          data: {
+            session: { access_token: 'tok', refresh_token: 'ref', user: { id: 'u2' } },
+            user: { id: 'u2' },
+          },
+          error: null,
+        } as any);
+
+        mockOnAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } } as any);
+
+        vi.resetModules();
+        const { useAuthStore } = await import('../stores/authStore');
+
+        // Set store to already-paired state
+        useAuthStore.setState({ isPaired: true, user: { id: 'u1' } as any, session: {} as any });
+
+        const store = useAuthStore.getState();
+        await store.redeemPairingCode('new-code');
+
+        // Should have signed out the old session first
+        expect(mockSignOut).toHaveBeenCalledWith({ scope: 'local' });
+        // Then verified the new code
+        expect(mockVerifyOtp).toHaveBeenCalled();
+
+        vi.unstubAllGlobals();
+      });
+    });
+
+    describe('initialize', () => {
+      it('should set isPaired true when existing session found', async () => {
+        const { supabase } = await import('../services/supabase');
+        const mockGetSession = vi.mocked(supabase.auth.getSession);
+        const mockOnAuthStateChange = vi.mocked(supabase.auth.onAuthStateChange);
+
+        const mockSession = {
+          access_token: 'existing-token',
+          refresh_token: 'existing-refresh',
+          user: { id: 'user-1', email: 'test@test.com' },
+        };
+
+        mockGetSession.mockResolvedValue({
+          data: { session: mockSession },
+          error: null,
+        } as any);
+        mockOnAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } } as any);
+
+        vi.resetModules();
+        const { useAuthStore } = await import('../stores/authStore');
+        const store = useAuthStore.getState();
+        await store.initialize();
+
+        const state = useAuthStore.getState();
+        expect(state.isPaired).toBe(true);
+        expect(state.session).toBe(mockSession);
+        expect(state.user).toEqual(mockSession.user);
+        expect(state.isLoading).toBe(false);
+      });
+
+      it('should sign out old session when initialUrl has code= and session exists', async () => {
+        const { supabase } = await import('../services/supabase');
+        const mockGetSession = vi.mocked(supabase.auth.getSession);
+        const mockSignOut = vi.mocked(supabase.auth.signOut);
+        const mockOnAuthStateChange = vi.mocked(supabase.auth.onAuthStateChange);
+
+        mockGetSession.mockResolvedValue({
+          data: { session: { access_token: 'old', user: { id: 'u1' } } },
+          error: null,
+        } as any);
+        mockSignOut.mockResolvedValue({ error: null } as any);
+        mockOnAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } } as any);
+
+        vi.resetModules();
+        const { useAuthStore } = await import('../stores/authStore');
+        const store = useAuthStore.getState();
+        await store.initialize('clautunnel://pair?code=abc-123');
+
+        // Should have signed out the old session
+        expect(mockSignOut).toHaveBeenCalledWith({ scope: 'local' });
+
+        const state = useAuthStore.getState();
+        // Should be unpaired after sign-out (ready for re-pairing)
+        expect(state.isPaired).toBe(false);
+        expect(state.session).toBeNull();
+        expect(state.user).toBeNull();
+        expect(state.isLoading).toBe(false);
+      });
+
+      it('should register onAuthStateChange listener', async () => {
+        const { supabase } = await import('../services/supabase');
+        const mockGetSession = vi.mocked(supabase.auth.getSession);
+        const mockOnAuthStateChange = vi.mocked(supabase.auth.onAuthStateChange);
+
+        // Clear previous calls from other tests
+        mockOnAuthStateChange.mockClear();
+
+        mockGetSession.mockResolvedValue({
+          data: { session: null },
+          error: null,
+        } as any);
+        mockOnAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } } as any);
+
+        vi.resetModules();
+        const { useAuthStore } = await import('../stores/authStore');
+        const store = useAuthStore.getState();
+        await store.initialize();
+
+        expect(mockOnAuthStateChange).toHaveBeenCalled();
+
+        // Simulate auth state change — use lastCall since other tests may have called it
+        const callback = mockOnAuthStateChange.mock.lastCall![0];
+        const newSession = { access_token: 'refreshed', user: { id: 'u1' } };
+        callback('TOKEN_REFRESHED', newSession);
+
+        const state = useAuthStore.getState();
+        expect(state.isPaired).toBe(true);
+        expect(state.session).toBe(newSession);
+      });
+    });
+
+    describe('disconnect', () => {
+      it('should clear all pairing state on success', async () => {
+        const { supabase } = await import('../services/supabase');
+        const mockSignOut = vi.mocked(supabase.auth.signOut);
+        mockSignOut.mockResolvedValue({ error: null } as any);
+
+        vi.resetModules();
+        const { useAuthStore } = await import('../stores/authStore');
+
+        // Start in a paired state
+        useAuthStore.setState({
+          isPaired: true,
+          user: { id: 'u1' } as any,
+          session: { access_token: 'tok' } as any,
+        });
+
+        const store = useAuthStore.getState();
+        await store.disconnect();
+
+        const state = useAuthStore.getState();
+        expect(state.isPaired).toBe(false);
+        expect(state.user).toBeNull();
+        expect(state.session).toBeNull();
+        expect(state.isLoading).toBe(false);
+        expect(state.error).toBeNull();
+      });
+
+      it('should set error when signOut fails', async () => {
+        const { supabase } = await import('../services/supabase');
+        const mockSignOut = vi.mocked(supabase.auth.signOut);
+        mockSignOut.mockResolvedValue({ error: new Error('Sign out failed') } as any);
+
+        vi.resetModules();
+        const { useAuthStore } = await import('../stores/authStore');
+        const store = useAuthStore.getState();
+        await store.disconnect();
+
+        const state = useAuthStore.getState();
+        expect(state.error).toBe('Sign out failed');
+        expect(state.isLoading).toBe(false);
+      });
     });
   });
 
