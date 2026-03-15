@@ -54,6 +54,12 @@ if pgrep -f "expo start" > /dev/null 2>&1; then
   pkill -f "expo start" 2>/dev/null && echo "  - expo process killed" || true
 fi
 
+# Kill anything on the default Expo port (8081)
+EXPO_PIDS=$(lsof -ti tcp:8081 2>/dev/null || true)
+if [ -n "$EXPO_PIDS" ]; then
+  echo "$EXPO_PIDS" | xargs kill 2>/dev/null && echo "  - port 8081 freed" || true
+fi
+
 # ─── Step 2: Restore macOS sleep prevention ──────────────────────────────────
 
 echo "[2/7] Restoring macOS sleep settings..."
@@ -126,32 +132,12 @@ else
   fi
 fi
 
-# ─── Step 4: Uninstall CLI (npm) ─────────────────────────────────────────────
-
-echo "[4/7] Uninstalling CLI (npm)..."
-if npm list -g @tongil_kim/clautunnel > /dev/null 2>&1; then
-  npm uninstall -g @tongil_kim/clautunnel
-  echo "  - npm package removed"
-else
-  echo "  - not installed via npm, skipped"
-fi
-
-# ─── Step 5: Uninstall CLI (Homebrew) ────────────────────────────────────────
-
-echo "[5/7] Uninstalling CLI (Homebrew)..."
-if brew list clautunnel > /dev/null 2>&1; then
-  brew uninstall clautunnel
-  echo "  - Homebrew package removed"
-else
-  echo "  - not installed via Homebrew, skipped"
-fi
-
-# ─── Step 6: Uninstall ngrok ────────────────────────────────────────────────
+# ─── Step 4: Uninstall ngrok ─────────────────────────────────────────────────
 
 if [ "$SKIP_NGROK" = true ]; then
-  echo "[6/7] Skipping ngrok cleanup (--skip-ngrok)"
+  echo "[4/7] Skipping ngrok cleanup (--skip-ngrok)"
 else
-  echo "[6/7] Uninstalling ngrok..."
+  echo "[4/7] Uninstalling ngrok..."
   if brew list ngrok > /dev/null 2>&1; then
     brew uninstall ngrok
     echo "  - ngrok removed"
@@ -174,9 +160,9 @@ else
   fi
 fi
 
-# ─── Step 7: Remove local data ──────────────────────────────────────────────
+# ─── Step 5: Remove local data ──────────────────────────────────────────────
 
-echo "[7/7] Removing local data..."
+echo "[5/7] Removing local data..."
 
 if [ -d "$CONFIG_DIR" ]; then
   rm -rf "$CONFIG_DIR"
@@ -190,6 +176,27 @@ if [ -d "$LEGACY_DIR" ]; then
   echo "  - ~/.termbridge removed (legacy)"
 else
   echo "  - ~/.termbridge already clean"
+fi
+
+# ─── Step 6: Uninstall CLI (npm) ─────────────────────────────────────────────
+# Runs after config removal so if it fails mid-way, re-running still works.
+
+echo "[6/7] Uninstalling CLI (npm)..."
+if npm list -g @tongil_kim/clautunnel > /dev/null 2>&1; then
+  npm uninstall -g @tongil_kim/clautunnel
+  echo "  - npm package removed"
+else
+  echo "  - not installed via npm, skipped"
+fi
+
+# ─── Step 7: Uninstall CLI (Homebrew) ────────────────────────────────────────
+
+echo "[7/7] Uninstalling CLI (Homebrew)..."
+if brew list clautunnel > /dev/null 2>&1; then
+  brew uninstall clautunnel
+  echo "  - Homebrew package removed"
+else
+  echo "  - not installed via Homebrew, skipped"
 fi
 
 echo ""

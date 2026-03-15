@@ -3,7 +3,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { execSync } from 'child_process';
-import { Config } from '../utils/config.js';
 import { Logger } from '../utils/logger.js';
 import { PID_FILE, readPidFile, isProcessAlive } from '../utils/pid.js';
 import { createSupabaseClient } from '../utils/supabase.js';
@@ -34,11 +33,11 @@ export function createResetCommand(): Command {
         if (!options.skipDb) {
           logger.info('  - Delete all your data from Supabase (machines, sessions, messages)');
         }
-        logger.info('  - Uninstall clautunnel (npm & Homebrew)');
         if (!options.skipNgrok) {
           logger.info('  - Uninstall ngrok and remove its config');
         }
         logger.info('  - Delete ~/.clautunnel/ config directory');
+        logger.info('  - Uninstall clautunnel (npm & Homebrew)');
         logger.info('');
 
         const confirmed = await promptYesNo('Are you sure? [y/N]: ');
@@ -122,31 +121,11 @@ export function createResetCommand(): Command {
         await cleanSupabaseDb(logger);
       }
 
-      // ─── Step 4: Uninstall CLI (npm) ──────────────────────────────
-      logger.info('[4/7] Uninstalling CLI (npm)...');
-      try {
-        execSync('npm list -g @tongil_kim/clautunnel', { stdio: 'ignore' });
-        execSync('npm uninstall -g @tongil_kim/clautunnel', { stdio: 'inherit' });
-        logger.info('  - npm package removed');
-      } catch {
-        logger.info('  - not installed via npm, skipped');
-      }
-
-      // ─── Step 5: Uninstall CLI (Homebrew) ─────────────────────────
-      logger.info('[5/7] Uninstalling CLI (Homebrew)...');
-      try {
-        execSync('brew list clautunnel', { stdio: 'ignore' });
-        execSync('brew uninstall clautunnel', { stdio: 'inherit' });
-        logger.info('  - Homebrew package removed');
-      } catch {
-        logger.info('  - not installed via Homebrew, skipped');
-      }
-
-      // ─── Step 6: Uninstall ngrok ──────────────────────────────────
+      // ─── Step 4: Uninstall ngrok ──────────────────────────────────
       if (options.skipNgrok) {
-        logger.info('[6/7] Skipping ngrok cleanup (--skip-ngrok)');
+        logger.info('[4/7] Skipping ngrok cleanup (--skip-ngrok)');
       } else {
-        logger.info('[6/7] Uninstalling ngrok...');
+        logger.info('[4/7] Uninstalling ngrok...');
         try {
           execSync('brew list ngrok', { stdio: 'ignore' });
           execSync('brew uninstall ngrok', { stdio: 'inherit' });
@@ -174,8 +153,8 @@ export function createResetCommand(): Command {
         }
       }
 
-      // ─── Step 7: Remove local data ────────────────────────────────
-      logger.info('[7/7] Removing local data...');
+      // ─── Step 5: Remove local data ────────────────────────────────
+      logger.info('[5/7] Removing local data...');
 
       const configDir = path.join(os.homedir(), '.clautunnel');
       const legacyDir = path.join(os.homedir(), '.termbridge');
@@ -190,6 +169,28 @@ export function createResetCommand(): Command {
       if (fs.existsSync(legacyDir)) {
         fs.rmSync(legacyDir, { recursive: true, force: true });
         logger.info('  - ~/.termbridge removed (legacy)');
+      }
+
+      // ─── Step 6: Uninstall CLI (npm) ──────────────────────────────
+      // Runs after config removal so if it fails, re-running the command
+      // still works (the binary is still available).
+      logger.info('[6/7] Uninstalling CLI (npm)...');
+      try {
+        execSync('npm list -g @tongil_kim/clautunnel', { stdio: 'ignore' });
+        execSync('npm uninstall -g @tongil_kim/clautunnel', { stdio: 'inherit' });
+        logger.info('  - npm package removed');
+      } catch {
+        logger.info('  - not installed via npm, skipped');
+      }
+
+      // ─── Step 7: Uninstall CLI (Homebrew) ─────────────────────────
+      logger.info('[7/7] Uninstalling CLI (Homebrew)...');
+      try {
+        execSync('brew list clautunnel', { stdio: 'ignore' });
+        execSync('brew uninstall clautunnel', { stdio: 'inherit' });
+        logger.info('  - Homebrew package removed');
+      } catch {
+        logger.info('  - not installed via Homebrew, skipped');
       }
 
       logger.info('');
