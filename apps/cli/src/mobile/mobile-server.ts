@@ -465,13 +465,6 @@ export class MobileServerManager {
     const pairingParam = this.options.pairingCode ? `/--/pair?code=${this.options.pairingCode}` : '';
     const expoUrl = `exp://${host}:443${pairingParam}`;
     console.log('');
-    console.log('  ┌─────────────────────────────────────────────────┐');
-    console.log('  │  Expo Go is required to open this QR code.      │');
-    console.log('  │  iOS:     https://apps.apple.com/app/id982107779│');
-    console.log('  │  Android: https://play.google.com/store/apps/   │');
-    console.log('  │           details?id=host.exp.exponent          │');
-    console.log('  └─────────────────────────────────────────────────┘');
-    console.log('');
     console.log('  Scan with Expo Go:');
     qrcode.generate(expoUrl, { small: true }, (code: string) => {
       // Indent each line for alignment
@@ -480,6 +473,13 @@ export class MobileServerManager {
       }
     });
     console.log(`  ${expoUrl}`);
+    console.log('');
+    console.log('  ┌─────────────────────────────────────────────────┐');
+    console.log('  │  Expo Go is required to open this QR code.      │');
+    console.log('  │  iOS:     https://apps.apple.com/app/id982107779│');
+    console.log('  │  Android: https://play.google.com/store/apps/   │');
+    console.log('  │           details?id=host.exp.exponent          │');
+    console.log('  └─────────────────────────────────────────────────┘');
     console.log('');
 
     return { started: true, tunnelUrl };
