@@ -1,281 +1,346 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type { RealtimeChannel } from '@supabase/supabase-js';
+import { RealtimeClient } from '../../apps/cli/src/realtime/client.js';
 
 /**
- * Integration tests for CLI-to-Realtime communication flow
- * These tests verify the end-to-end flow of data from PTY to Realtime channels
+ * Integration tests for CLI RealtimeClient
+ * Tests actual RealtimeClient behavior with mocked Supabase boundary
  */
 
-// Mock Supabase
-const mockChannel = {
-  subscribe: vi.fn((cb) => {
-    setTimeout(() => cb('SUBSCRIBED'), 0);
-    return mockChannel;
-  }),
-  send: vi.fn().mockResolvedValue({ error: null }),
-  on: vi.fn().mockReturnThis(),
-};
+// --- Mock Supabase boundary ---
 
-const mockSupabase = {
-  channel: vi.fn(() => mockChannel),
-  removeChannel: vi.fn().mockResolvedValue({ error: null }),
-  from: vi.fn(() => ({
-    insert: vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({
-          data: { id: 'test-session', machine_id: 'test-machine', status: 'active' },
-          error: null,
-        }),
-      }),
+function createMockChannel(subscribeStatus: string = 'SUBSCRIBED') {
+  const channel: any = {
+    subscribe: vi.fn((cb: (status: string) => void) => {
+      setTimeout(() => cb(subscribeStatus), 0);
+      return channel as RealtimeChannel;
     }),
-    update: vi.fn().mockReturnValue({
-      eq: vi.fn().mockResolvedValue({ error: null }),
-    }),
-    select: vi.fn().mockReturnValue({
-      eq: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({ data: null, error: { code: 'PGRST116' } }),
-      }),
-    }),
-  })),
-};
+    send: vi.fn().mockResolvedValue({ error: null }),
+    on: vi.fn().mockReturnThis(),
+    track: vi.fn().mockResolvedValue(undefined),
+    untrack: vi.fn().mockResolvedValue(undefined),
+  };
+  return channel;
+}
 
-vi.mock('node-pty', () => ({
-  spawn: vi.fn(() => ({
-    onData: vi.fn(),
-    onExit: vi.fn(),
-    write: vi.fn(),
-    resize: vi.fn(),
-    kill: vi.fn(),
-  })),
-}));
+let inputHandler: ((payload: any) => void) | null = null;
 
-describe('CLI to Realtime Integration', () => {
+function createMockInputChannel(subscribeStatus: string = 'SUBSCRIBED') {
+  const channel: any = {
+    subscribe: vi.fn((cb: (status: string) => void) => {
+      setTimeout(() => cb(subscribeStatus), 0);
+      return channel as RealtimeChannel;
+    }),
+    send: vi.fn().mockResolvedValue({ error: null }),
+    on: vi.fn((event: string, filter: any, handler: (payload: any) => void) => {
+      if (event === 'broadcast' && filter?.event === 'input') {
+        inputHandler = handler;
+      }
+      return channel;
+    }),
+    track: vi.fn().mockResolvedValue(undefined),
+    untrack: vi.fn().mockResolvedValue(undefined),
+  };
+  return channel;
+}
+
+function createMockPresenceChannel() {
+  const channel: any = {
+    subscribe: vi.fn((cb: (status: string) => void) => {
+      setTimeout(() => cb('SUBSCRIBED'), 0);
+      return channel as RealtimeChannel;
+    }),
+    track: vi.fn().mockResolvedValue(undefined),
+    untrack: vi.fn().mockResolvedValue(undefined),
+  };
+  return channel;
+}
+
+function createMockInsert() {
+  return vi.fn().mockResolvedValue({ error: null });
+}
+
+function createMockSupabase(
+  outputChannel: any,
+  inputChannel: any,
+  presenceChannel: any,
+  mockInsert: ReturnType<typeof vi.fn>,
+) {
+  let channelCallCount = 0;
+  const channels = [outputChannel, inputChannel, presenceChannel];
+
+  return {
+    channel: vi.fn(() => {
+      return channels[channelCallCount++] || presenceChannel;
+    }),
+    removeChannel: vi.fn().mockResolvedValue({ error: null }),
+    from: vi.fn(() => ({
+      insert: mockInsert,
+    })),
+  } as any;
+}
+
+describe('CLI RealtimeClient Integration', () => {
+  let client: RealtimeClient;
+  let mockOutputChannel: any;
+  let mockInputChannel: any;
+  let mockPresenceChannel: any;
+  let mockInsert: ReturnType<typeof vi.fn>;
+  let mockSupabase: any;
+
   beforeEach(() => {
-    vi.clearAllMocks();
+    inputHandler = null;
+    mockOutputChannel = createMockChannel();
+    mockInputChannel = createMockInputChannel();
+    mockPresenceChannel = createMockPresenceChannel();
+    mockInsert = createMockInsert();
+    mockSupabase = createMockSupabase(
+      mockOutputChannel,
+      mockInputChannel,
+      mockPresenceChannel,
+      mockInsert,
+    );
+    client = new RealtimeClient({ supabase: mockSupabase, sessionId: 'test-session' });
+  });
+
+  afterEach(async () => {
+    if (client.isConnected()) {
+      await client.disconnect();
+    }
   });
 
   describe('Output Broadcasting', () => {
-    it('should broadcast PTY output to realtime channel', async () => {
-      // Simulate the flow: PTY output -> RealtimeClient.broadcast()
-      const outputData = 'Hello from Claude Code';
+    it('broadcast() increments seq by 1 and emits a broadcast event', async () => {
+      // Arrange
+      await client.connect();
+      const handler = vi.fn();
+      client.on('broadcast', handler);
 
-      // Connect to channel
-      await new Promise<void>((resolve) => {
-        mockChannel.subscribe((status: string) => {
-          if (status === 'SUBSCRIBED') resolve();
-        });
-      });
+      // Act
+      await client.broadcast('Hello');
 
-      // Simulate broadcast
-      await mockChannel.send({
-        type: 'broadcast',
-        event: 'output',
-        payload: {
+      // Assert
+      expect(handler).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'output', content: 'Hello' }),
+      );
+      expect(client.getSeq()).toBe(1);
+    });
+
+    it('sequential broadcasts increment seq in order', async () => {
+      // Arrange
+      await client.connect();
+
+      // Act
+      await client.broadcast('one');
+      await client.broadcast('two');
+      await client.broadcast('three');
+
+      // Assert
+      expect(client.getSeq()).toBe(3);
+    });
+
+    it('broadcast persists the message to the database', async () => {
+      // Arrange
+      await client.connect();
+
+      // Act
+      await client.broadcast('persisted content');
+
+      // Assert (DB is an external boundary, so verifying the mock call is acceptable)
+      expect(mockInsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          session_id: 'test-session',
           type: 'output',
-          content: outputData,
+          content: 'persisted content',
+          seq: 1,
+        }),
+      );
+    });
+
+    it('100 rapid broadcasts are all processed with correct final seq', async () => {
+      // Arrange
+      await client.connect();
+
+      // Act
+      await Promise.all(
+        Array.from({ length: 100 }, (_, i) => client.broadcast(`msg-${i}`)),
+      );
+
+      // Assert
+      expect(client.getSeq()).toBe(100);
+    });
+  });
+
+  describe('Input Receiving', () => {
+    it('emits an input event when the input channel receives a message', async () => {
+      // Arrange
+      await client.connect();
+      const handler = vi.fn();
+      client.on('input', handler);
+
+      // Act - simulate incoming message via the captured input handler
+      expect(inputHandler).not.toBeNull();
+      inputHandler!({
+        payload: {
+          type: 'input',
+          content: 'y\n',
           timestamp: Date.now(),
           seq: 1,
         },
       });
 
-      expect(mockChannel.send).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'broadcast',
-          event: 'output',
-          payload: expect.objectContaining({
-            content: outputData,
-          }),
-        })
+      // Assert
+      expect(handler).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'input', content: 'y\n' }),
       );
     });
 
-    it('should include sequence number in broadcast messages', async () => {
-      let seq = 0;
+    it('handles special character inputs without errors', async () => {
+      // Arrange
+      await client.connect();
+      const handler = vi.fn();
+      client.on('input', handler);
 
-      const broadcast = async (content: string) => {
-        await mockChannel.send({
-          type: 'broadcast',
-          event: 'output',
-          payload: {
-            type: 'output',
-            content,
-            timestamp: Date.now(),
-            seq: ++seq,
-          },
-        });
-      };
-
-      await broadcast('message 1');
-      await broadcast('message 2');
-      await broadcast('message 3');
-
-      expect(mockChannel.send).toHaveBeenCalledTimes(3);
-
-      const calls = mockChannel.send.mock.calls;
-      expect(calls[0][0].payload.seq).toBe(1);
-      expect(calls[1][0].payload.seq).toBe(2);
-      expect(calls[2][0].payload.seq).toBe(3);
-    });
-
-    it('should handle rapid consecutive outputs', async () => {
-      const outputs = Array.from({ length: 100 }, (_, i) => `output-${i}`);
-      let seq = 0;
-
-      const broadcasts = outputs.map((content) =>
-        mockChannel.send({
-          type: 'broadcast',
-          event: 'output',
-          payload: { type: 'output', content, timestamp: Date.now(), seq: ++seq },
-        })
-      );
-
-      await Promise.all(broadcasts);
-
-      expect(mockChannel.send).toHaveBeenCalledTimes(100);
-    });
-  });
-
-  describe('Input Receiving', () => {
-    it('should receive input from mobile via realtime channel', async () => {
-      let receivedInput: string | null = null;
-      let inputHandler: ((payload: any) => void) | null = null;
-
-      mockChannel.on = vi.fn((event, filter, handler) => {
-        if (event === 'broadcast' && filter.event === 'input') {
-          inputHandler = handler;
-        }
-        return mockChannel;
-      });
-
-      // Set up listener
-      mockChannel.on('broadcast', { event: 'input' }, (payload: any) => {
-        receivedInput = payload.payload.content;
-      });
-
-      // Simulate receiving input
-      if (inputHandler) {
-        inputHandler({
-          payload: {
-            type: 'input',
-            content: 'y\n',
-            timestamp: Date.now(),
-            seq: 1,
-          },
-        });
-      }
-
-      expect(receivedInput).toBe('y\n');
-    });
-
-    it('should handle special characters in input', async () => {
       const specialInputs = [
         '\x03', // Ctrl+C
         '\x04', // Ctrl+D
         '\t',   // Tab
         '\n',   // Enter
         '\x1b[A', // Arrow up
+        '\x1b[B', // Arrow down
       ];
 
+      // Act
       for (const input of specialInputs) {
-        const message = {
-          type: 'input',
-          content: input,
-          timestamp: Date.now(),
-          seq: 1,
-        };
-
-        // Should not throw
-        expect(() => {
-          JSON.stringify(message);
-        }).not.toThrow();
+        inputHandler!({
+          payload: { type: 'input', content: input, timestamp: Date.now(), seq: 1 },
+        });
       }
+
+      // Assert
+      expect(handler).toHaveBeenCalledTimes(specialInputs.length);
     });
   });
 
-  describe('Session Lifecycle', () => {
-    it('should create session on daemon start', async () => {
-      const createSession = async (machineId: string) => {
-        const { data, error } = await mockSupabase
-          .from('sessions')
-          .insert({ machine_id: machineId, status: 'active' })
-          .select()
-          .single();
+  describe('Connection Lifecycle', () => {
+    it('isConnected() returns true after connect()', async () => {
+      // Act
+      await client.connect();
 
-        return data;
-      };
-
-      const session = await createSession('machine-123');
-
-      expect(session).toBeDefined();
-      expect(session.status).toBe('active');
+      // Assert
+      expect(client.isConnected()).toBe(true);
     });
 
-    it('should end session on daemon stop', async () => {
-      const endSession = async (sessionId: string) => {
-        await mockSupabase
-          .from('sessions')
-          .update({ status: 'ended', ended_at: new Date().toISOString() })
-          .eq('id', sessionId);
-      };
+    it('isConnected() returns false after disconnect()', async () => {
+      // Arrange
+      await client.connect();
 
-      // Should not throw
-      await expect(endSession('session-123')).resolves.not.toThrow();
+      // Act
+      await client.disconnect();
+
+      // Assert
+      expect(client.isConnected()).toBe(false);
     });
 
-    it('should update machine status on connection changes', async () => {
-      const updateMachineStatus = async (machineId: string, status: string) => {
-        await mockSupabase
-          .from('machines')
-          .update({ status, last_seen_at: new Date().toISOString() })
-          .eq('id', machineId);
-      };
+    it('emits connected event on connect()', async () => {
+      // Arrange
+      const handler = vi.fn();
+      client.on('connected', handler);
 
-      await updateMachineStatus('machine-123', 'online');
-      await updateMachineStatus('machine-123', 'offline');
+      // Act
+      await client.connect();
 
-      expect(mockSupabase.from).toHaveBeenCalledWith('machines');
+      // Assert
+      expect(handler).toHaveBeenCalledTimes(1);
+    });
+
+    it('emits disconnected event on disconnect()', async () => {
+      // Arrange
+      await client.connect();
+      const handler = vi.fn();
+      client.on('disconnected', handler);
+
+      // Act
+      await client.disconnect();
+
+      // Assert
+      expect(handler).toHaveBeenCalledTimes(1);
+    });
+
+    it('realtimeEnabled is false when channel subscription fails', async () => {
+      // Arrange - create client with failing channels
+      const failingOutput = createMockChannel('CHANNEL_ERROR');
+      const failingInput = createMockInputChannel('CHANNEL_ERROR');
+      const failSupabase = createMockSupabase(
+        failingOutput,
+        failingInput,
+        mockPresenceChannel,
+        mockInsert,
+      );
+      const failClient = new RealtimeClient({
+        supabase: failSupabase,
+        sessionId: 'fail-session',
+      });
+
+      // Act
+      await failClient.connect();
+
+      // Assert
+      expect(failClient.isRealtimeEnabled()).toBe(false);
+
+      await failClient.disconnect();
+    });
+
+    it('broadcast only persists to DB when realtime is disabled (no channel.send)', async () => {
+      // Arrange - failing subscription means realtimeEnabled = false
+      const failingOutput = createMockChannel('CHANNEL_ERROR');
+      const failingInput = createMockInputChannel('CHANNEL_ERROR');
+      const failSupabase = createMockSupabase(
+        failingOutput,
+        failingInput,
+        mockPresenceChannel,
+        mockInsert,
+      );
+      const failClient = new RealtimeClient({
+        supabase: failSupabase,
+        sessionId: 'fail-session',
+      });
+      await failClient.connect();
+
+      // Act
+      await failClient.broadcast('db-only');
+
+      // Assert - DB was called (external boundary check is allowed)
+      expect(mockInsert).toHaveBeenCalled();
+      // channel.send should NOT have been called
+      expect(failingOutput.send).not.toHaveBeenCalled();
+
+      await failClient.disconnect();
     });
   });
 
-  describe('Reconnection Flow', () => {
-    it('should attempt reconnection on disconnect', async () => {
-      let reconnectAttempts = 0;
-      const maxRetries = 3;
-
-      const attemptReconnect = async (): Promise<boolean> => {
-        reconnectAttempts++;
-        if (reconnectAttempts >= maxRetries) {
-          return true; // Simulated success on 3rd attempt
-        }
-        return false;
-      };
-
-      while (reconnectAttempts < maxRetries) {
-        const success = await attemptReconnect();
-        if (success) break;
-      }
-
-      expect(reconnectAttempts).toBe(3);
+  describe('Error Resilience', () => {
+    it('broadcast() throws Not connected when not connected', async () => {
+      // Act & Assert
+      await expect(client.broadcast('hello')).rejects.toThrow('Not connected');
     });
 
-    it('should use exponential backoff for retries', () => {
-      const baseDelay = 1000;
-      const maxDelay = 30000;
+    it('broadcast does not throw when DB persist fails', async () => {
+      // Arrange
+      mockInsert.mockResolvedValue({ error: { message: 'DB failure' } });
+      await client.connect();
 
-      const calculateBackoff = (attempt: number): number => {
-        const exponentialDelay = Math.min(
-          baseDelay * Math.pow(2, attempt),
-          maxDelay
-        );
-        const jitter = exponentialDelay * 0.2 * (Math.random() * 2 - 1);
-        return Math.floor(exponentialDelay + jitter);
-      };
+      // Act & Assert
+      await expect(client.broadcast('still works')).resolves.not.toThrow();
+    });
 
-      const delays = [0, 1, 2, 3, 4, 5].map(calculateBackoff);
+    it('broadcast does not throw when DB persist throws an exception', async () => {
+      // Arrange
+      mockInsert.mockRejectedValue(new Error('Network error'));
+      await client.connect();
 
-      // Verify exponential growth (with some tolerance for jitter)
-      expect(delays[1]).toBeLessThan(delays[2]);
-      expect(delays[2]).toBeLessThan(delays[3]);
-      expect(delays[5]).toBeLessThanOrEqual(maxDelay * 1.2); // Allow for jitter
+      // Act & Assert
+      await expect(client.broadcast('resilient')).resolves.not.toThrow();
     });
   });
 });

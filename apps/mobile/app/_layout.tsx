@@ -36,9 +36,12 @@ export default function RootLayout() {
 
   const { isPaired, isLoading, initialize } = useAuthStore();
 
-  // Initialize auth on app load (skip in test mode — stores have mock data from init)
+  // Initialize auth on app load
   useEffect(() => {
-    if (!isTestMode()) {
+    if (isTestMode()) {
+      // In test mode, initialize() just clears isLoading so routing can proceed
+      initialize();
+    } else {
       // Pass the initial URL so initialize() can detect re-pairing deep links
       // and sign out the old session before routing decisions are made
       Linking.getInitialURL().then((url) => {

@@ -9,6 +9,12 @@ import {
 import * as Linking from 'expo-linking';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuthStore } from '../src/stores/authStore';
+import { isTestMode } from '../src/utils/testMode';
+
+// Module-level flag: auto-pair only once per app process lifetime.
+// After disconnect, the pair screen remounts but should NOT auto-pair again,
+// so the logout Maestro flow can verify a stable logged-out state.
+let testModeAutoPaired = false;
 
 export default function PairScreen() {
   const { code } = useLocalSearchParams<{ code?: string }>();
@@ -19,6 +25,16 @@ export default function PairScreen() {
   const { redeemPairingCode, isPaired, isLoading, error } = useAuthStore();
   const [attemptedCode, setAttemptedCode] = useState<string | null>(null);
   const attemptedCodeRef = useRef<string | null>(null);
+
+  // In test mode, auto-pair on first app launch so Maestro flows proceed.
+  // Skip on subsequent mounts (e.g. after disconnect) so the logout E2E
+  // flow can verify the pair screen stays visible.
+  useEffect(() => {
+    if (isTestMode() && !testModeAutoPaired) {
+      testModeAutoPaired = true;
+      redeemPairingCode('test-code');
+    }
+  }, []);
 
   // Handle cold-start deep links (code available from route params)
   useEffect(() => {
@@ -51,7 +67,7 @@ export default function PairScreen() {
   }, [isPaired]);
 
   return (
-    <View style={[styles.container, isDark && styles.containerDark]}>
+    <View testID="pair-screen" style={[styles.container, isDark && styles.containerDark]}>
       <View style={styles.content}>
         <Text style={[styles.title, isDark && styles.titleDark]}>
           ClauTunnel
@@ -59,14 +75,14 @@ export default function PairScreen() {
 
         {isLoading || (code && code !== attemptedCode) ? (
           <>
-            <ActivityIndicator size="large" color="#3b82f6" style={styles.spinner} />
-            <Text style={[styles.status, isDark && styles.statusDark]}>
+            <ActivityIndicator testID="pair-spinner" size="large" color="#3b82f6" style={styles.spinner} />
+            <Text testID="pair-status-text" style={[styles.status, isDark && styles.statusDark]}>
               Pairing device...
             </Text>
           </>
         ) : error ? (
           <>
-            <Text style={styles.errorText}>{error}</Text>
+            <Text testID="pair-error-text" style={styles.errorText}>{error}</Text>
             <Text style={[styles.instructions, isDark && styles.instructionsDark]}>
               The pairing code may have expired.{'\n'}
               Run "clautunnel start" again to get a new QR code.
@@ -77,7 +93,7 @@ export default function PairScreen() {
             <Text style={[styles.subtitle, isDark && styles.subtitleDark]}>
               Remote control for Claude Code
             </Text>
-            <View style={styles.instructionBox}>
+            <View testID="pair-instructions" style={styles.instructionBox}>
               <Text style={[styles.instructionTitle, isDark && styles.instructionTitleDark]}>
                 To pair this device:
               </Text>

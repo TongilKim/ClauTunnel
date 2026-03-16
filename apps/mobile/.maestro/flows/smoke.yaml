@@ -3,25 +3,8 @@ appId: com.clautunnel.app
 - launchApp:
     clearState: true
 
-# Wait for the login screen to finish rendering, especially on Android cold starts
-- extendedWaitUntil:
-    visible:
-      id: "login-email-input"
-    timeout: 15000
-- takeScreenshot: app-launched
-
-# Sign in with mock credentials
-- assertVisible: "ClauTunnel"
-- tapOn:
-    id: "login-email-input"
-- inputText: "test@clautunnel.com"
-- tapOn:
-    id: "login-password-input"
-- inputText: "password123"
-- tapOn:
-    id: "login-button"
-
-# Session list — wait for mock data to render
+# In test mode, the app auto-pairs and redirects to the session list.
+# Wait for mock session data to render.
 - extendedWaitUntil:
     visible:
       id: "sessions-stats-total"

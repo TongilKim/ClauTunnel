@@ -2,18 +2,12 @@ appId: com.clautunnel.app
 ---
 - launchApp:
     clearState: true
-- tapOn:
-    id: "login-email-input"
-- inputText: "test@clautunnel.com"
-- tapOn:
-    id: "login-password-input"
-- inputText: "password123"
-- tapOn:
-    id: "login-button"
+# Test mode auto-pairs — wait for session list
 - extendedWaitUntil:
     visible:
       id: "sessions-stats-total"
-    timeout: 5000
+    timeout: 15000
+# Navigate to settings
 - tapOn:
     point: "75%,93%"
 - extendedWaitUntil:
@@ -24,9 +18,10 @@ appId: com.clautunnel.app
     id: "settings-logout-button"
 - tapOn:
     id: "settings-logout-button"
-- tapOn: "Sign Out"
+- tapOn: "Disconnect"
+# After logout, should land on pair screen
 - extendedWaitUntil:
     visible:
-      id: "login-email-input"
+      id: "pair-screen"
     timeout: 5000
 - assertVisible: "ClauTunnel"

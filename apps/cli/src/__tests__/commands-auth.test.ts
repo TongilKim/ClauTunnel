@@ -36,6 +36,21 @@ vi.mock('../utils/sleep-prevention.js', () => ({
   openFullDiskAccessSettings: vi.fn().mockReturnValue(true),
 }));
 
+// Mock PID file utilities to prevent real file system side effects
+vi.mock('../utils/pid.js', () => ({
+  acquirePidFile: vi.fn().mockReturnValue(null), // Lock acquired
+  removePidFile: vi.fn(),
+  readPidFile: vi.fn().mockReturnValue(null),
+  isProcessAlive: vi.fn().mockReturnValue(false),
+  pidFileExists: vi.fn().mockReturnValue(false),
+  PID_FILE: '/tmp/test-daemon.pid',
+}));
+
+// Mock Claude CLI auth check to prevent real execSync
+vi.mock('../utils/claude-auth.js', () => ({
+  checkClaudeCliAuth: vi.fn().mockReturnValue({ loggedIn: true }),
+}));
+
 // Mock process.exit to prevent test from exiting
 const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
   throw new Error('process.exit called');
@@ -48,11 +63,19 @@ const mockUnsubscribe = vi.fn();
 const mockOnAuthStateChange = vi.fn().mockReturnValue({
   data: { subscription: { unsubscribe: mockUnsubscribe } },
 });
+const mockGetSession = vi.fn().mockResolvedValue({
+  data: { session: null },
+  error: null,
+});
 const mockSupabaseClient = {
   auth: {
     setSession: mockSetSession,
     getUser: mockGetUser,
+    getSession: mockGetSession,
     onAuthStateChange: mockOnAuthStateChange,
+  },
+  functions: {
+    invoke: vi.fn().mockResolvedValue({ data: { code: 'test-pair-code' }, error: null }),
   },
   channel: vi.fn(() => ({
     on: vi.fn().mockReturnThis(),
@@ -156,20 +179,21 @@ describe('Command Authentication', () => {
         };
       });
 
-      const { createStartCommand } = await import('../commands/start.js');
-      const cmd = createStartCommand();
+      // Test restoreSession directly — this is the unit that setSession
+      // lives in. Going through the full command is fragile because the
+      // daemon setup has many unrelated dependencies.
+      const { restoreSession } = await import('../utils/supabase.js');
+      const { Config } = await import('../utils/config.js');
+      const config = new Config();
 
-      // This will fail for other reasons (daemon setup) but we can verify setSession was called
-      try {
-        await cmd.parseAsync(['node', 'test', 'claude'], { from: 'user' });
-      } catch {
-        // Expected to fail due to daemon setup, but setSession should have been called
-      }
+      const result = await restoreSession(mockSupabaseClient as any, config);
 
       expect(mockSetSession).toHaveBeenCalledWith({
         access_token: 'test-access-token',
         refresh_token: 'test-refresh-token',
       });
+      expect(mockGetUser).toHaveBeenCalled();
+      expect(result).toEqual({ user: { id: 'user-123', email: 'test@example.com' } });
     });
 
     it('should exit with error when session is expired', async () => {

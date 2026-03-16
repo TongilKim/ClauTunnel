@@ -1,4 +1,6 @@
-export type MessageType = 'output' | 'input' | 'error' | 'system' | 'tool-use';
+import { MESSAGE_TYPES, REALTIME_MESSAGE_TYPES } from '../constants/message-types.js';
+
+export type MessageType = (typeof MESSAGE_TYPES)[number];
 
 export type PermissionMode =
   | 'default' // Ask before making changes
@@ -17,38 +19,7 @@ export interface Message {
   created_at: string;
 }
 
-export type RealtimeMessageType =
-  | 'output'
-  | 'input'
-  | 'error'
-  | 'system'
-  | 'mode'
-  | 'mode-change'
-  | 'commands'
-  | 'commands-request'
-  | 'model'
-  | 'model-change'
-  | 'models'
-  | 'models-request'
-  | 'mobile-disconnect'
-  | 'interactive-request'
-  | 'interactive-response'
-  | 'interactive-apply'
-  | 'interactive-confirm'
-  | 'cancel-request' // Request to cancel/stop Claude's current processing
-  | 'clear-request' // Request to clear conversation (doesn't appear in chat)
-  | 'resume-request' // Request to resume a different session (doesn't appear in chat)
-  | 'resume-history' // Tells mobile to load messages from a previous session
-  | 'user-question' // Claude is asking the user a question with options
-  | 'user-answer' // User's answer to a question
-  | 'permission-request' // SDK is asking for tool permission
-  | 'permission-response' // User's response to permission request
-  | 'request-queued' // Message was queued because Claude is still processing
-  | 'status-request' // Mobile requests current pending state (question/permission)
-  | 'status-response' // CLI responds with current processing state
-  | 'session-title' // Session title was auto-generated from first user message
-  | 'tool-use' // Tool use data for displaying diffs (Edit, Write, etc.)
-  | 'complete'; // Claude has finished responding (query complete)
+export type RealtimeMessageType = (typeof REALTIME_MESSAGE_TYPES)[number];
 
 export type InteractiveCommandType =
   | 'config'

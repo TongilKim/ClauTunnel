@@ -849,6 +849,616 @@ describe('RealtimeClient', () => {
     });
   });
 
+  describe('broadcastInteractiveResponse', () => {
+    it('should emit broadcast event with interactive-response type and interactiveData', async () => {
+      const client = new RealtimeClient({
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      const broadcastHandler = vi.fn();
+      client.on('broadcast', broadcastHandler);
+
+      await client.connect();
+
+      const mockData = { command: 'undo', args: ['--soft'] } as any;
+      await client.broadcastInteractiveResponse(mockData);
+
+      expect(broadcastHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'interactive-response',
+          interactiveData: mockData,
+        })
+      );
+      expect(client.getSeq()).toBe(1);
+    });
+
+    it('should throw Not connected when not connected', async () => {
+      const client = new RealtimeClient({
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      await expect(
+        client.broadcastInteractiveResponse({ command: 'undo' } as any)
+      ).rejects.toThrow('Not connected');
+    });
+
+    it('should skip broadcast when realtime is disabled', async () => {
+      const errorOutputChannel = {
+        subscribe: vi.fn((cb) => {
+          setTimeout(() => cb('CHANNEL_ERROR'), 0);
+          return errorOutputChannel as RealtimeChannel;
+        }),
+        send: vi.fn().mockResolvedValue({ error: null }),
+        on: vi.fn().mockReturnThis(),
+      };
+
+      const errorInputChannel = {
+        subscribe: vi.fn((cb) => {
+          setTimeout(() => cb('CHANNEL_ERROR'), 0);
+          return errorInputChannel as RealtimeChannel;
+        }),
+        send: vi.fn().mockResolvedValue({ error: null }),
+        on: vi.fn().mockReturnThis(),
+      };
+
+      const errorSupabase = {
+        channel: vi.fn((name) => {
+          if (name.includes('output')) {
+            return errorOutputChannel as RealtimeChannel;
+          }
+          return errorInputChannel as RealtimeChannel;
+        }),
+        removeChannel: vi.fn().mockResolvedValue({ error: null }),
+      };
+
+      const client = new RealtimeClient({
+        supabase: errorSupabase as unknown as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      await client.connect();
+      await client.broadcastInteractiveResponse({ command: 'undo' } as any);
+
+      expect(errorOutputChannel.send).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('broadcastInteractiveConfirm', () => {
+    it('should emit broadcast event with interactive-confirm type, command and result', async () => {
+      const client = new RealtimeClient({
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      const broadcastHandler = vi.fn();
+      client.on('broadcast', broadcastHandler);
+
+      await client.connect();
+      await client.broadcastInteractiveConfirm('undo' as any, 'accepted' as any);
+
+      expect(broadcastHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'interactive-confirm',
+          interactiveCommand: 'undo',
+          interactiveResult: 'accepted',
+        })
+      );
+    });
+
+    it('should throw Not connected when not connected', async () => {
+      const client = new RealtimeClient({
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      await expect(
+        client.broadcastInteractiveConfirm('undo' as any, 'accepted' as any)
+      ).rejects.toThrow('Not connected');
+    });
+
+    it('should skip broadcast when realtime is disabled', async () => {
+      const errorOutputChannel = {
+        subscribe: vi.fn((cb) => {
+          setTimeout(() => cb('CHANNEL_ERROR'), 0);
+          return errorOutputChannel as RealtimeChannel;
+        }),
+        send: vi.fn().mockResolvedValue({ error: null }),
+        on: vi.fn().mockReturnThis(),
+      };
+
+      const errorInputChannel = {
+        subscribe: vi.fn((cb) => {
+          setTimeout(() => cb('CHANNEL_ERROR'), 0);
+          return errorInputChannel as RealtimeChannel;
+        }),
+        send: vi.fn().mockResolvedValue({ error: null }),
+        on: vi.fn().mockReturnThis(),
+      };
+
+      const errorSupabase = {
+        channel: vi.fn((name) => {
+          if (name.includes('output')) {
+            return errorOutputChannel as RealtimeChannel;
+          }
+          return errorInputChannel as RealtimeChannel;
+        }),
+        removeChannel: vi.fn().mockResolvedValue({ error: null }),
+      };
+
+      const client = new RealtimeClient({
+        supabase: errorSupabase as unknown as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      await client.connect();
+      await client.broadcastInteractiveConfirm('undo' as any, 'accepted' as any);
+
+      expect(errorOutputChannel.send).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('broadcastResumeHistory', () => {
+    it('should emit broadcast event with resume-history type and historySessionId', async () => {
+      const client = new RealtimeClient({
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      const broadcastHandler = vi.fn();
+      client.on('broadcast', broadcastHandler);
+
+      await client.connect();
+      await client.broadcastResumeHistory('prev-session-id');
+
+      expect(broadcastHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'resume-history',
+          historySessionId: 'prev-session-id',
+        })
+      );
+    });
+
+    it('should throw Not connected when not connected', async () => {
+      const client = new RealtimeClient({
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      await expect(
+        client.broadcastResumeHistory('prev-session-id')
+      ).rejects.toThrow('Not connected');
+    });
+
+    it('should skip broadcast when realtime is disabled', async () => {
+      const errorOutputChannel = {
+        subscribe: vi.fn((cb) => {
+          setTimeout(() => cb('CHANNEL_ERROR'), 0);
+          return errorOutputChannel as RealtimeChannel;
+        }),
+        send: vi.fn().mockResolvedValue({ error: null }),
+        on: vi.fn().mockReturnThis(),
+      };
+
+      const errorInputChannel = {
+        subscribe: vi.fn((cb) => {
+          setTimeout(() => cb('CHANNEL_ERROR'), 0);
+          return errorInputChannel as RealtimeChannel;
+        }),
+        send: vi.fn().mockResolvedValue({ error: null }),
+        on: vi.fn().mockReturnThis(),
+      };
+
+      const errorSupabase = {
+        channel: vi.fn((name) => {
+          if (name.includes('output')) {
+            return errorOutputChannel as RealtimeChannel;
+          }
+          return errorInputChannel as RealtimeChannel;
+        }),
+        removeChannel: vi.fn().mockResolvedValue({ error: null }),
+      };
+
+      const client = new RealtimeClient({
+        supabase: errorSupabase as unknown as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      await client.connect();
+      await client.broadcastResumeHistory('prev-session-id');
+
+      expect(errorOutputChannel.send).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('broadcastUserQuestion', () => {
+    it('should emit broadcast event with user-question type and userQuestion data', async () => {
+      const client = new RealtimeClient({
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      const broadcastHandler = vi.fn();
+      client.on('broadcast', broadcastHandler);
+
+      await client.connect();
+
+      const mockQuestionData = { question: 'Continue?', options: ['yes', 'no'] } as any;
+      await client.broadcastUserQuestion(mockQuestionData);
+
+      expect(broadcastHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'user-question',
+          userQuestion: mockQuestionData,
+        })
+      );
+    });
+
+    it('should throw Not connected when not connected', async () => {
+      const client = new RealtimeClient({
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      await expect(
+        client.broadcastUserQuestion({ question: 'Continue?' } as any)
+      ).rejects.toThrow('Not connected');
+    });
+
+    it('should skip broadcast when realtime is disabled', async () => {
+      const errorOutputChannel = {
+        subscribe: vi.fn((cb) => {
+          setTimeout(() => cb('CHANNEL_ERROR'), 0);
+          return errorOutputChannel as RealtimeChannel;
+        }),
+        send: vi.fn().mockResolvedValue({ error: null }),
+        on: vi.fn().mockReturnThis(),
+      };
+
+      const errorInputChannel = {
+        subscribe: vi.fn((cb) => {
+          setTimeout(() => cb('CHANNEL_ERROR'), 0);
+          return errorInputChannel as RealtimeChannel;
+        }),
+        send: vi.fn().mockResolvedValue({ error: null }),
+        on: vi.fn().mockReturnThis(),
+      };
+
+      const errorSupabase = {
+        channel: vi.fn((name) => {
+          if (name.includes('output')) {
+            return errorOutputChannel as RealtimeChannel;
+          }
+          return errorInputChannel as RealtimeChannel;
+        }),
+        removeChannel: vi.fn().mockResolvedValue({ error: null }),
+      };
+
+      const client = new RealtimeClient({
+        supabase: errorSupabase as unknown as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      await client.connect();
+      await client.broadcastUserQuestion({ question: 'Continue?' } as any);
+
+      expect(errorOutputChannel.send).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('broadcastPermissionRequest', () => {
+    it('should emit broadcast event with permission-request type and permissionRequest data', async () => {
+      const client = new RealtimeClient({
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      const broadcastHandler = vi.fn();
+      client.on('broadcast', broadcastHandler);
+
+      await client.connect();
+
+      const mockRequestData = { tool: 'bash', command: 'rm -rf /' } as any;
+      await client.broadcastPermissionRequest(mockRequestData);
+
+      expect(broadcastHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'permission-request',
+          permissionRequest: mockRequestData,
+        })
+      );
+    });
+
+    it('should throw Not connected when not connected', async () => {
+      const client = new RealtimeClient({
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      await expect(
+        client.broadcastPermissionRequest({ tool: 'bash' } as any)
+      ).rejects.toThrow('Not connected');
+    });
+
+    it('should skip broadcast when realtime is disabled', async () => {
+      const errorOutputChannel = {
+        subscribe: vi.fn((cb) => {
+          setTimeout(() => cb('CHANNEL_ERROR'), 0);
+          return errorOutputChannel as RealtimeChannel;
+        }),
+        send: vi.fn().mockResolvedValue({ error: null }),
+        on: vi.fn().mockReturnThis(),
+      };
+
+      const errorInputChannel = {
+        subscribe: vi.fn((cb) => {
+          setTimeout(() => cb('CHANNEL_ERROR'), 0);
+          return errorInputChannel as RealtimeChannel;
+        }),
+        send: vi.fn().mockResolvedValue({ error: null }),
+        on: vi.fn().mockReturnThis(),
+      };
+
+      const errorSupabase = {
+        channel: vi.fn((name) => {
+          if (name.includes('output')) {
+            return errorOutputChannel as RealtimeChannel;
+          }
+          return errorInputChannel as RealtimeChannel;
+        }),
+        removeChannel: vi.fn().mockResolvedValue({ error: null }),
+      };
+
+      const client = new RealtimeClient({
+        supabase: errorSupabase as unknown as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      await client.connect();
+      await client.broadcastPermissionRequest({ tool: 'bash' } as any);
+
+      expect(errorOutputChannel.send).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('broadcastToolUse', () => {
+    it('should emit broadcast event with tool-use type and persist to database', async () => {
+      const mockInsert = vi.fn().mockResolvedValue({ error: null });
+      const supabaseWithInsert = {
+        ...mockSupabase,
+        from: vi.fn().mockReturnValue({ insert: mockInsert }),
+      };
+
+      const client = new RealtimeClient({
+        supabase: supabaseWithInsert as unknown as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      const broadcastHandler = vi.fn();
+      client.on('broadcast', broadcastHandler);
+
+      await client.connect();
+
+      const mockToolUseData = { toolName: 'Edit', toolInput: { file: 'test.ts' } } as any;
+      await client.broadcastToolUse(mockToolUseData);
+
+      expect(supabaseWithInsert.from).toHaveBeenCalledWith('messages');
+      expect(mockInsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          session_id: 'test-session-123',
+          type: 'tool-use',
+        })
+      );
+      expect(broadcastHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'tool-use',
+          toolUseData: mockToolUseData,
+        })
+      );
+      expect(client.getSeq()).toBe(1);
+    });
+
+    it('should persist to DB even when realtime is disabled', async () => {
+      const errorOutputChannel = {
+        subscribe: vi.fn((cb) => {
+          setTimeout(() => cb('CHANNEL_ERROR'), 0);
+          return errorOutputChannel as RealtimeChannel;
+        }),
+        send: vi.fn().mockResolvedValue({ error: null }),
+        on: vi.fn().mockReturnThis(),
+      };
+
+      const errorInputChannel = {
+        subscribe: vi.fn((cb) => {
+          setTimeout(() => cb('CHANNEL_ERROR'), 0);
+          return errorInputChannel as RealtimeChannel;
+        }),
+        send: vi.fn().mockResolvedValue({ error: null }),
+        on: vi.fn().mockReturnThis(),
+      };
+
+      const mockInsert = vi.fn().mockResolvedValue({ error: null });
+      const errorSupabase = {
+        channel: vi.fn((name) => {
+          if (name.includes('output')) {
+            return errorOutputChannel as RealtimeChannel;
+          }
+          return errorInputChannel as RealtimeChannel;
+        }),
+        removeChannel: vi.fn().mockResolvedValue({ error: null }),
+        from: vi.fn().mockReturnValue({ insert: mockInsert }),
+      };
+
+      const client = new RealtimeClient({
+        supabase: errorSupabase as unknown as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      await client.connect();
+
+      const mockToolUseData = { toolName: 'Edit', toolInput: { file: 'test.ts' } } as any;
+      await client.broadcastToolUse(mockToolUseData);
+
+      // Should persist to database
+      expect(errorSupabase.from).toHaveBeenCalledWith('messages');
+      expect(mockInsert).toHaveBeenCalled();
+      // Should NOT send via realtime
+      expect(errorOutputChannel.send).not.toHaveBeenCalled();
+    });
+
+    it('should throw Not connected when not connected', async () => {
+      const client = new RealtimeClient({
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      await expect(
+        client.broadcastToolUse({ toolName: 'Edit' } as any)
+      ).rejects.toThrow('Not connected');
+    });
+  });
+
+  describe('broadcastComplete', () => {
+    it('should emit broadcast event with complete type', async () => {
+      const client = new RealtimeClient({
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      const broadcastHandler = vi.fn();
+      client.on('broadcast', broadcastHandler);
+
+      await client.connect();
+      await client.broadcastComplete();
+
+      expect(broadcastHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'complete',
+        })
+      );
+    });
+
+    it('should throw Not connected when not connected', async () => {
+      const client = new RealtimeClient({
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      await expect(client.broadcastComplete()).rejects.toThrow('Not connected');
+    });
+
+    it('should skip broadcast when realtime is disabled', async () => {
+      const errorOutputChannel = {
+        subscribe: vi.fn((cb) => {
+          setTimeout(() => cb('CHANNEL_ERROR'), 0);
+          return errorOutputChannel as RealtimeChannel;
+        }),
+        send: vi.fn().mockResolvedValue({ error: null }),
+        on: vi.fn().mockReturnThis(),
+      };
+
+      const errorInputChannel = {
+        subscribe: vi.fn((cb) => {
+          setTimeout(() => cb('CHANNEL_ERROR'), 0);
+          return errorInputChannel as RealtimeChannel;
+        }),
+        send: vi.fn().mockResolvedValue({ error: null }),
+        on: vi.fn().mockReturnThis(),
+      };
+
+      const errorSupabase = {
+        channel: vi.fn((name) => {
+          if (name.includes('output')) {
+            return errorOutputChannel as RealtimeChannel;
+          }
+          return errorInputChannel as RealtimeChannel;
+        }),
+        removeChannel: vi.fn().mockResolvedValue({ error: null }),
+      };
+
+      const client = new RealtimeClient({
+        supabase: errorSupabase as unknown as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      await client.connect();
+      await client.broadcastComplete();
+
+      expect(errorOutputChannel.send).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('broadcastQueued', () => {
+    it('should emit broadcast event with request-queued type', async () => {
+      const client = new RealtimeClient({
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      const broadcastHandler = vi.fn();
+      client.on('broadcast', broadcastHandler);
+
+      await client.connect();
+      await client.broadcastQueued();
+
+      expect(broadcastHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'request-queued',
+        })
+      );
+    });
+
+    it('should throw Not connected when not connected', async () => {
+      const client = new RealtimeClient({
+        supabase: mockSupabase as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      await expect(client.broadcastQueued()).rejects.toThrow('Not connected');
+    });
+
+    it('should skip broadcast when realtime is disabled', async () => {
+      const errorOutputChannel = {
+        subscribe: vi.fn((cb) => {
+          setTimeout(() => cb('CHANNEL_ERROR'), 0);
+          return errorOutputChannel as RealtimeChannel;
+        }),
+        send: vi.fn().mockResolvedValue({ error: null }),
+        on: vi.fn().mockReturnThis(),
+      };
+
+      const errorInputChannel = {
+        subscribe: vi.fn((cb) => {
+          setTimeout(() => cb('CHANNEL_ERROR'), 0);
+          return errorInputChannel as RealtimeChannel;
+        }),
+        send: vi.fn().mockResolvedValue({ error: null }),
+        on: vi.fn().mockReturnThis(),
+      };
+
+      const errorSupabase = {
+        channel: vi.fn((name) => {
+          if (name.includes('output')) {
+            return errorOutputChannel as RealtimeChannel;
+          }
+          return errorInputChannel as RealtimeChannel;
+        }),
+        removeChannel: vi.fn().mockResolvedValue({ error: null }),
+      };
+
+      const client = new RealtimeClient({
+        supabase: errorSupabase as unknown as SupabaseClient,
+        sessionId: 'test-session-123',
+      });
+
+      await client.connect();
+      await client.broadcastQueued();
+
+      expect(errorOutputChannel.send).not.toHaveBeenCalled();
+    });
+  });
+
   describe('broadcastError', () => {
     it('should broadcast error message with correct structure', async () => {
       const client = new RealtimeClient({
