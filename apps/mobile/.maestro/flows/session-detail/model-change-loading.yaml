@@ -44,7 +44,7 @@ appId: com.clautunnel.app
 
 # Verify badge updated to Sonnet (not still showing Opus)
 - extendedWaitUntil:
-    visible: "Sonnet 4"
+    visible: "Sonnet 4.6"
     timeout: 3000
 - assertNotVisible: "Opus 4.6"
 

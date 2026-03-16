@@ -915,7 +915,7 @@ export class SdkSession extends EventEmitter {
     const coreModels: ModelInfo[] = [
       { value: 'opus', displayName: 'Opus 4.6', description: 'Opus 4.6 · Most capable for complex work' },
       { value: 'haiku', displayName: 'Haiku 4.5', description: 'Haiku 4.5 · Fastest for quick answers' },
-      { value: 'sonnet', displayName: 'Sonnet 4.5', description: 'Sonnet 4.5 · Best for everyday tasks' },
+      { value: 'sonnet', displayName: 'Sonnet 4.6', description: 'Sonnet 4.6 · Best for everyday tasks' },
     ];
 
     // Return cached SDK models if available

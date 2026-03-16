@@ -159,7 +159,7 @@ export const MOCK_MODELS: ModelInfo[] = [
   },
   {
     value: 'sonnet',
-    displayName: 'Sonnet 4',
+    displayName: 'Sonnet 4.6',
     description: 'Fast, balanced default model',
   },
   {

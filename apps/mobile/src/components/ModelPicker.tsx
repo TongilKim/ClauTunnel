@@ -126,6 +126,8 @@ export function ModelPicker({
                       >
                         {model.value === 'opus'
                           ? 'claude-opus-4-6'
+                          : model.value === 'sonnet'
+                          ? 'claude-sonnet-4-6'
                           : model.value === 'haiku'
                           ? 'claude-3-5-haiku-20241022'
                           : model.value}
