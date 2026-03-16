@@ -11,6 +11,11 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuthStore } from '../src/stores/authStore';
 import { isTestMode } from '../src/utils/testMode';
 
+// Module-level flag: auto-pair only once per app process lifetime.
+// After disconnect, the pair screen remounts but should NOT auto-pair again,
+// so the logout Maestro flow can verify a stable logged-out state.
+let testModeAutoPaired = false;
+
 export default function PairScreen() {
   const { code } = useLocalSearchParams<{ code?: string }>();
   const router = useRouter();
@@ -21,9 +26,12 @@ export default function PairScreen() {
   const [attemptedCode, setAttemptedCode] = useState<string | null>(null);
   const attemptedCodeRef = useRef<string | null>(null);
 
-  // In test mode, auto-pair immediately so Maestro flows proceed to the main app
+  // In test mode, auto-pair on first app launch so Maestro flows proceed.
+  // Skip on subsequent mounts (e.g. after disconnect) so the logout E2E
+  // flow can verify the pair screen stays visible.
   useEffect(() => {
-    if (isTestMode()) {
+    if (isTestMode() && !testModeAutoPaired) {
+      testModeAutoPaired = true;
       redeemPairingCode('test-code');
     }
   }, []);

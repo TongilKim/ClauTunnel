@@ -74,6 +74,9 @@ const mockSupabaseClient = {
     getSession: mockGetSession,
     onAuthStateChange: mockOnAuthStateChange,
   },
+  functions: {
+    invoke: vi.fn().mockResolvedValue({ data: { code: 'test-pair-code' }, error: null }),
+  },
   channel: vi.fn(() => ({
     on: vi.fn().mockReturnThis(),
     subscribe: vi.fn(),
@@ -176,31 +179,21 @@ describe('Command Authentication', () => {
         };
       });
 
-      // Mock getSession to return the session after setSession succeeds
-      mockGetSession.mockResolvedValue({
-        data: {
-          session: {
-            access_token: 'test-access-token',
-            refresh_token: 'test-refresh-token',
-          },
-        },
-        error: null,
-      });
+      // Test restoreSession directly — this is the unit that setSession
+      // lives in. Going through the full command is fragile because the
+      // daemon setup has many unrelated dependencies.
+      const { restoreSession } = await import('../utils/supabase.js');
+      const { Config } = await import('../utils/config.js');
+      const config = new Config();
 
-      const { createStartCommand } = await import('../commands/start.js');
-      const cmd = createStartCommand();
-
-      // The command will eventually fail (daemon setup, etc.) but setSession
-      // must have been called before that point. Use rejects to catch the
-      // downstream error without a blanket try/catch.
-      await expect(
-        cmd.parseAsync(['node', 'test', 'claude'], { from: 'user' })
-      ).rejects.toThrow();
+      const result = await restoreSession(mockSupabaseClient as any, config);
 
       expect(mockSetSession).toHaveBeenCalledWith({
         access_token: 'test-access-token',
         refresh_token: 'test-refresh-token',
       });
+      expect(mockGetUser).toHaveBeenCalled();
+      expect(result).toEqual({ user: { id: 'user-123', email: 'test@example.com' } });
     });
 
     it('should exit with error when session is expired', async () => {
