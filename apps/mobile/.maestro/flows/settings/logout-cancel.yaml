@@ -2,14 +2,6 @@ appId: com.clautunnel.app
 ---
 - launchApp:
     clearState: true
-- tapOn:
-    id: "login-email-input"
-- inputText: "test@clautunnel.com"
-- tapOn:
-    id: "login-password-input"
-- inputText: "password123"
-- tapOn:
-    id: "login-button"
 - extendedWaitUntil:
     visible:
       id: "sessions-stats-total"
@@ -22,7 +14,7 @@ appId: com.clautunnel.app
     timeout: 5000
 - tapOn:
     id: "settings-logout-button"
-- assertVisible: "Sign Out"
+- assertVisible: "Disconnect"
 - tapOn: "Cancel"
 - assertVisible:
     id: "settings-logout-button"
