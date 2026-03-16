@@ -14,6 +14,7 @@ let outputHandler: ((payload: any) => void) | null = null;
 
 const mockSend = vi.fn().mockResolvedValue({ error: null });
 const mockRemoveChannel = vi.fn().mockResolvedValue({ error: null });
+const mockMessagesInsert = vi.fn().mockResolvedValue({ error: null });
 
 function createMockSelectChain(overrides: {
   sessionData?: any;
@@ -54,7 +55,7 @@ function createMockSelectChain(overrides: {
             }),
           }),
         }),
-        insert: vi.fn().mockResolvedValue({ error: null }),
+        insert: mockMessagesInsert,
       };
     }
     return {
@@ -630,10 +631,19 @@ describe('ConnectionStore — Real Behavior', () => {
     it('persists input message to database', async () => {
       const useStore = await getStore();
       await connectStore(useStore);
+      mockMessagesInsert.mockClear();
 
       await useStore.getState().sendInput('Hello Claude');
 
-      expect(mockSupabase.from).toHaveBeenCalledWith('messages');
+      // Wait for the fire-and-forget DB persist (.then().catch())
+      await new Promise((r) => setTimeout(r, 10));
+
+      expect(mockMessagesInsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'input',
+          content: 'Hello Claude',
+        }),
+      );
     });
 
     it('sets error when channel.send() fails', async () => {

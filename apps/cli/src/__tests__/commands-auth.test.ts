@@ -63,10 +63,15 @@ const mockUnsubscribe = vi.fn();
 const mockOnAuthStateChange = vi.fn().mockReturnValue({
   data: { subscription: { unsubscribe: mockUnsubscribe } },
 });
+const mockGetSession = vi.fn().mockResolvedValue({
+  data: { session: null },
+  error: null,
+});
 const mockSupabaseClient = {
   auth: {
     setSession: mockSetSession,
     getUser: mockGetUser,
+    getSession: mockGetSession,
     onAuthStateChange: mockOnAuthStateChange,
   },
   channel: vi.fn(() => ({
@@ -171,15 +176,26 @@ describe('Command Authentication', () => {
         };
       });
 
+      // Mock getSession to return the session after setSession succeeds
+      mockGetSession.mockResolvedValue({
+        data: {
+          session: {
+            access_token: 'test-access-token',
+            refresh_token: 'test-refresh-token',
+          },
+        },
+        error: null,
+      });
+
       const { createStartCommand } = await import('../commands/start.js');
       const cmd = createStartCommand();
 
-      // This will fail for other reasons (daemon setup) but we can verify setSession was called
-      try {
-        await cmd.parseAsync(['node', 'test', 'claude'], { from: 'user' });
-      } catch {
-        // Expected to fail due to daemon setup, but setSession should have been called
-      }
+      // The command will eventually fail (daemon setup, etc.) but setSession
+      // must have been called before that point. Use rejects to catch the
+      // downstream error without a blanket try/catch.
+      await expect(
+        cmd.parseAsync(['node', 'test', 'claude'], { from: 'user' })
+      ).rejects.toThrow();
 
       expect(mockSetSession).toHaveBeenCalledWith({
         access_token: 'test-access-token',
