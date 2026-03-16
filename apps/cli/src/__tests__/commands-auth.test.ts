@@ -36,6 +36,21 @@ vi.mock('../utils/sleep-prevention.js', () => ({
   openFullDiskAccessSettings: vi.fn().mockReturnValue(true),
 }));
 
+// Mock PID file utilities to prevent real file system side effects
+vi.mock('../utils/pid.js', () => ({
+  acquirePidFile: vi.fn().mockReturnValue(null), // Lock acquired
+  removePidFile: vi.fn(),
+  readPidFile: vi.fn().mockReturnValue(null),
+  isProcessAlive: vi.fn().mockReturnValue(false),
+  pidFileExists: vi.fn().mockReturnValue(false),
+  PID_FILE: '/tmp/test-daemon.pid',
+}));
+
+// Mock Claude CLI auth check to prevent real execSync
+vi.mock('../utils/claude-auth.js', () => ({
+  checkClaudeCliAuth: vi.fn().mockReturnValue({ loggedIn: true }),
+}));
+
 // Mock process.exit to prevent test from exiting
 const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
   throw new Error('process.exit called');

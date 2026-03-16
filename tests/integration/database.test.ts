@@ -1,301 +1,495 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-/**
- * Integration tests for Database operations and RLS policies
- * These tests verify database schema constraints and security policies
- */
+// ---------------------------------------------------------------------------
+// Environment gate – skip the entire suite when credentials are absent
+// ---------------------------------------------------------------------------
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.SUPABASE_LOCAL_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 
-describe('Database Integration', () => {
+const canRunDbTests = !!(SUPABASE_URL && SUPABASE_SERVICE_KEY && SUPABASE_ANON_KEY);
+
+const describeDb = canRunDbTests ? describe : describe.skip;
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Build a Supabase client authenticated as a specific user (subject to RLS). */
+async function createUserClient(
+  serviceClient: SupabaseClient,
+  email: string,
+  password: string,
+): Promise<{ client: SupabaseClient; userId: string }> {
+  // Create the user via admin API (service role)
+  const { data: userData, error: createErr } =
+    await serviceClient.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    });
+
+  if (createErr) throw createErr;
+  const userId = userData.user.id;
+
+  // Sign in to obtain an access token, then build a client with that JWT
+  const anonClient = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!);
+  const { data: signInData, error: signInErr } =
+    await anonClient.auth.signInWithPassword({ email, password });
+
+  if (signInErr) throw signInErr;
+
+  const userClient = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
+    global: {
+      headers: {
+        Authorization: `Bearer ${signInData.session!.access_token}`,
+      },
+    },
+  });
+
+  return { client: userClient, userId };
+}
+
+// ---------------------------------------------------------------------------
+// Test suite
+// ---------------------------------------------------------------------------
+
+describeDb('Database Integration', () => {
+  let serviceClient: SupabaseClient;
+
+  // Test users – created once, cleaned up in afterAll
+  let userA: { client: SupabaseClient; userId: string };
+  let userB: { client: SupabaseClient; userId: string };
+
+  const testUserAEmail = `test-db-a-${Date.now()}@clautunnel-test.local`;
+  const testUserBEmail = `test-db-b-${Date.now()}@clautunnel-test.local`;
+  const testPassword = 'Test_Password_12345!';
+
+  // Track IDs created during each test so afterEach can clean up
+  const createdMachineIds: string[] = [];
+  const createdSessionIds: string[] = [];
+  const createdPushTokenIds: string[] = [];
+  const createdPairingIds: string[] = [];
+
+  // -----------------------------------------------------------------------
+  // Setup / Teardown
+  // -----------------------------------------------------------------------
+
+  beforeAll(async () => {
+    serviceClient = createClient(SUPABASE_URL!, SUPABASE_SERVICE_KEY!);
+    userA = await createUserClient(serviceClient, testUserAEmail, testPassword);
+    userB = await createUserClient(serviceClient, testUserBEmail, testPassword);
+  }, 30_000);
+
+  afterEach(async () => {
+    // Clean up in reverse dependency order using service client (bypasses RLS)
+    for (const id of createdPushTokenIds) {
+      await serviceClient.from('push_tokens').delete().eq('id', id);
+    }
+    createdPushTokenIds.length = 0;
+
+    for (const id of createdPairingIds) {
+      await serviceClient.from('mobile_pairings').delete().eq('id', id);
+    }
+    createdPairingIds.length = 0;
+
+    // Deleting machines cascades to sessions and messages
+    for (const id of createdMachineIds) {
+      await serviceClient.from('machines').delete().eq('id', id);
+    }
+    createdMachineIds.length = 0;
+
+    // In case sessions were created without a tracked machine
+    for (const id of createdSessionIds) {
+      await serviceClient.from('sessions').delete().eq('id', id);
+    }
+    createdSessionIds.length = 0;
+  });
+
+  afterAll(async () => {
+    // Remove test users
+    if (userA?.userId) {
+      await serviceClient.auth.admin.deleteUser(userA.userId);
+    }
+    if (userB?.userId) {
+      await serviceClient.auth.admin.deleteUser(userB.userId);
+    }
+  }, 15_000);
+
+  // -----------------------------------------------------------------------
+  // Helpers to insert test records via service client (bypasses RLS)
+  // -----------------------------------------------------------------------
+
+  async function insertMachine(
+    overrides: Record<string, unknown> = {},
+  ) {
+    const defaults = {
+      user_id: userA.userId,
+      name: 'test-machine',
+      hostname: null,
+      status: 'offline',
+    };
+    const row = { ...defaults, ...overrides };
+    const { data, error } = await serviceClient
+      .from('machines')
+      .insert(row)
+      .select()
+      .single();
+    if (data) createdMachineIds.push(data.id);
+    return { data, error };
+  }
+
+  async function insertSession(
+    machineId: string,
+    overrides: Record<string, unknown> = {},
+  ) {
+    const defaults = {
+      machine_id: machineId,
+      status: 'active',
+    };
+    const row = { ...defaults, ...overrides };
+    const { data, error } = await serviceClient
+      .from('sessions')
+      .insert(row)
+      .select()
+      .single();
+    if (data) createdSessionIds.push(data.id);
+    return { data, error };
+  }
+
+  async function insertMessage(
+    sessionId: string,
+    seq: number,
+    overrides: Record<string, unknown> = {},
+  ) {
+    const defaults = {
+      session_id: sessionId,
+      type: 'output',
+      content: `msg-${seq}`,
+      seq,
+    };
+    const row = { ...defaults, ...overrides };
+    const { data, error } = await serviceClient
+      .from('messages')
+      .insert(row)
+      .select()
+      .single();
+    return { data, error };
+  }
+
+  async function insertPushToken(
+    overrides: Record<string, unknown> = {},
+  ) {
+    const defaults = {
+      user_id: userA.userId,
+      token: `ExponentPushToken[test-${Date.now()}-${Math.random()}]`,
+      device_name: 'test-device',
+    };
+    const row = { ...defaults, ...overrides };
+    const { data, error } = await serviceClient
+      .from('push_tokens')
+      .insert(row)
+      .select()
+      .single();
+    if (data) createdPushTokenIds.push(data.id);
+    return { data, error };
+  }
+
+  // -----------------------------------------------------------------------
+  // Schema Constraints
+  // -----------------------------------------------------------------------
+
   describe('Schema Constraints', () => {
-    it('should enforce machine status constraint', () => {
-      const validStatuses = ['online', 'offline'];
-      const invalidStatuses = ['active', 'inactive', 'unknown'];
+    it('rejects invalid machine status', async () => {
+      const { error } = await insertMachine({ status: 'invalid' });
+      expect(error).not.toBeNull();
+    });
 
-      for (const status of validStatuses) {
-        expect(validStatuses.includes(status)).toBe(true);
-      }
-
-      for (const status of invalidStatuses) {
-        expect(validStatuses.includes(status)).toBe(false);
+    it('accepts all valid machine statuses: online, offline', async () => {
+      for (const status of ['online', 'offline']) {
+        const { data, error } = await insertMachine({
+          status,
+          name: `machine-${status}`,
+          hostname: `host-${status}-${Date.now()}`,
+        });
+        expect(error).toBeNull();
+        expect(data).not.toBeNull();
       }
     });
 
-    it('should enforce session status constraint', () => {
-      const validStatuses = ['active', 'paused', 'ended'];
-      const invalidStatuses = ['running', 'stopped', 'pending'];
+    it('rejects invalid session status', async () => {
+      const { data: machine } = await insertMachine();
+      const { error } = await insertSession(machine!.id, { status: 'running' });
+      expect(error).not.toBeNull();
+    });
 
-      for (const status of validStatuses) {
-        expect(validStatuses.includes(status)).toBe(true);
-      }
-
-      for (const status of invalidStatuses) {
-        expect(validStatuses.includes(status)).toBe(false);
+    it('accepts all valid session statuses: active, paused, ended', async () => {
+      const { data: machine } = await insertMachine();
+      for (const status of ['active', 'paused', 'ended']) {
+        const { data, error } = await insertSession(machine!.id, { status });
+        expect(error).toBeNull();
+        expect(data).not.toBeNull();
       }
     });
 
-    it('should enforce message type constraint', () => {
-      const validTypes = ['output', 'input', 'error', 'system'];
-      const invalidTypes = ['log', 'debug', 'info'];
+    it('rejects invalid message type', async () => {
+      const { data: machine } = await insertMachine();
+      const { data: session } = await insertSession(machine!.id);
+      const { error } = await insertMessage(session!.id, 1, { type: 'log' });
+      expect(error).not.toBeNull();
+    });
 
-      for (const type of validTypes) {
-        expect(validTypes.includes(type)).toBe(true);
-      }
-
-      for (const type of invalidTypes) {
-        expect(validTypes.includes(type)).toBe(false);
+    it('accepts all valid message types including tool-use', async () => {
+      const { data: machine } = await insertMachine();
+      const { data: session } = await insertSession(machine!.id);
+      let seq = 1;
+      for (const type of ['output', 'input', 'error', 'system', 'tool-use']) {
+        const { data, error } = await insertMessage(session!.id, seq++, { type });
+        expect(error).toBeNull();
+        expect(data).not.toBeNull();
       }
     });
 
-    it('should require machine_id for sessions', () => {
-      const session = {
-        id: 'session-1',
-        machine_id: 'machine-1',
-        status: 'active',
-        started_at: new Date().toISOString(),
-      };
-
-      expect(session.machine_id).toBeDefined();
-      expect(session.machine_id).not.toBe('');
+    it('requires machine_id on sessions (NOT NULL)', async () => {
+      const { error } = await serviceClient
+        .from('sessions')
+        .insert({ status: 'active' })
+        .select()
+        .single();
+      expect(error).not.toBeNull();
     });
 
-    it('should require session_id for messages', () => {
-      const message = {
-        id: 1,
-        session_id: 'session-1',
-        type: 'output',
-        content: 'Hello',
-        seq: 1,
-        created_at: new Date().toISOString(),
-      };
-
-      expect(message.session_id).toBeDefined();
-      expect(message.session_id).not.toBe('');
+    it('requires session_id on messages (NOT NULL)', async () => {
+      const { error } = await serviceClient
+        .from('messages')
+        .insert({ type: 'output', content: 'hello', seq: 1 })
+        .select()
+        .single();
+      expect(error).not.toBeNull();
     });
   });
+
+  // -----------------------------------------------------------------------
+  // Cascade Deletes
+  // -----------------------------------------------------------------------
 
   describe('Cascade Deletes', () => {
-    it('should cascade delete sessions when machine deleted', () => {
-      const machines = [{ id: 'machine-1', user_id: 'user-1' }];
-      let sessions = [
-        { id: 'session-1', machine_id: 'machine-1' },
-        { id: 'session-2', machine_id: 'machine-1' },
-      ];
+    it('deletes sessions when machine is deleted', async () => {
+      const { data: machine } = await insertMachine();
+      const { data: s1 } = await insertSession(machine!.id);
+      const { data: s2 } = await insertSession(machine!.id);
 
-      // Simulate cascade delete
-      const deleteMachine = (machineId: string) => {
-        sessions = sessions.filter((s) => s.machine_id !== machineId);
-      };
+      // Act: delete the machine
+      await serviceClient.from('machines').delete().eq('id', machine!.id);
+      // Remove from tracked list since we already deleted it
+      const idx = createdMachineIds.indexOf(machine!.id);
+      if (idx !== -1) createdMachineIds.splice(idx, 1);
 
-      deleteMachine('machine-1');
-
-      expect(sessions).toHaveLength(0);
+      // Assert: sessions are gone
+      const { data: remaining } = await serviceClient
+        .from('sessions')
+        .select('id')
+        .in('id', [s1!.id, s2!.id]);
+      expect(remaining).toHaveLength(0);
     });
 
-    it('should cascade delete messages when session deleted', () => {
-      let messages = [
-        { id: 1, session_id: 'session-1' },
-        { id: 2, session_id: 'session-1' },
-        { id: 3, session_id: 'session-2' },
-      ];
+    it('deletes messages when session is deleted', async () => {
+      const { data: machine } = await insertMachine();
+      const { data: session } = await insertSession(machine!.id);
+      const { data: m1 } = await insertMessage(session!.id, 1);
+      const { data: m2 } = await insertMessage(session!.id, 2);
+      const { data: m3 } = await insertMessage(session!.id, 3);
 
-      // Simulate cascade delete
-      const deleteSession = (sessionId: string) => {
-        messages = messages.filter((m) => m.session_id !== sessionId);
-      };
+      // Act: delete the session
+      await serviceClient.from('sessions').delete().eq('id', session!.id);
+      const sIdx = createdSessionIds.indexOf(session!.id);
+      if (sIdx !== -1) createdSessionIds.splice(sIdx, 1);
 
-      deleteSession('session-1');
+      // Assert: messages are gone
+      const { data: remaining } = await serviceClient
+        .from('messages')
+        .select('id')
+        .in('id', [m1!.id, m2!.id, m3!.id]);
+      expect(remaining).toHaveLength(0);
+    });
 
-      expect(messages).toHaveLength(1);
-      expect(messages[0].session_id).toBe('session-2');
+    it('cascades through machine -> sessions -> messages', async () => {
+      const { data: machine } = await insertMachine();
+      const { data: session } = await insertSession(machine!.id);
+      const { data: msg } = await insertMessage(session!.id, 1);
+
+      // Act: delete machine (top of chain)
+      await serviceClient.from('machines').delete().eq('id', machine!.id);
+      const idx = createdMachineIds.indexOf(machine!.id);
+      if (idx !== -1) createdMachineIds.splice(idx, 1);
+
+      // Assert: session gone
+      const { data: sessions } = await serviceClient
+        .from('sessions')
+        .select('id')
+        .eq('id', session!.id);
+      expect(sessions).toHaveLength(0);
+
+      // Assert: message gone
+      const { data: messages } = await serviceClient
+        .from('messages')
+        .select('id')
+        .eq('id', msg!.id);
+      expect(messages).toHaveLength(0);
     });
   });
+
+  // -----------------------------------------------------------------------
+  // RLS Policies
+  // -----------------------------------------------------------------------
 
   describe('RLS Policies', () => {
-    it('should only allow users to see their own machines', () => {
-      const machines = [
-        { id: 'm1', user_id: 'user-1', name: 'Machine 1' },
-        { id: 'm2', user_id: 'user-2', name: 'Machine 2' },
-        { id: 'm3', user_id: 'user-1', name: 'Machine 3' },
-      ];
+    it('user can only see their own machines', async () => {
+      // Arrange: create machines for each user via service client
+      await insertMachine({ user_id: userA.userId, name: 'A-machine' });
+      await insertMachine({ user_id: userB.userId, name: 'B-machine' });
 
-      const getUserMachines = (userId: string) => {
-        return machines.filter((m) => m.user_id === userId);
-      };
+      // Act: userB queries machines
+      const { data: bMachines } = await userB.client.from('machines').select('*');
 
-      const user1Machines = getUserMachines('user-1');
-      const user2Machines = getUserMachines('user-2');
-
-      expect(user1Machines).toHaveLength(2);
-      expect(user2Machines).toHaveLength(1);
+      // Assert: userB should NOT see userA's machine
+      const names = (bMachines ?? []).map((m: any) => m.name);
+      expect(names).toContain('B-machine');
+      expect(names).not.toContain('A-machine');
     });
 
-    it('should only allow users to see sessions for their machines', () => {
-      const machines = [
-        { id: 'm1', user_id: 'user-1' },
-        { id: 'm2', user_id: 'user-2' },
-      ];
+    it('user cannot insert machines with another user_id', async () => {
+      // Act: userA tries to insert a machine owned by userB
+      const { data, error } = await userA.client
+        .from('machines')
+        .insert({ user_id: userB.userId, name: 'sneaky-machine' })
+        .select()
+        .single();
 
-      const sessions = [
-        { id: 's1', machine_id: 'm1' },
-        { id: 's2', machine_id: 'm1' },
-        { id: 's3', machine_id: 'm2' },
-      ];
-
-      const getUserSessions = (userId: string) => {
-        const userMachineIds = machines
-          .filter((m) => m.user_id === userId)
-          .map((m) => m.id);
-        return sessions.filter((s) => userMachineIds.includes(s.machine_id));
-      };
-
-      expect(getUserSessions('user-1')).toHaveLength(2);
-      expect(getUserSessions('user-2')).toHaveLength(1);
+      // Assert: either an error or zero rows returned
+      const failed = error !== null || data === null;
+      expect(failed).toBe(true);
     });
 
-    it('should only allow users to see their own push tokens', () => {
-      const pushTokens = [
-        { id: 't1', user_id: 'user-1', token: 'token-1' },
-        { id: 't2', user_id: 'user-2', token: 'token-2' },
-        { id: 't3', user_id: 'user-1', token: 'token-3' },
-      ];
+    it('user can only see sessions for their own machines', async () => {
+      // Arrange
+      const { data: machineA } = await insertMachine({
+        user_id: userA.userId,
+        name: 'A-session-machine',
+      });
+      const { data: machineB } = await insertMachine({
+        user_id: userB.userId,
+        name: 'B-session-machine',
+      });
+      await insertSession(machineA!.id);
+      await insertSession(machineB!.id);
 
-      const getUserTokens = (userId: string) => {
-        return pushTokens.filter((t) => t.user_id === userId);
-      };
+      // Act: userA queries sessions
+      const { data: aSessions } = await userA.client.from('sessions').select('*');
 
-      expect(getUserTokens('user-1')).toHaveLength(2);
-      expect(getUserTokens('user-2')).toHaveLength(1);
+      // Assert: userA only sees their own machine's session
+      const machineIds = (aSessions ?? []).map((s: any) => s.machine_id);
+      expect(machineIds).toContain(machineA!.id);
+      expect(machineIds).not.toContain(machineB!.id);
     });
 
-    it('should prevent users from inserting machines for other users', () => {
-      const currentUserId = 'user-1';
+    it('user can only see their own push tokens', async () => {
+      // Arrange
+      await insertPushToken({ user_id: userA.userId, token: `tok-a-${Date.now()}` });
+      await insertPushToken({ user_id: userB.userId, token: `tok-b-${Date.now()}` });
 
-      const canInsertMachine = (userId: string) => {
-        return userId === currentUserId;
-      };
+      // Act: userA queries push_tokens
+      const { data: aTokens } = await userA.client.from('push_tokens').select('*');
 
-      expect(canInsertMachine('user-1')).toBe(true);
-      expect(canInsertMachine('user-2')).toBe(false);
+      // Assert
+      const userIds = (aTokens ?? []).map((t: any) => t.user_id);
+      expect(userIds.every((uid: string) => uid === userA.userId)).toBe(true);
     });
   });
+
+  // -----------------------------------------------------------------------
+  // Unique Constraints
+  // -----------------------------------------------------------------------
 
   describe('Unique Constraints', () => {
-    it('should enforce unique push token', () => {
-      const tokens = new Set<string>();
+    it('enforces unique push token', async () => {
+      const sharedToken = `ExponentPushToken[unique-${Date.now()}]`;
 
-      const insertToken = (token: string): boolean => {
-        if (tokens.has(token)) {
-          return false; // Constraint violation
-        }
-        tokens.add(token);
-        return true;
-      };
+      const { error: firstErr } = await insertPushToken({ token: sharedToken });
+      expect(firstErr).toBeNull();
 
-      expect(insertToken('token-1')).toBe(true);
-      expect(insertToken('token-2')).toBe(true);
-      expect(insertToken('token-1')).toBe(false); // Duplicate
+      const { error: secondErr } = await insertPushToken({
+        token: sharedToken,
+        user_id: userB.userId,
+      });
+      expect(secondErr).not.toBeNull();
     });
 
-    it('should enforce unique user_id + hostname for machines', () => {
-      const machines = new Set<string>();
+    it('enforces unique user_id + hostname', async () => {
+      const hostname = `host-unique-${Date.now()}`;
 
-      const insertMachine = (userId: string, hostname: string | null): boolean => {
-        if (hostname === null) {
-          return true; // No uniqueness for null hostname
-        }
-        const key = `${userId}:${hostname}`;
-        if (machines.has(key)) {
-          return false;
-        }
-        machines.add(key);
-        return true;
-      };
+      const { error: firstErr } = await insertMachine({
+        user_id: userA.userId,
+        name: 'dup-1',
+        hostname,
+      });
+      expect(firstErr).toBeNull();
 
-      expect(insertMachine('user-1', 'host-1')).toBe(true);
-      expect(insertMachine('user-1', 'host-2')).toBe(true);
-      expect(insertMachine('user-2', 'host-1')).toBe(true); // Different user
-      expect(insertMachine('user-1', 'host-1')).toBe(false); // Duplicate
-      expect(insertMachine('user-1', null)).toBe(true); // Null hostname OK
-      expect(insertMachine('user-1', null)).toBe(true); // Multiple null OK
-    });
-  });
-
-  describe('Indexes', () => {
-    it('should have index on machines.user_id', () => {
-      // Simulating index behavior - queries by user_id should be fast
-      const machines = Array.from({ length: 1000 }, (_, i) => ({
-        id: `m${i}`,
-        user_id: `user-${i % 10}`,
-      }));
-
-      const startTime = Date.now();
-      const result = machines.filter((m) => m.user_id === 'user-5');
-      const endTime = Date.now();
-
-      expect(result).toHaveLength(100);
-      expect(endTime - startTime).toBeLessThan(100);
+      const { error: secondErr } = await insertMachine({
+        user_id: userA.userId,
+        name: 'dup-2',
+        hostname,
+      });
+      expect(secondErr).not.toBeNull();
     });
 
-    it('should have index on sessions.machine_id', () => {
-      const sessions = Array.from({ length: 1000 }, (_, i) => ({
-        id: `s${i}`,
-        machine_id: `machine-${i % 50}`,
-      }));
+    it('allows multiple null hostnames for same user', async () => {
+      const { error: err1 } = await insertMachine({
+        user_id: userA.userId,
+        name: 'null-host-1',
+        hostname: null,
+      });
+      expect(err1).toBeNull();
 
-      const startTime = Date.now();
-      const result = sessions.filter((s) => s.machine_id === 'machine-25');
-      const endTime = Date.now();
-
-      expect(result).toHaveLength(20);
-      expect(endTime - startTime).toBeLessThan(100);
-    });
-
-    it('should have index on messages.session_id + seq', () => {
-      const messages = Array.from({ length: 10000 }, (_, i) => ({
-        id: i,
-        session_id: `session-${i % 100}`,
-        seq: Math.floor(i / 100) + 1,
-      }));
-
-      const startTime = Date.now();
-      const result = messages
-        .filter((m) => m.session_id === 'session-50')
-        .sort((a, b) => a.seq - b.seq);
-      const endTime = Date.now();
-
-      expect(result).toHaveLength(100);
-      expect(endTime - startTime).toBeLessThan(100);
+      const { error: err2 } = await insertMachine({
+        user_id: userA.userId,
+        name: 'null-host-2',
+        hostname: null,
+      });
+      expect(err2).toBeNull();
     });
   });
+
+  // -----------------------------------------------------------------------
+  // Timestamps
+  // -----------------------------------------------------------------------
 
   describe('Timestamps', () => {
-    it('should auto-generate created_at for machines', () => {
-      const now = new Date();
-      const machine = {
-        id: 'machine-1',
-        user_id: 'user-1',
-        name: 'Test',
-        created_at: now.toISOString(),
-      };
+    it('auto-updates updated_at on push_tokens update', async () => {
+      const { data: token } = await insertPushToken();
+      expect(token).not.toBeNull();
 
-      expect(new Date(machine.created_at).getTime()).toBeLessThanOrEqual(Date.now());
-    });
+      const createdAt = new Date(token!.updated_at).getTime();
 
-    it('should update updated_at on push_tokens modification', () => {
-      const token = {
-        id: 'token-1',
-        user_id: 'user-1',
-        token: 'ExponentPushToken[xxx]',
-        created_at: new Date('2024-01-01').toISOString(),
-        updated_at: new Date('2024-01-01').toISOString(),
-      };
+      // Small delay so timestamp can advance
+      await new Promise((r) => setTimeout(r, 50));
 
-      // Simulate update
-      token.updated_at = new Date().toISOString();
+      // Update the token's device_name
+      await serviceClient
+        .from('push_tokens')
+        .update({ device_name: 'updated-device' })
+        .eq('id', token!.id);
 
-      expect(new Date(token.updated_at).getTime()).toBeGreaterThan(
-        new Date(token.created_at).getTime()
-      );
+      // Re-fetch
+      const { data: updated } = await serviceClient
+        .from('push_tokens')
+        .select('*')
+        .eq('id', token!.id)
+        .single();
+
+      const updatedAt = new Date(updated!.updated_at).getTime();
+      expect(updatedAt).toBeGreaterThan(createdAt);
     });
   });
 });

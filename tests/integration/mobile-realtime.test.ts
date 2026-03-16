@@ -1,216 +1,173 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { REALTIME_CHANNELS } from 'clautunnel-shared';
 
 /**
- * Integration tests for Mobile-to-Realtime communication flow
- * These tests verify the end-to-end flow of data from Mobile to CLI via Realtime
+ * Integration tests for Mobile-to-Realtime communication patterns
+ *
+ * Since connectionStore and mobile UI require React Native / Zustand environment,
+ * these tests verify the Supabase interaction patterns and shared utilities
+ * that the mobile app relies on, without importing RN-specific modules.
  */
 
-// Mock Supabase
-const mockChannel = {
-  subscribe: vi.fn((cb) => {
-    setTimeout(() => cb('SUBSCRIBED'), 0);
-    return mockChannel;
-  }),
-  send: vi.fn().mockResolvedValue({ error: null }),
-  on: vi.fn().mockReturnThis(),
-};
+// --- Mock Supabase boundary ---
 
-const mockSupabase = {
-  channel: vi.fn(() => mockChannel),
-  removeChannel: vi.fn().mockResolvedValue({ error: null }),
-  from: vi.fn(() => ({
-    select: vi.fn().mockReturnValue({
-      order: vi.fn().mockResolvedValue({
-        data: [
-          {
-            id: 'session-1',
-            machine_id: 'machine-1',
-            status: 'active',
-            started_at: new Date().toISOString(),
-          },
-        ],
-        error: null,
-      }),
-      eq: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({
-          data: {
-            id: 'session-1',
-            machine_id: 'machine-1',
-            status: 'active',
-          },
-          error: null,
+function createMockSupabase(overrides: Record<string, any> = {}) {
+  return {
+    from: vi.fn(() => ({
+      select: vi.fn().mockReturnValue({
+        order: vi.fn().mockResolvedValue({
+          data: overrides.sessionsData ?? [
+            {
+              id: 'session-1',
+              machine_id: 'machine-1',
+              status: 'active',
+              started_at: '2026-01-01T00:00:00Z',
+            },
+          ],
+          error: overrides.sessionsError ?? null,
         }),
-      }),
-    }),
-  })),
-  auth: {
-    getSession: vi.fn().mockResolvedValue({
-      data: { session: { user: { id: 'user-123' } } },
-      error: null,
-    }),
-    signInWithPassword: vi.fn().mockResolvedValue({
-      data: { user: { id: 'user-123', email: 'test@example.com' }, session: {} },
-      error: null,
-    }),
-    signOut: vi.fn().mockResolvedValue({ error: null }),
-  },
-};
-
-describe('Mobile to Realtime Integration', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  describe('Session List', () => {
-    it('should fetch and display user sessions', async () => {
-      const fetchSessions = async () => {
-        const { data, error } = await mockSupabase
-          .from('sessions')
-          .select('*')
-          .order('started_at', { ascending: false });
-
-        return { sessions: data, error };
-      };
-
-      const { sessions, error } = await fetchSessions();
-
-      expect(error).toBeNull();
-      expect(sessions).toHaveLength(1);
-      expect(sessions[0].status).toBe('active');
-    });
-
-    it('should show active sessions with online indicator', async () => {
-      const sessions = [
-        { id: '1', status: 'active', machine: { status: 'online' } },
-        { id: '2', status: 'active', machine: { status: 'offline' } },
-        { id: '3', status: 'ended', machine: { status: 'offline' } },
-      ];
-
-      const activeSessions = sessions.filter(
-        (s) => s.status === 'active' && s.machine.status === 'online'
-      );
-
-      expect(activeSessions).toHaveLength(1);
-    });
-
-    it('should handle empty sessions list', async () => {
-      mockSupabase.from = vi.fn(() => ({
-        select: vi.fn().mockReturnValue({
-          order: vi.fn().mockResolvedValue({
-            data: [],
-            error: null,
+        eq: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({
+            data: overrides.singleSessionData ?? {
+              id: 'session-1',
+              machine_id: 'machine-1',
+              status: 'active',
+            },
+            error: overrides.singleSessionError ?? null,
           }),
         }),
-      }));
+      }),
+    })),
+    auth: {
+      signInWithPassword: overrides.signInWithPassword ?? vi.fn().mockResolvedValue({
+        data: { user: { id: 'user-123', email: 'test@example.com' }, session: {} },
+        error: null,
+      }),
+      signOut: overrides.signOut ?? vi.fn().mockResolvedValue({ error: null }),
+      getSession: overrides.getSession ?? vi.fn().mockResolvedValue({
+        data: { session: { user: { id: 'user-123' } } },
+        error: null,
+      }),
+    },
+  } as any;
+}
 
-      const { data } = await mockSupabase
+describe('Mobile to Realtime Integration', () => {
+  describe('Session List Behavior', () => {
+    it('returns session data on successful query', async () => {
+      // Arrange
+      const mockSupabase = createMockSupabase();
+
+      // Act
+      const { data, error } = await mockSupabase
         .from('sessions')
         .select('*')
         .order('started_at', { ascending: false });
 
-      expect(data).toEqual([]);
-    });
-  });
-
-  describe('Terminal Connection', () => {
-    it('should connect to session realtime channel', async () => {
-      const sessionId = 'session-123';
-      const channelName = `session:${sessionId}:output`;
-
-      mockSupabase.channel(channelName);
-
-      expect(mockSupabase.channel).toHaveBeenCalledWith(channelName);
-    });
-
-    it('should receive and accumulate output messages', async () => {
-      const messages: any[] = [];
-      let lastSeq = 0;
-
-      const addMessage = (message: any) => {
-        messages.push(message);
-        lastSeq = message.seq;
-      };
-
-      // Simulate receiving messages
-      addMessage({ type: 'output', content: 'Hello', seq: 1 });
-      addMessage({ type: 'output', content: ' World', seq: 2 });
-      addMessage({ type: 'output', content: '!\n', seq: 3 });
-
-      expect(messages).toHaveLength(3);
-      expect(lastSeq).toBe(3);
-      expect(messages.map((m) => m.content).join('')).toBe('Hello World!\n');
-    });
-
-    it('should detect and handle message gaps', async () => {
-      const messages: any[] = [];
-      let lastSeq = 0;
-      const gaps: number[] = [];
-
-      const addMessage = (message: any) => {
-        if (lastSeq > 0 && message.seq !== lastSeq + 1) {
-          gaps.push(message.seq);
-        }
-        messages.push(message);
-        lastSeq = message.seq;
-      };
-
-      addMessage({ seq: 1, content: 'a' });
-      addMessage({ seq: 2, content: 'b' });
-      addMessage({ seq: 5, content: 'e' }); // Gap!
-      addMessage({ seq: 6, content: 'f' });
-
-      expect(gaps).toContain(5);
-    });
-
-    it('should handle large output without freezing', async () => {
-      const largeOutput = 'x'.repeat(100000);
-      const messages: any[] = [];
-
-      const startTime = Date.now();
-
-      // Simulate processing large output
-      for (let i = 0; i < 100; i++) {
-        messages.push({
-          type: 'output',
-          content: largeOutput.substring(i * 1000, (i + 1) * 1000),
-          seq: i + 1,
-        });
-      }
-
-      const endTime = Date.now();
-
-      expect(messages).toHaveLength(100);
-      expect(endTime - startTime).toBeLessThan(1000); // Should complete in < 1s
-    });
-  });
-
-  describe('Input Sending', () => {
-    it('should send input to CLI via realtime channel', async () => {
-      const sessionId = 'session-123';
-      const inputContent = 'y\n';
-
-      await mockChannel.send({
-        type: 'broadcast',
-        event: 'input',
-        payload: {
-          type: 'input',
-          content: inputContent,
-          timestamp: Date.now(),
-          seq: 1,
-        },
-      });
-
-      expect(mockChannel.send).toHaveBeenCalledWith(
+      // Assert
+      expect(error).toBeNull();
+      expect(data).toHaveLength(1);
+      expect(data[0]).toEqual(
         expect.objectContaining({
-          event: 'input',
-          payload: expect.objectContaining({
-            content: inputContent,
-          }),
-        })
+          id: 'session-1',
+          status: 'active',
+        }),
       );
     });
 
-    it('should send quick action inputs correctly', async () => {
+    it('handles an empty sessions list without error', async () => {
+      // Arrange
+      const mockSupabase = createMockSupabase({ sessionsData: [] });
+
+      // Act
+      const { data, error } = await mockSupabase
+        .from('sessions')
+        .select('*')
+        .order('started_at', { ascending: false });
+
+      // Assert
+      expect(error).toBeNull();
+      expect(data).toEqual([]);
+    });
+
+    it('returns error object when query fails', async () => {
+      // Arrange
+      const mockSupabase = createMockSupabase({
+        sessionsError: { message: 'permission denied' },
+      });
+
+      // Act
+      const { data, error } = await mockSupabase
+        .from('sessions')
+        .select('*')
+        .order('started_at', { ascending: false });
+
+      // Assert
+      expect(error).toBeDefined();
+      expect(error.message).toBe('permission denied');
+    });
+  });
+
+  describe('Terminal Connection Behavior', () => {
+    it('REALTIME_CHANNELS.sessionOutput produces the correct channel name', () => {
+      // Act
+      const channelName = REALTIME_CHANNELS.sessionOutput('abc-123');
+
+      // Assert
+      expect(channelName).toBe('session:abc-123:output');
+    });
+
+    it('REALTIME_CHANNELS.sessionInput produces the correct channel name', () => {
+      // Act
+      const channelName = REALTIME_CHANNELS.sessionInput('abc-123');
+
+      // Assert
+      expect(channelName).toBe('session:abc-123:input');
+    });
+
+    it('REALTIME_CHANNELS.sessionPresence produces the correct channel name', () => {
+      // Act
+      const channelName = REALTIME_CHANNELS.sessionPresence('abc-123');
+
+      // Assert
+      expect(channelName).toBe('session:abc-123:presence');
+    });
+
+    it('messages with sequential seq values maintain ordering', () => {
+      // Arrange
+      const messages = [
+        { type: 'output', content: 'Hello', seq: 1, timestamp: 1000 },
+        { type: 'output', content: ' World', seq: 2, timestamp: 1001 },
+        { type: 'output', content: '!\n', seq: 3, timestamp: 1002 },
+      ];
+
+      // Act
+      const sorted = [...messages].sort((a, b) => a.seq - b.seq);
+
+      // Assert
+      expect(sorted.map((m) => m.seq)).toEqual([1, 2, 3]);
+      expect(sorted.map((m) => m.content).join('')).toBe('Hello World!\n');
+    });
+
+    it('out-of-order messages can be reordered by seq', () => {
+      // Arrange
+      const messages = [
+        { seq: 3, content: 'c' },
+        { seq: 1, content: 'a' },
+        { seq: 2, content: 'b' },
+      ];
+
+      // Act
+      const sorted = [...messages].sort((a, b) => a.seq - b.seq);
+
+      // Assert
+      expect(sorted.map((m) => m.content)).toEqual(['a', 'b', 'c']);
+    });
+  });
+
+  describe('Input Sending Behavior', () => {
+    it('quick action values have the correct escape sequences', () => {
+      // These are the quick actions used in the mobile terminal UI
       const quickActions = [
         { label: 'y', value: 'y\n' },
         { label: 'n', value: 'n\n' },
@@ -219,116 +176,88 @@ describe('Mobile to Realtime Integration', () => {
         { label: 'Tab', value: '\t' },
       ];
 
-      for (const action of quickActions) {
-        await mockChannel.send({
-          type: 'broadcast',
-          event: 'input',
-          payload: {
-            type: 'input',
-            content: action.value,
-            timestamp: Date.now(),
-            seq: 1,
-          },
-        });
-      }
-
-      expect(mockChannel.send).toHaveBeenCalledTimes(5);
+      // Assert each action produces valid string content
+      expect(quickActions.find((a) => a.label === 'Ctrl+C')!.value).toBe('\x03');
+      expect(quickActions.find((a) => a.label === 'Tab')!.value).toBe('\t');
+      expect(quickActions.find((a) => a.label === 'Enter')!.value).toBe('\n');
+      expect(quickActions.find((a) => a.label === 'y')!.value).toBe('y\n');
+      expect(quickActions.find((a) => a.label === 'n')!.value).toBe('n\n');
     });
 
-    it('should not send input when disconnected', async () => {
-      const state = 'disconnected';
+    it('quick action values are JSON-serializable', () => {
+      const specialValues = ['\x03', '\x04', '\t', '\n', '\x1b[A', '\x1b[B'];
 
-      const sendInput = async (content: string) => {
-        if (state !== 'connected') {
-          throw new Error('Not connected');
-        }
-        await mockChannel.send({ type: 'broadcast', event: 'input', payload: { content } });
-      };
-
-      await expect(sendInput('test')).rejects.toThrow('Not connected');
+      for (const value of specialValues) {
+        const payload = { type: 'input', content: value, timestamp: Date.now(), seq: 1 };
+        expect(() => JSON.stringify(payload)).not.toThrow();
+        expect(JSON.parse(JSON.stringify(payload)).content).toBe(value);
+      }
     });
   });
 
   describe('Authentication Flow', () => {
-    it('should sign in user successfully', async () => {
+    it('signInWithPassword returns user data on success', async () => {
+      // Arrange
+      const mockSupabase = createMockSupabase();
+
+      // Act
       const { data, error } = await mockSupabase.auth.signInWithPassword({
         email: 'test@example.com',
         password: 'password123',
       });
 
+      // Assert
       expect(error).toBeNull();
       expect(data.user).toBeDefined();
       expect(data.user.email).toBe('test@example.com');
     });
 
-    it('should handle sign in failure', async () => {
-      mockSupabase.auth.signInWithPassword = vi.fn().mockResolvedValue({
-        data: { user: null, session: null },
-        error: { message: 'Invalid credentials' },
+    it('signInWithPassword returns error message on invalid credentials', async () => {
+      // Arrange
+      const mockSupabase = createMockSupabase({
+        signInWithPassword: vi.fn().mockResolvedValue({
+          data: { user: null, session: null },
+          error: { message: 'Invalid login credentials' },
+        }),
       });
 
+      // Act
       const { data, error } = await mockSupabase.auth.signInWithPassword({
         email: 'wrong@example.com',
         password: 'wrong',
       });
 
+      // Assert
       expect(error).toBeDefined();
-      expect(error.message).toBe('Invalid credentials');
+      expect(error.message).toBe('Invalid login credentials');
+      expect(data.user).toBeNull();
     });
 
-    it('should sign out and clear session', async () => {
+    it('signOut completes without error', async () => {
+      // Arrange
+      const mockSupabase = createMockSupabase();
+
+      // Act
       const { error } = await mockSupabase.auth.signOut();
 
+      // Assert
       expect(error).toBeNull();
-      expect(mockSupabase.auth.signOut).toHaveBeenCalled();
     });
 
-    it('should redirect to login when not authenticated', async () => {
-      mockSupabase.auth.getSession = vi.fn().mockResolvedValue({
-        data: { session: null },
-        error: null,
+    it('getSession returns null session when not authenticated', async () => {
+      // Arrange
+      const mockSupabase = createMockSupabase({
+        getSession: vi.fn().mockResolvedValue({
+          data: { session: null },
+          error: null,
+        }),
       });
 
+      // Act
       const { data } = await mockSupabase.auth.getSession();
 
+      // Assert
       expect(data.session).toBeNull();
-      // In real app, this would trigger redirect to login
-    });
-  });
-
-  describe('Connection State Management', () => {
-    it('should track connection state correctly', async () => {
-      const states: string[] = [];
-      let currentState = 'disconnected';
-
-      const setState = (state: string) => {
-        states.push(state);
-        currentState = state;
-      };
-
-      // Simulate connection flow
-      setState('connecting');
-      await new Promise((r) => setTimeout(r, 10));
-      setState('connected');
-
-      expect(states).toEqual(['connecting', 'connected']);
-      expect(currentState).toBe('connected');
-    });
-
-    it('should handle reconnection attempts', async () => {
-      const states: string[] = [];
-
-      const simulateReconnection = async () => {
-        states.push('disconnected');
-        states.push('reconnecting');
-        await new Promise((r) => setTimeout(r, 10));
-        states.push('connected');
-      };
-
-      await simulateReconnection();
-
-      expect(states).toContain('reconnecting');
-      expect(states[states.length - 1]).toBe('connected');
     });
   });
 });
