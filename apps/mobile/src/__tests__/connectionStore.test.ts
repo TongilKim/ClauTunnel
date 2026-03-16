@@ -608,6 +608,44 @@ describe('ConnectionStore — Real Behavior', () => {
       expect(state.isTyping).toBe(true);
     });
 
+    it('sends input message via realtime channel', async () => {
+      const useStore = await getStore();
+      await connectStore(useStore);
+      mockSend.mockClear();
+
+      await useStore.getState().sendInput('Hello Claude');
+
+      expect(mockSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'broadcast',
+          event: 'input',
+          payload: expect.objectContaining({
+            type: 'input',
+            content: 'Hello Claude',
+          }),
+        }),
+      );
+    });
+
+    it('persists input message to database', async () => {
+      const useStore = await getStore();
+      await connectStore(useStore);
+
+      await useStore.getState().sendInput('Hello Claude');
+
+      expect(mockSupabase.from).toHaveBeenCalledWith('messages');
+    });
+
+    it('sets error when channel.send() fails', async () => {
+      const useStore = await getStore();
+      await connectStore(useStore);
+      mockSend.mockRejectedValueOnce(new Error('send failed'));
+
+      await useStore.getState().sendInput('Hello Claude');
+
+      expect(useStore.getState().error).toBe('Failed to send message');
+    });
+
     it('sets error when not connected', async () => {
       const useStore = await getStore();
       // Don't connect
