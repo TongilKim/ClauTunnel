@@ -7,7 +7,7 @@ import { getModelBadgeState } from '../utils/modelBadgeState';
 const sampleModels: ModelInfo[] = [
   { value: 'opus', displayName: 'Opus 4.6', description: 'Claude Opus 4.6 — most capable' },
   { value: 'haiku', displayName: 'Haiku 3.5', description: 'Claude Haiku 3.5 — fastest' },
-  { value: 'sonnet', displayName: 'Sonnet 4.5', description: 'Claude Sonnet 4.5 — balanced performance' },
+  { value: 'sonnet', displayName: 'Sonnet 4.6', description: 'Claude Sonnet 4.6 — balanced performance' },
 ];
 
 describe('getModelDisplayName', () => {
@@ -20,14 +20,14 @@ describe('getModelDisplayName', () => {
       expect(getModelDisplayName('haiku', sampleModels)).toBe('Haiku 3.5');
     });
 
-    it('should return "Sonnet 4.5" for model "sonnet"', () => {
-      expect(getModelDisplayName('sonnet', sampleModels)).toBe('Sonnet 4.5');
+    it('should return "Sonnet 4.6" for model "sonnet"', () => {
+      expect(getModelDisplayName('sonnet', sampleModels)).toBe('Sonnet 4.6');
     });
   });
 
   describe('returns correct display name for full model identifiers', () => {
-    it('should return "Sonnet 4.5" for full sonnet identifier', () => {
-      expect(getModelDisplayName('claude-sonnet-4-5-20250929', sampleModels)).toBe('Sonnet 4.5');
+    it('should return "Sonnet 4.6" for full sonnet identifier', () => {
+      expect(getModelDisplayName('claude-sonnet-4-6', sampleModels)).toBe('Sonnet 4.6');
     });
 
     it('should return "Opus 4.6" for full opus identifier', () => {
@@ -64,8 +64,8 @@ describe('getModelDisplayName', () => {
     });
 
     it('should resolve full sonnet identifier via sonnet shorthand entry', () => {
-      const result = getModelDisplayName('claude-sonnet-4-5-20250929', sampleModels);
-      expect(result).toBe('Sonnet 4.5');
+      const result = getModelDisplayName('claude-sonnet-4-6', sampleModels);
+      expect(result).toBe('Sonnet 4.6');
     });
 
     it('should resolve full haiku identifier via haiku shorthand entry', () => {
@@ -165,13 +165,13 @@ describe('getModelBadgeState', () => {
       });
       expect(during.showSpinner).toBe(true);
 
-      // After: Sonnet 4.5
+      // After: Sonnet 4.6
       const after = getModelBadgeState({
         model: 'sonnet',
         availableModels: sampleModels,
         isModelChanging: false,
       });
-      expect(after.displayText).toBe('Sonnet 4.5');
+      expect(after.displayText).toBe('Sonnet 4.6');
       expect(after.showSpinner).toBe(false);
     });
   });

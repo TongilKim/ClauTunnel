@@ -300,7 +300,7 @@ export class Daemon extends EventEmitter {
         if (previousModel !== message.model) {
           const modelNames: Record<string, string> = {
             'default': 'Opus 4.6',
-            'sonnet': 'Sonnet 4.5',
+            'sonnet': 'Sonnet 4.6',
             'opus': 'Opus 4.6',
             'haiku': 'Haiku 3.5',
           };
