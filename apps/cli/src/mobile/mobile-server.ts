@@ -156,6 +156,12 @@ export class MobileServerManager {
       // Clone with depth 1 and sparse checkout for apps/mobile only
       const repoDir = join(clautunnelDir, 'repo');
       if (existsSync(repoDir)) {
+        // Reset any local changes (e.g. pnpm-lock.yaml modified by install) before pulling
+        execSync('git checkout -- .', {
+          cwd: repoDir,
+          stdio: 'pipe',
+          timeout: 10000,
+        });
         // Pull latest
         execSync('git pull --ff-only', {
           cwd: repoDir,
