@@ -54,11 +54,49 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (initialUrl?.includes('code=') && session) {
         await supabase.auth.signOut({ scope: 'local' });
         set({ session: null, user: null, isPaired: false, isLoading: false });
+      } else if (session) {
+        // Session exists in SecureStore — check if the access token is expired.
+        // getSession() only reads from local storage and does not validate with
+        // the server, so after a long period (e.g. app rebuild hours later) the
+        // stored tokens may be stale. Force a refresh via setSession() which
+        // sends the refresh_token to Supabase and returns a new token pair.
+        const isExpired =
+          typeof session.expires_at === 'number' &&
+          session.expires_at < Math.floor(Date.now() / 1000);
+
+        if (isExpired) {
+          const { data: refreshed, error: refreshError } =
+            await supabase.auth.setSession({
+              access_token: session.access_token,
+              refresh_token: session.refresh_token,
+            });
+
+          if (refreshError || !refreshed.session) {
+            // Refresh failed — tokens are fully expired. Clean up and show
+            // the pairing screen so the user can re-pair.
+            await supabase.auth.signOut({ scope: 'local' });
+            set({ session: null, user: null, isPaired: false, isLoading: false });
+          } else {
+            set({
+              session: refreshed.session,
+              user: refreshed.session.user ?? null,
+              isPaired: true,
+              isLoading: false,
+            });
+          }
+        } else {
+          set({
+            session,
+            user: session.user ?? null,
+            isPaired: true,
+            isLoading: false,
+          });
+        }
       } else {
         set({
-          session,
-          user: session?.user ?? null,
-          isPaired: !!session,
+          session: null,
+          user: null,
+          isPaired: false,
           isLoading: false,
         });
       }
