@@ -20,6 +20,8 @@ import {
   type SleepPreventionState,
   type FullDiskAccessStatus,
 } from '../utils/sleep-prevention.js';
+import { existsSync } from 'fs';
+import { join, resolve } from 'path';
 import { MobileServerManager } from '../mobile/mobile-server.js';
 import { acquirePidFile, removePidFile } from '../utils/pid.js';
 import { checkClaudeCliAuth } from '../utils/claude-auth.js';
@@ -249,7 +251,16 @@ export function createStartCommand(): Command {
 
           const pairingCode = pairingData.code;
 
-          const mobileProjectPath = config.getMobileProjectPath();
+          let mobileProjectPath = config.getMobileProjectPath();
+
+          // Auto-detect local mobile project when running from within the monorepo
+          if (!mobileProjectPath) {
+            const siblingMobile = resolve(process.cwd(), '..', 'mobile');
+            if (existsSync(join(siblingMobile, 'package.json'))) {
+              mobileProjectPath = siblingMobile;
+            }
+          }
+
           mobileServer = new MobileServerManager({
             mobileProjectPath,
             supabaseUrl: config.getSupabaseUrl(),
