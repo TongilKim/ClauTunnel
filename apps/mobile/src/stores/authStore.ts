@@ -63,8 +63,36 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         clearCachedAuthTokens();
         set({ session: null, user: null, isPaired: false, isLoading: false });
       } else if (session) {
-        // Valid session from getSession() — use as-is
-        set({ session, user: session.user ?? null, isPaired: true, isLoading: false });
+        // Session exists — check if access_token is expired
+        const isExpired =
+          typeof session.expires_at === 'number' &&
+          session.expires_at < Math.floor(Date.now() / 1000);
+
+        if (isExpired) {
+          // Try to refresh the expired session synchronously
+          const { data: refreshed, error: refreshError } =
+            await supabase.auth.setSession({
+              access_token: session.access_token,
+              refresh_token: session.refresh_token,
+            });
+
+          if (!refreshError && refreshed.session) {
+            set({
+              session: refreshed.session,
+              user: refreshed.session.user ?? null,
+              isPaired: true,
+              isLoading: false,
+            });
+          } else {
+            // refresh_token also expired — re-pairing required
+            await supabase.auth.signOut({ scope: 'local' });
+            clearCachedAuthTokens();
+            set({ session: null, user: null, isPaired: false, isLoading: false });
+          }
+        } else {
+          // Valid session — use as-is
+          set({ session, user: session.user ?? null, isPaired: true, isLoading: false });
+        }
       } else {
         // getSession() returned null — Supabase's internal initialization may
         // have failed to refresh an expired token (e.g., network not ready on
@@ -85,6 +113,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           } else {
             // refresh_token also expired — re-pairing required (normal)
             await supabase.auth.signOut({ scope: 'local' });
+            clearCachedAuthTokens();
             set({ session: null, user: null, isPaired: false, isLoading: false });
           }
         } else {
@@ -215,6 +244,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (error) throw error;
 
       await clearLastRedeemedCode();
+      clearCachedAuthTokens();
 
       set({
         session: null,

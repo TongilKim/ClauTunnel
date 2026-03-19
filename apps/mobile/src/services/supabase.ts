@@ -43,6 +43,9 @@ const SecureStoreAdapter = {
   removeItem: async (key: string): Promise<void> => {
     try {
       await SecureStore.deleteItemAsync(key);
+      if (key.endsWith('-auth-token')) {
+        _cachedAuthTokens = null;
+      }
     } catch {
       // Silently fail on web
     }

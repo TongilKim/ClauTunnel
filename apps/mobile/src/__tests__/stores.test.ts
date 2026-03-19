@@ -441,6 +441,94 @@ describe('Store Logic', () => {
         expect(state.isLoading).toBe(false);
       });
 
+      it('should refresh expired session and set isPaired true on success', async () => {
+        const { supabase } = await import('../services/supabase');
+        const mockGetSession = vi.mocked(supabase.auth.getSession);
+        const mockSetSession = vi.mocked(supabase.auth.setSession);
+        const mockOnAuthStateChange = vi.mocked(supabase.auth.onAuthStateChange);
+
+        const expiredSession = {
+          access_token: 'expired-token',
+          refresh_token: 'valid-refresh',
+          expires_at: Math.floor(Date.now() / 1000) - 3600,
+          user: { id: 'user-1', email: 'test@test.com' },
+        };
+
+        const refreshedSession = {
+          access_token: 'new-token',
+          refresh_token: 'new-refresh',
+          expires_at: Math.floor(Date.now() / 1000) + 3600,
+          user: { id: 'user-1', email: 'test@test.com' },
+        };
+
+        mockGetSession.mockResolvedValue({
+          data: { session: expiredSession },
+          error: null,
+        } as any);
+
+        mockSetSession.mockResolvedValue({
+          data: { session: refreshedSession, user: refreshedSession.user },
+          error: null,
+        } as any);
+
+        mockOnAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } } as any);
+
+        vi.resetModules();
+        const { useAuthStore } = await import('../stores/authStore');
+        const store = useAuthStore.getState();
+        await store.initialize();
+
+        expect(mockSetSession).toHaveBeenCalledWith({
+          access_token: 'expired-token',
+          refresh_token: 'valid-refresh',
+        });
+
+        const state = useAuthStore.getState();
+        expect(state.isPaired).toBe(true);
+        expect(state.session).toBe(refreshedSession);
+        expect(state.isLoading).toBe(false);
+      });
+
+      it('should sign out when expired session refresh fails', async () => {
+        const { supabase } = await import('../services/supabase');
+        const mockGetSession = vi.mocked(supabase.auth.getSession);
+        const mockSetSession = vi.mocked(supabase.auth.setSession);
+        const mockSignOut = vi.mocked(supabase.auth.signOut);
+        const mockOnAuthStateChange = vi.mocked(supabase.auth.onAuthStateChange);
+
+        const expiredSession = {
+          access_token: 'expired-token',
+          refresh_token: 'expired-refresh',
+          expires_at: Math.floor(Date.now() / 1000) - 3600,
+          user: { id: 'user-1', email: 'test@test.com' },
+        };
+
+        mockGetSession.mockResolvedValue({
+          data: { session: expiredSession },
+          error: null,
+        } as any);
+
+        mockSetSession.mockResolvedValue({
+          data: { session: null, user: null },
+          error: new Error('Refresh token expired'),
+        } as any);
+
+        mockSignOut.mockResolvedValue({ error: null } as any);
+        mockOnAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } } as any);
+
+        vi.resetModules();
+        const { useAuthStore } = await import('../stores/authStore');
+        const store = useAuthStore.getState();
+        await store.initialize();
+
+        expect(mockSignOut).toHaveBeenCalledWith({ scope: 'local' });
+
+        const state = useAuthStore.getState();
+        expect(state.isPaired).toBe(false);
+        expect(state.session).toBeNull();
+        expect(state.isLoading).toBe(false);
+      });
+
       it('should set isPaired true when existing session found', async () => {
         const { supabase } = await import('../services/supabase');
         const mockGetSession = vi.mocked(supabase.auth.getSession);
