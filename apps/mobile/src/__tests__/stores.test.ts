@@ -622,6 +622,46 @@ describe('Store Logic', () => {
         vi.mocked(getLastRedeemedCode).mockResolvedValue(null);
       });
 
+      it('should skip cached token recovery when new pairing code is present', async () => {
+        const { supabase, getLastRedeemedCode } = await import('../services/supabase');
+        const mockGetSession = vi.mocked(supabase.auth.getSession);
+        const mockSetSession = vi.mocked(supabase.auth.setSession);
+        const mockOnAuthStateChange = vi.mocked(supabase.auth.onAuthStateChange);
+
+        // getSession returns null (cold start timing)
+        mockGetSession.mockResolvedValue({
+          data: { session: null },
+          error: null,
+        } as any);
+
+        // Old cached tokens exist and could be recovered
+        mockGetCachedAuthTokens.mockReturnValue({
+          access_token: 'old-token',
+          refresh_token: 'old-refresh',
+        });
+
+        // New code — not the same as last redeemed
+        vi.mocked(getLastRedeemedCode).mockResolvedValue('old-code');
+        mockSetSession.mockClear();
+        mockOnAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } } as any);
+
+        vi.resetModules();
+        const { useAuthStore } = await import('../stores/authStore');
+        const store = useAuthStore.getState();
+        await store.initialize('clautunnel://pair?code=new-code');
+
+        // Should NOT have tried to recover old session via setSession
+        expect(mockSetSession).not.toHaveBeenCalled();
+
+        const state = useAuthStore.getState();
+        // Should be unpaired, ready for new pair flow
+        expect(state.isPaired).toBe(false);
+        expect(state.session).toBeNull();
+
+        mockGetCachedAuthTokens.mockReturnValue(null);
+        vi.mocked(getLastRedeemedCode).mockResolvedValue(null);
+      });
+
       it('should register onAuthStateChange listener', async () => {
         const { supabase } = await import('../services/supabase');
         const mockGetSession = vi.mocked(supabase.auth.getSession);

@@ -58,8 +58,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const lastRedeemed = codeFromUrl ? await getLastRedeemedCode() : null;
       const isNewPairingCode = codeFromUrl && codeFromUrl !== lastRedeemed;
 
-      if (isNewPairingCode && session) {
-        await supabase.auth.signOut({ scope: 'local' });
+      if (isNewPairingCode) {
+        // New QR code scanned — clear old session/tokens so pair flow proceeds
+        if (session) {
+          await supabase.auth.signOut({ scope: 'local' });
+        }
         clearCachedAuthTokens();
         set({ session: null, user: null, isPaired: false, isLoading: false });
       } else if (session) {
