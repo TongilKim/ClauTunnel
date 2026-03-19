@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '../services/supabase';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY, getCachedAuthTokens, clearCachedAuthTokens, getLastRedeemedCode, setLastRedeemedCode, clearLastRedeemedCode } from '../services/supabase';
 import type { User, Session } from '@supabase/supabase-js';
 import {
   isTestMode,
@@ -45,22 +45,52 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         error,
       } = await supabase.auth.getSession();
 
+
       if (error) throw error;
 
-      // If app was opened with a pairing code and already has a session,
+      // If app was opened with a NEW pairing code and already has a session,
       // sign out the old session so re-pairing can proceed.
-      // This must happen before isLoading is set to false to prevent
-      // routing from redirecting to tabs with the stale session.
-      if (initialUrl?.includes('code=') && session) {
+      // Expo Go caches the initial URL, so on cold restart the same code=
+      // from the previous QR scan is returned. We skip re-pairing if the
+      // code was already redeemed to avoid signing out a valid session.
+      const codeMatch = initialUrl?.match(/[?&]code=([^&]+)/);
+      const codeFromUrl = codeMatch?.[1] ?? null;
+      const lastRedeemed = codeFromUrl ? await getLastRedeemedCode() : null;
+      const isNewPairingCode = codeFromUrl && codeFromUrl !== lastRedeemed;
+
+      if (isNewPairingCode && session) {
         await supabase.auth.signOut({ scope: 'local' });
+        clearCachedAuthTokens();
         set({ session: null, user: null, isPaired: false, isLoading: false });
+      } else if (session) {
+        // Valid session from getSession() — use as-is
+        set({ session, user: session.user ?? null, isPaired: true, isLoading: false });
       } else {
-        set({
-          session,
-          user: session?.user ?? null,
-          isPaired: !!session,
-          isLoading: false,
-        });
+        // getSession() returned null — Supabase's internal initialization may
+        // have failed to refresh an expired token (e.g., network not ready on
+        // cold start) and already removed it from SecureStore. Try to recover
+        // using the tokens we cached during the initial SecureStore read.
+        const cached = getCachedAuthTokens();
+        if (cached) {
+          const { data: refreshed, error: refreshError } =
+            await supabase.auth.setSession(cached);
+
+          if (!refreshError && refreshed.session) {
+            set({
+              session: refreshed.session,
+              user: refreshed.session.user ?? null,
+              isPaired: true,
+              isLoading: false,
+            });
+          } else {
+            // refresh_token also expired — re-pairing required (normal)
+            await supabase.auth.signOut({ scope: 'local' });
+            set({ session: null, user: null, isPaired: false, isLoading: false });
+          }
+        } else {
+          // No tokens at all (first run or fully cleared)
+          set({ session: null, user: null, isPaired: false, isLoading: false });
+        }
       }
 
       // Listen for auth changes (token refresh, re-pairing, etc.)
@@ -149,6 +179,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         throw new Error('No session returned from verification');
       }
 
+      await setLastRedeemedCode(code);
+
       set({
         session: verifyData.session,
         user: verifyData.user,
@@ -181,6 +213,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { error } = await supabase.auth.signOut({ scope: 'local' });
 
       if (error) throw error;
+
+      await clearLastRedeemedCode();
 
       set({
         session: null,
